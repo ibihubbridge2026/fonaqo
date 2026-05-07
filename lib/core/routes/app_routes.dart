@@ -25,4 +25,10 @@ abstract final class AppRoutes {
 
   /// Mission detail (route empilée).
   static const String missionDetail = '/mission-detail';
+
+  /// Détail événement (route empilée).
+  static const String eventDetail = '/event-detail';
+
+  /// Ouvrir un litige (route empilée).
+  static const String litige = '/litige';
 }

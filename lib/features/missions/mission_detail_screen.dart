@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../widgets/custom_app_bar.dart';
+import 'widgets/step_5_tracking_view.dart';
 
 class MissionDetailScreen extends StatelessWidget {
   const MissionDetailScreen({super.key});
@@ -7,13 +8,33 @@ class MissionDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFDF0),
-      appBar: CustomAppBar.detailStack(detailTitleWidget: Text("Détails de la mission")),
+      backgroundColor: const Color(0xFFF9F9F9),
+      appBar: const CustomAppBar.detailStack(
+        detailTitleWidget: Text("Détails de la mission", style: TextStyle(fontWeight: FontWeight.w900)),
+      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Image de contexte (avant le lieu)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Image.asset(
+                  'assets/images/hero/img-2.jpg',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: Colors.grey[200],
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.image_not_supported_outlined, color: Colors.grey, size: 48),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
             // Status Badge
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -54,17 +75,58 @@ class MissionDetailScreen extends StatelessWidget {
             _buildInfoTile("Montant bloqué", "2 500 CFA"),
             _buildInfoTile("Heure de début", "14:30"),
             
-            const SizedBox(height: 40),
-            
-            ElevatedButton(
+            const SizedBox(height: 24),
+
+            // Tracking + actions
+            const Text("Suivi", style: TextStyle(fontWeight: FontWeight.w900)),
+            const SizedBox(height: 10),
+            Step5TrackingView(
+              onBackToMissions: () {},
+              showBackButton: false,
+            ),
+            const SizedBox(height: 18),
+            const Text("Actions", style: TextStyle(fontWeight: FontWeight.w900)),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.black,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 54),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
+                    ),
+                    child: const Text("LIBÉRER L'ARGENT", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {},
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFD400),
+                      foregroundColor: Colors.black,
+                      minimumSize: const Size(double.infinity, 54),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
+                    ),
+                    child: const Text("FINALISER", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
               onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                minimumSize: const Size(double.infinity, 60),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 54),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              child: const Text("APPELER L'AGENT", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-            )
+              child: const Text("APPELER L'AGENT", style: TextStyle(fontWeight: FontWeight.w900)),
+            ),
           ],
         ),
       ),

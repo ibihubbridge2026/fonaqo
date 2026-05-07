@@ -12,11 +12,15 @@ import 'main_navigation_bar.dart';
 class MainShellScope extends InheritedWidget {
   final int currentIndex;
   final ValueChanged<int> setIndex;
+  final VoidCallback openCreateMission;
+  final VoidCallback closeCreateMission;
 
   const MainShellScope({
     super.key,
     required this.currentIndex,
     required this.setIndex,
+    required this.openCreateMission,
+    required this.closeCreateMission,
     required super.child,
   });
 
@@ -38,30 +42,19 @@ class MainWrapper extends StatefulWidget {
 
 class _MainWrapperState extends State<MainWrapper> {
   int _currentIndex = 0;
+  final ValueNotifier<bool> _showCreateMission = ValueNotifier<bool>(false);
 
   late final List<Widget> _pages = [
     HomeScreen(),
-    MissionsScreen(),
+    MissionsScreen(showCreateMissionListenable: _showCreateMission),
     AgentsScreen(),
     EventsScreen(),
     ProfileScreen(),
   ];  
 
   PreferredSizeWidget _appBarForIndex() {
-    switch (_currentIndex) {
-      case 0:
-        return const CustomAppBar.mainShellHome();
-      case 1:
-        return const CustomAppBar.mainShellSection(sectionTitle: 'Missions');
-      case 2:
-        return const CustomAppBar.mainShellSection(sectionTitle: 'Agents');
-      case 3:
-        return const CustomAppBar.mainShellSection(sectionTitle: 'Événements');  
-      case 4:
-        return const CustomAppBar.mainShellSection(sectionTitle: 'Profil');
-      default:
-        return const CustomAppBar.mainShellHome();
-    }
+    // Demande: mêmes header pour Missions/Agents/Événements/Profil que pour Home.
+    return const CustomAppBar.mainShellHome();
   }
 
   @override
@@ -73,6 +66,8 @@ class _MainWrapperState extends State<MainWrapper> {
           _currentIndex = index;
         });
       },
+      openCreateMission: () => _showCreateMission.value = true,
+      closeCreateMission: () => _showCreateMission.value = false,
       child: Scaffold(
         backgroundColor: const Color(0xFFF9F9F9),
         appBar: _appBarForIndex(),

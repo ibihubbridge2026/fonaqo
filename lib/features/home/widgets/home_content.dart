@@ -69,7 +69,15 @@ class _HomeContentState extends State<HomeContent> {
         ),
         const SizedBox(height: 25),
         PrimaryCreateMissionPanel(
-          onPressed: () => Navigator.pushNamed(context, AppRoutes.createMission),
+          onPressed: () {
+            if (shell != null) {
+              shell.setIndex(1);
+              shell.openCreateMission();
+              return;
+            }
+            // Fallback si le contenu est utilisé hors shell.
+            Navigator.pushNamed(context, AppRoutes.createMission);
+          },
         ),
         SectionTitleStrip(
           title: 'Missions en cours',
@@ -320,7 +328,7 @@ class ReportLitigeCardPanel extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () {},
+              onPressed: () => Navigator.pushNamed(context, AppRoutes.litige),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFFD400),
                 foregroundColor: Colors.black,

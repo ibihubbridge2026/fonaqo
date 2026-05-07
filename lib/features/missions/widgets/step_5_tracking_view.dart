@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
 
 class Step5TrackingView extends StatelessWidget {
-  const Step5TrackingView({super.key});
+  /// Appelée lorsque l’utilisateur veut revenir à la liste des missions (dans le shell).
+  final VoidCallback onBackToMissions;
+
+  /// Affiche le bouton bas (retour menu) si true.
+  final bool showBackButton;
+
+  const Step5TrackingView({
+    super.key,
+    required this.onBackToMissions,
+    this.showBackButton = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -61,16 +71,18 @@ class Step5TrackingView extends StatelessWidget {
           ],
         ),
 
-        const SizedBox(height: 40),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.black,
-            minimumSize: const Size(double.infinity, 60),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        if (showBackButton) ...[
+          const SizedBox(height: 40),
+          ElevatedButton(
+            onPressed: onBackToMissions,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black,
+              minimumSize: const Size(double.infinity, 60),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            ),
+            child: const Text("MENU PRINCIPAL", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
           ),
-          child: const Text("MENU PRINCIPAL", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-        )
+        ],
       ],
     );
   }

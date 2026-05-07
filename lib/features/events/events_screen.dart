@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routes/app_routes.dart';
+
 class EventsScreen extends StatelessWidget {
   const EventsScreen({super.key});
 
@@ -20,6 +22,7 @@ class EventsScreen extends StatelessWidget {
           "Palais de la Culture",
           "File d'attente",
           "assets/images/events/event-wle.webp", // Exemple d'image locale
+          context,
         ),
         _buildEventCard(
           "Festi Chill",
@@ -27,28 +30,42 @@ class EventsScreen extends StatelessWidget {
           "Hôtel Ivoire",
           "En attente",
           "assets/images/events/event-vd.jpg",
+          context,
         ),
       ],
     );
   }
 
   Widget _buildEventCard(
-      String title, String date, String place, String status, String imagePath) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          )
-        ],
+      String title, String date, String place, String status, String imagePath, BuildContext context) {
+    return InkWell(
+      onTap: () => Navigator.pushNamed(
+        context,
+        AppRoutes.eventDetail,
+        arguments: {
+          'title': title,
+          'date': date,
+          'place': place,
+          'status': status,
+          'imagePath': imagePath,
+        },
       ),
-      child: Column(
-        children: [
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            )
+          ],
+        ),
+        child: Column(
+          children: [
           // --- ZONE IMAGE ---
           Container(
             height: 160, // Augmenté un peu pour mieux voir l'image
@@ -137,7 +154,8 @@ class EventsScreen extends StatelessWidget {
               ],
             ),
           )
-        ],
+          ],
+        ),
       ),
     );
   }
