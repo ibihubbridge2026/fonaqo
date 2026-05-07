@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Barre de navigation inférieure du shell principal.
 ///
-/// [currentIndex]: index de l'onglet actif (0 = accueil, suivi missions / tickets / profil).
+/// [currentIndex]: index de l'onglet actif (0 = accueil, suivi missions / Agents / profil).
 ///
 /// [onTap]: invoquée avec le nouvel index lorsqu'un utilisateur sélectionne un onglet.
 class MainNavigationBar extends StatelessWidget {
@@ -47,12 +47,19 @@ class MainNavigationBar extends StatelessWidget {
           _NavItem(
             index: 2,
             currentIndex: currentIndex,
-            icon: Icons.confirmation_number_rounded,
-            label: 'Tickets',
+            icon: Icons.group_work,
+            label: 'Agents',
             onTap: onTap,
           ),
           _NavItem(
             index: 3,
+            currentIndex: currentIndex,
+            icon: Icons.event_rounded,
+            label: 'Événements',
+            onTap: onTap,
+          ),
+          _NavItem(
+            index: 4,
             currentIndex: currentIndex,
             icon: Icons.person_rounded,
             label: 'Profil',

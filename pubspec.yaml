@@ -30,7 +30,8 @@ flutter:
     - assets/icon/fonaco.png
     - assets/images/slide/
     - assets/images/hero/
-    - assets/images/avatar/user.png
+    - assets/images/avatar/
+    - assets/images/events/
 #CONFIG ICON APP (IMPORTANT: ICI ET PAS DANS DEPENDENCIES)
 flutter_launcher_icons:
   android: true

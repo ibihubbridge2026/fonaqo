@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/routes/app_routes.dart';
+import '../../../widgets/main_wrapper.dart';
+
 /// Bloc corps de page d’accueil (carrousel auto, missions, suggestions, litige).
 /// Contient le [PageController], le métronome pour le slider et la liste des slides.
 ///
@@ -52,6 +55,7 @@ class _HomeContentState extends State<HomeContent> {
   @override
   Widget build(BuildContext context) {
     final bottomReserve = MediaQuery.paddingOf(context).bottom + 12;
+    final shell = MainShellScope.maybeOf(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,14 +68,23 @@ class _HomeContentState extends State<HomeContent> {
           assetPaths: _heroAssets,
         ),
         const SizedBox(height: 25),
-        const PrimaryCreateMissionPanel(),
-        const SectionTitleStrip(title: 'Missions en cours'),
+        PrimaryCreateMissionPanel(
+          onPressed: () => Navigator.pushNamed(context, AppRoutes.createMission),
+        ),
+        SectionTitleStrip(
+          title: 'Missions en cours',
+          onSeeAllPressed: shell == null ? null : () => shell.setIndex(1),
+        ),
         const SizedBox(height: 12),
         const OngoingMissionStrip(),
         const SizedBox(height: 25),
-        const SectionTitleStrip(title: 'Suggestions', showSeeAll: false),
+        SectionTitleStrip(
+          title: 'Suggestions d\'agents',
+          showSeeAll: true,
+          onSeeAllPressed: shell == null ? null : () => shell.setIndex(2),
+        ),
         const SizedBox(height: 12),
-        const CategorySuggestionGrid(),
+        const AgentSuggestionSlider(),
         const SizedBox(height: 25),
         const SectionTitleStrip(title: 'Historique rapide'),
         const SizedBox(height: 10),
@@ -197,14 +210,17 @@ class HeroCarouselSlide extends StatelessWidget {
 
 /// Bouton primaire création de mission.
 class PrimaryCreateMissionPanel extends StatelessWidget {
-  const PrimaryCreateMissionPanel({super.key});
+  /// Callback déclenchée lorsque l’utilisateur veut créer une mission.
+  final VoidCallback? onPressed;
+
+  const PrimaryCreateMissionPanel({super.key, this.onPressed});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
       child: ElevatedButton.icon(
-        onPressed: () {},
+        onPressed: onPressed,
         icon: const Icon(Icons.add_circle, size: 22),
         label: const Text(
           'CRÉER UNE MISSION',
@@ -226,11 +242,13 @@ class PrimaryCreateMissionPanel extends StatelessWidget {
 class SectionTitleStrip extends StatelessWidget {
   final String title;
   final bool showSeeAll;
+  final VoidCallback? onSeeAllPressed;
 
   const SectionTitleStrip({
     super.key,
     required this.title,
     this.showSeeAll = true,
+    this.onSeeAllPressed,
   });
 
   @override
@@ -243,7 +261,7 @@ class SectionTitleStrip extends StatelessWidget {
           Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
           if (showSeeAll)
             TextButton(
-              onPressed: () {},
+              onPressed: onSeeAllPressed,
               child: const Text(
                 'Voir tous',
                 style: TextStyle(color: Color(0xFF715D00), fontWeight: FontWeight.bold),
@@ -319,37 +337,194 @@ class ReportLitigeCardPanel extends StatelessWidget {
   }
 }
 
-/// Grille synthétique de catégories de services pour le demandeur.
-class CategorySuggestionGrid extends StatelessWidget {
-  const CategorySuggestionGrid({super.key});
+/// Liste horizontale des profils d'agents certifiés.
+class AgentSuggestionSlider extends StatefulWidget {
+  const AgentSuggestionSlider({super.key});
+
+  @override
+  State<AgentSuggestionSlider> createState() => _AgentSuggestionSliderState();
+}
+
+class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
+  final ScrollController _scrollController = ScrollController();
+  Timer? _autoScrollTimer;
+
+  static const double _cardStep = 175;
+
+  @override
+  void initState() {
+    super.initState();
+    // Demande: slider qui défile de droite vers gauche en boucle sans arrêt.
+    _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 1400), _onTick);
+  }
+
+  void _onTick(Timer timer) {
+    if (!_scrollController.hasClients) return;
+    final max = _scrollController.position.maxScrollExtent;
+    final next = _scrollController.offset + _cardStep;
+
+    if (next >= max) {
+      _scrollController.jumpTo(0);
+      return;
+    }
+
+    _scrollController.animateTo(
+      next,
+      duration: const Duration(milliseconds: 650),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _autoScrollTimer?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 3,
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      children: const [
-        CategorySuggestionTile(label: 'Banque', icon: Icons.account_balance_rounded),
-        CategorySuggestionTile(label: 'Admin', icon: Icons.description_rounded),
-        CategorySuggestionTile(label: 'Courses', icon: Icons.shopping_bag_rounded),
-        CategorySuggestionTile(label: 'Tickets', icon: Icons.confirmation_number_rounded),
-        CategorySuggestionTile(label: 'Resto', icon: Icons.restaurant_rounded),
-        CategorySuggestionTile(label: 'Santé', icon: Icons.medical_services_rounded),
-      ],
+    // Simulation de données agents (à remplacer plus tard par une API)
+    final List<Map<String, String>> agents = [
+      {
+        'name': 'Marc-Antoine',
+        'role': 'Polyvalent',
+        'image': 'assets/images/avatar/agent1.jpg',
+      },
+      {
+        'name': 'Pauline C.',
+        'role': 'Conciergerie & Courses',
+        'image': 'assets/images/avatar/agent2.avif',
+      },
+      {
+        'name': 'Thomas L.',
+        'role': 'Assistant de maison',
+        'image': 'assets/images/avatar/agent3.png',
+      },
+    ];
+
+    return SizedBox(
+      height: 200, // Hauteur ajustée pour les cartes agents
+      child: ListView.builder(
+        controller: _scrollController,
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: agents.length * 20,
+        itemBuilder: (context, index) {
+          final agent = agents[index % agents.length];
+          return AgentCard(
+            name: agent['name']!,
+            role: agent['role']!,
+            imagePath: agent['image']!,
+          );
+        },
+      ),
     );
   }
 }
 
-/// Tuile pastel pour suggestion de catégorie.
-class CategorySuggestionTile extends StatelessWidget {
+  /// Carte individuelle d'un agent avec badge de certification.
+  class AgentCard extends StatelessWidget {
+    final String name;
+    final String role;
+    final String imagePath;
+
+    const AgentCard({
+      super.key,
+      required this.name,
+      required this.role,
+      required this.imagePath,
+    });
+
+    @override
+    Widget build(BuildContext context) {
+      return Container(
+        width: 160,
+        margin: const EdgeInsets.only(right: 15, bottom: 10),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                CircleAvatar(
+                  radius: 40,
+                  backgroundColor: Colors.grey[200],
+                  child: ClipOval(
+                    child: Image.asset(
+                      imagePath,
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) {
+                        return const Icon(Icons.person, color: Colors.black54, size: 40);
+                      },
+                    ),
+                  ),
+                ),
+                // Badge de vérification style "Facebook/Blue Check"
+                Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  padding: const EdgeInsets.all(2),
+                  child: const Icon(
+                    Icons.verified,
+                    color: Colors.blue,
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              name,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              role,
+              style: const TextStyle(color: Colors.grey, fontSize: 11),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 10),
+            // Petit bouton profil
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD400),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Voir Profil',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+/// Tuile pastel pour suggestion d'agent.
+class AgentSuggestionTile extends StatelessWidget {
   final String label;
   final IconData icon;
 
-  const CategorySuggestionTile({
+  const AgentSuggestionTile({
     super.key,
     required this.label,
     required this.icon,
@@ -481,6 +656,7 @@ class QuickHistoryEntries extends StatelessWidget {
       children: [
         HistoryEntryRow(title: 'Bureau de Poste', dateLine: 'Hier, 14:30', priceLabel: '12,50€'),
         HistoryEntryRow(title: 'Billetterie Concert', dateLine: '12 Oct, 10:15', priceLabel: '25,00€'),
+        HistoryEntryRow(title: 'Banque Nationale', dateLine: 'Hier, 14:30', priceLabel: '12,50€'),
       ],
     );
   }

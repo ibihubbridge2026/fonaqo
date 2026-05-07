@@ -27,6 +27,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// Comportement visuel principal du bandeau.
   final CustomAppBarVariant variant;
 
+  
   /// Titre centré lorsque `variant == mainShellSection`.
   final String? sectionTitle;
 
@@ -128,30 +129,16 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget? _buildTitle(BuildContext context) {
     switch (variant) {
       case CustomAppBarVariant.mainShellHome:
-        return Image.asset(
-          'assets/icon/fonaco.png',
-          height: 32,
-          errorBuilder: (_, _, _) {
-            return Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Image.asset(
-                  'assets/images/favicon.png',
-                  width: 22,
-                  errorBuilder: (_, _, _) => const Icon(Icons.bolt, color: _accent, size: 22),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'FONAQO',
-                  style: TextStyle(
-                    color: _accent,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 18,
-                  ),
-                ),
-              ],
-            );
-          },
+        // Demande: enlever l’icône centrée du header.
+        // On conserve un wordmark texte propre et stable (sans asset central).
+        return const Text(
+          'FONAQO',
+          style: TextStyle(
+            color: _accent,
+            fontWeight: FontWeight.w900,
+            fontSize: 18,
+            letterSpacing: 0.5,
+          ),
         );
 
       case CustomAppBarVariant.mainShellSection:
