@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/routes/app_routes.dart';
+
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -43,10 +45,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               onPageChanged: (index) => setState(() => _currentIndex = index),
               itemCount: _onboardingData.length,
               itemBuilder: (context, index) {
-                return _buildSlide(
-                  _onboardingData[index]['title']!,
-                  _onboardingData[index]['desc']!,
-                  _onboardingData[index]['image']!,
+                return OnboardingSlideView(
+                  title: _onboardingData[index]['title']!,
+                  description: _onboardingData[index]['desc']!,
+                  imageAssetPath: _onboardingData[index]['image']!,
                 );
               },
             ),
@@ -109,7 +111,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               duration: const Duration(milliseconds: 300),
                               curve: Curves.ease);
                         } else {
-                          Navigator.pushReplacementNamed(context, '/login');
+                          Navigator.pushReplacementNamed(context, AppRoutes.login);
                         }
                       },
                       style: ElevatedButton.styleFrom(
@@ -140,18 +142,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       ),
     );
   }
+}
 
-  Widget _buildSlide(String title, String desc, String imagePath) {
+/// Page d’introduction : visuel en haut + titre + description sous le carrousel principal.
+class OnboardingSlideView extends StatelessWidget {
+  final String title;
+  final String description;
+  final String imageAssetPath;
+
+  const OnboardingSlideView({
+    super.key,
+    required this.title,
+    required this.description,
+    required this.imageAssetPath,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       children: [
-        // Partie Image (Occupe le haut de l'écran sans marges inutiles)
         Expanded(
           flex: 5,
           child: Container(
             width: double.infinity,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5F5F7),
-              borderRadius: const BorderRadius.only(
+            decoration: const BoxDecoration(
+              color: Color(0xFFF5F5F7),
+              borderRadius: BorderRadius.only(
                 bottomLeft: Radius.circular(30),
                 bottomRight: Radius.circular(30),
               ),
@@ -162,14 +178,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 bottomRight: Radius.circular(30),
               ),
               child: Image.asset(
-                imagePath,
-                fit: BoxFit.cover, // Remplit tout le conteneur proprement
-                alignment: Alignment.bottomCenter, // Aligne l'image sur le bas du bloc gris
+                imageAssetPath,
+                fit: BoxFit.cover,
+                alignment: Alignment.bottomCenter,
+                errorBuilder: (_, _, _) {
+                  return Container(
+                    color: const Color(0xFFE8E8E8),
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.photo_size_select_actual_outlined, color: Colors.grey, size: 64),
+                  );
+                },
               ),
             ),
           ),
         ),
-        // Partie Texte
         Expanded(
           flex: 4,
           child: Padding(
@@ -189,7 +211,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  desc,
+                  description,
                   style: const TextStyle(
                     fontSize: 16,
                     color: Color(0xFF333333),

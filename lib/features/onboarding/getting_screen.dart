@@ -1,5 +1,8 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../../core/routes/app_routes.dart';
 
 class GettingScreen extends StatefulWidget {
   const GettingScreen({super.key});
@@ -25,7 +28,7 @@ class _GettingScreenState extends State<GettingScreen> {
     Timer(const Duration(milliseconds: 2500), () {
       if (mounted) {
         // Redirige vers l'Onboarding
-        Navigator.pushReplacementNamed(context, '/onboarding');
+        Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
       }
     });
   }
@@ -60,8 +63,10 @@ class _GettingScreenState extends State<GettingScreen> {
                     'assets/icon/fonaco.png',
                     width: 80,
                     height: 80,
-                    // Si l'image de base est foncée, on la force en blanc pour qu'elle ressorte sur le carré noir
                     color: Colors.white,
+                    errorBuilder: (_, _, _) {
+                      return const Icon(Icons.bolt, color: Colors.white, size: 72);
+                    },
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -90,17 +95,6 @@ class _GettingScreenState extends State<GettingScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBlurCircle(Color color, double size) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
       ),
     );
   }

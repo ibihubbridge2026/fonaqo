@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
-import 'features/onboarding/onboarding_screen.dart';
-import 'features/onboarding/getting_screen.dart';
+import 'core/routes/app_routes.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/register_screen.dart';
-import 'features/home/requester_dashboard.dart';
 import 'features/chat/chat_screen.dart';
+import 'features/onboarding/getting_screen.dart';
+import 'features/onboarding/onboarding_screen.dart';
+import 'widgets/main_wrapper.dart';
 
 void main() {
   runApp(const FonacoApp());
@@ -19,17 +20,14 @@ class FonacoApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'FONACO',
-
-      // 2. UTILISE initialRoute pour définir par quelle page l'app commence
-      home: const GettingScreen(),
-
+      initialRoute: AppRoutes.splash,
       routes: {
-        // La route '/' correspond maintenant à ton Splash (GettingScreen)
-        '/onboarding': (context) => const OnboardingScreen(),
-        '/login': (context) => const LoginScreen(),
-        '/register': (context) => const RegisterScreen(),
-        '/dashboard': (context) => const RequesterDashboard(),
-        '/chat': (context) => const ChatScreen(), // AJOUTE CETTE LIGNE
+        AppRoutes.splash: (context) => const GettingScreen(),
+        AppRoutes.onboarding: (context) => const OnboardingScreen(),
+        AppRoutes.login: (context) => const LoginScreen(),
+        AppRoutes.register: (context) => const RegisterScreen(),
+        AppRoutes.mainShell: (context) => const MainWrapper(),
+        AppRoutes.chat: (context) => const ChatScreen(),
       },
     );
   }

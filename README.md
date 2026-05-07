@@ -51,6 +51,14 @@ lib/
 ```
 
 ---
+L'application suit désormais une séparation stricte des responsabilités :
+
+- **Core** (`lib/core/`) : Centralisation des routes (`AppRoutes`) et de la configuration globale.
+- **Widgets Globaux** (`lib/widgets/`) : Composants transversaux (`MainWrapper`, `AppBar`) gérant le Shell de navigation.
+- **Features** (`lib/features/`) : Découpage par domaine fonctionnel.
+    - Chaque feature est divisée en `widgets/` (composants internes) et `screens/` (pages).
+- **Navigation** : Utilisation d'un `IndexedStack` pour préserver l'état des pages et optimiser les performances du slider.
+
 
 # Installation & Configuration
 

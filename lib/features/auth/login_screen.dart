@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart'; // Importation nécessaire
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+
+import '../../core/routes/app_routes.dart';
+
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
@@ -22,7 +25,10 @@ class LoginScreen extends StatelessWidget {
                   Image.asset(
                     'assets/icon/fonaco.png',
                     width: 120,
-                    color: Colors.black, // Force le logo en noir
+                    color: Colors.black,
+                    errorBuilder: (_, _, _) {
+                      return const Icon(Icons.bolt, color: Colors.black, size: 120);
+                    },
                   ),
                 ],
               ),
@@ -87,7 +93,7 @@ class LoginScreen extends StatelessWidget {
                             width: double.infinity,
                             height: 56,
                             child: ElevatedButton(
-                              onPressed: () => Navigator.pushReplacementNamed(context, '/dashboard'),
+                              onPressed: () => Navigator.pushReplacementNamed(context, AppRoutes.mainShell),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFFFD400),
                                 foregroundColor: Colors.black,
@@ -142,7 +148,7 @@ class LoginScreen extends StatelessWidget {
                             children: [
                               const Text("Pas encore de compte ?", style: TextStyle(fontSize: 14, color: Color(0xFF5E5E5E))),
                               TextButton(
-                                onPressed: () => Navigator.pushNamed(context, '/register'),
+                                onPressed: () => Navigator.pushNamed(context, AppRoutes.register),
                                 child: const Text("S'inscrire", style: TextStyle(color: Color(0xFF715D00), fontWeight: FontWeight.bold)),
                               ),
                             ],

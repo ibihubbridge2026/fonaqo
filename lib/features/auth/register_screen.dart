@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
+import '../../core/routes/app_routes.dart';
+
 class RegisterScreen extends StatelessWidget {
   const RegisterScreen({super.key});
 
@@ -23,6 +25,9 @@ class RegisterScreen extends StatelessWidget {
                     'assets/icon/fonaco.png',
                     width: 100,
                     color: Colors.black,
+                    errorBuilder: (_, _, _) {
+                      return const Icon(Icons.bolt, color: Colors.black, size: 100);
+                    },
                   ),
                 ],
               ),
