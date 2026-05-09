@@ -149,10 +149,14 @@ class ProfileHeader extends StatelessWidget {
                 backgroundImage: AssetImage('assets/images/avatar/user.png'),
               ),
             ),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-              child: const Icon(Icons.edit, color: Color(0xFFFFD400), size: 18),
+            InkWell(
+              onTap: () => Navigator.pushNamed(context, AppRoutes.profilePersonalInfo),
+              borderRadius: BorderRadius.circular(99),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+                child: const Icon(Icons.edit, color: Color(0xFFFFD400), size: 18),
+              ),
             ),
           ],
         ),

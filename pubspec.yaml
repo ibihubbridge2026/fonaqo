@@ -15,11 +15,12 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   flutter_launcher_icons: ^0.14.4
+  google_maps_flutter: ^2.7.0
+  geolocator: ^13.0.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^6.0.0
 
 flutter:
@@ -27,13 +28,16 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/icon/fonaco.png
+    - assets/icon/
     - assets/images/slide/
     - assets/images/hero/
     - assets/images/avatar/
     - assets/images/events/
+    - favicon.png
 #CONFIG ICON APP (IMPORTANT: ICI ET PAS DANS DEPENDENCIES)
 flutter_launcher_icons:
-  android: true
+  android: "ic_launcher"
   ios: true
-  image_path: "assets/icon/fonaco.png"
+  image_path: "assets/icon/fonaco-icon.png" # Chemin vers ton icône
+  adaptive_icon_background: "#FFD400" # Ton jaune Fonaqo
+  adaptive_icon_foreground: "assets/icon/fonaco-icon.png"

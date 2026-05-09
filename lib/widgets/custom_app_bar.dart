@@ -169,7 +169,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     switch (variant) {
       case CustomAppBarVariant.mainShellHome:
         final chat = onChatPressed ?? () => Navigator.pushNamed(context, AppRoutes.chat);
-        final bell = onNotificationsPressed ?? () {};
+        final bell = onNotificationsPressed ?? () => Navigator.pushNamed(context, AppRoutes.notifications);
         return [
           IconButton(
             icon: const Icon(Icons.notifications_none_rounded, color: Colors.black54),

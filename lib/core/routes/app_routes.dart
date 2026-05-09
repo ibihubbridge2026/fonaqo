@@ -6,12 +6,10 @@ abstract final class AppRoutes {
   static const onboarding = '/onboarding';
   static const login = '/login';
   static const register = '/register';
+  static const forgotPassword = '/forgot-password';
 
   /// Conteneur principal avec barre inférieure (post-authentification).
   static const mainShell = '/main';
-
-  /// Création d'une mission (pile détail).
-  static const createMission = '/missions/create';
 
   /// Sous-écrans profil (pile détail).
   static const profilePersonalInfo = '/profile/personal-info';
@@ -31,4 +29,10 @@ abstract final class AppRoutes {
 
   /// Ouvrir un litige (route empilée).
   static const String litige = '/litige';
+
+  /// Notifications (liste).
+  static const String notifications = '/notifications';
+
+  /// Notation d’un agent (fin mission).
+  static const String rating = '/rating';
 }

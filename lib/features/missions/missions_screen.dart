@@ -17,9 +17,11 @@ class MissionsScreen extends StatelessWidget {
       valueListenable: showCreateMissionListenable,
       builder: (context, isCreating, _) {
         if (isCreating) {
-          return const Padding(
-            padding: EdgeInsets.fromLTRB(20, 12, 20, 100),
-            child: CreateMissionScreen(),
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+            child: SizedBox.expand(
+              child: CreateMissionScreen(),
+            ),
           );
         }
 
@@ -28,6 +30,8 @@ class MissionsScreen extends StatelessWidget {
           children: [
             const Text("Mes Missions", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
             const SizedBox(height: 16),
+            const MissionsPromoQueueCard(),
+            const SizedBox(height: 14),
 
             // Barre catégories + bouton créer (dans le shell -> footer conservé)
             SingleChildScrollView(
@@ -177,6 +181,46 @@ class _StatusBadge extends StatelessWidget {
       child: Text(
         status,
         style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 10),
+      ),
+    );
+  }
+}
+
+/// Carte promo (style screenshot) : “Faites la queue à votre place”.
+class MissionsPromoQueueCard extends StatelessWidget {
+  const MissionsPromoQueueCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFD400),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 14, offset: const Offset(0, 6))],
+      ),
+      child: Row(
+        children: [
+          const Expanded(
+            child: Text(
+              "Faites la queue à\nvotre place",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, height: 1.1),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            width: 52,
+            height: 52,
+            decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+            child: ClipOval(
+              child: Image.asset(
+                'favicon.png',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(Icons.hourglass_bottom, color: Color(0xFFFFD400)),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -76,7 +76,7 @@ class _HomeContentState extends State<HomeContent> {
               return;
             }
             // Fallback si le contenu est utilisé hors shell.
-            Navigator.pushNamed(context, AppRoutes.createMission);
+            Navigator.pushNamed(context, AppRoutes.missionDetail);
           },
         ),
         SectionTitleStrip(
@@ -94,7 +94,10 @@ class _HomeContentState extends State<HomeContent> {
         const SizedBox(height: 12),
         const AgentSuggestionSlider(),
         const SizedBox(height: 25),
-        const SectionTitleStrip(title: 'Historique rapide'),
+        SectionTitleStrip(
+          title: 'Historique rapide',
+          onSeeAllPressed: shell == null ? null : () => shell.setIndex(1),
+        ),
         const SizedBox(height: 10),
         const QuickHistoryEntries(),
         const SizedBox(height: 25),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:geolocator/geolocator.dart';
 
 class AgentsScreen extends StatefulWidget {
   const AgentsScreen({super.key});
@@ -44,13 +46,117 @@ class _AgentsScreenState extends State<AgentsScreen> {
     },
   ];
 
+  static const Color _accent = Color(0xFFFFD400);
+
+  final CameraPosition _initialCamera = const CameraPosition(
+    target: LatLng(5.3363, -4.0260), // Abidjan (approx.)
+    zoom: 12.8,
+  );
+
+  GoogleMapController? _mapController;
+  LatLng? _currentLatLng;
+  bool _locating = false;
+
+  Set<Marker> _markers = const <Marker>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _initLocation();
+  }
+
+  Future<void> _initLocation() async {
+    setState(() => _locating = true);
+    try {
+      final enabled = await Geolocator.isLocationServiceEnabled();
+      if (!enabled) {
+        setState(() => _locating = false);
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        setState(() => _locating = false);
+        return;
+      }
+
+      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      final me = LatLng(pos.latitude, pos.longitude);
+      _currentLatLng = me;
+      _markers = _buildMarkersAround(me);
+
+      setState(() => _locating = false);
+
+      // Si la map est déjà prête, on centre immédiatement.
+      await _animateTo(me);
+    } catch (_) {
+      setState(() => _locating = false);
+    }
+  }
+
+  Set<Marker> _buildMarkersAround(LatLng center) {
+    // Positionnement “demo” : 4 agents autour de l’utilisateur (petit offset).
+    const offsets = <LatLng>[
+      LatLng(0.0045, 0.0030),
+      LatLng(-0.0035, 0.0020),
+      LatLng(0.0020, -0.0040),
+      LatLng(-0.0040, -0.0030),
+    ];
+
+    final markers = <Marker>{};
+
+    // Marker utilisateur
+    markers.add(
+      Marker(
+        markerId: const MarkerId('me'),
+        position: center,
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        infoWindow: const InfoWindow(title: 'Vous'),
+      ),
+    );
+
+    for (var i = 0; i < _allAgents.length; i++) {
+      final agent = _allAgents[i];
+      final off = offsets[i % offsets.length];
+      final pos = LatLng(center.latitude + off.latitude, center.longitude + off.longitude);
+      markers.add(
+        Marker(
+          markerId: MarkerId('agent_$i'),
+          position: pos,
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+          infoWindow: InfoWindow(title: agent['name'], snippet: agent['role']),
+        ),
+      );
+    }
+
+    return markers;
+  }
+
+  Future<void> _animateTo(LatLng target) async {
+    final controller = _mapController;
+    if (controller == null) return;
+    await controller.animateCamera(
+      CameraUpdate.newCameraPosition(CameraPosition(target: target, zoom: 14)),
+    );
+  }
+
   // --- FONCTION POUR LE FILTRE (Image ec4474) ---
   void _showFilterSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const _AgentFilterSheet(),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: const SingleChildScrollView(
+            child: _AgentFilterSheet(),
+          ),
+        );
+      },
     );
   }
 
@@ -65,7 +171,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 15),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(30),
                 boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
               ),
               child: const TextField(
@@ -83,8 +189,8 @@ class _AgentsScreenState extends State<AgentsScreen> {
             child: Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFD400),
-                borderRadius: BorderRadius.circular(15),
+                color: _accent,
+                borderRadius: BorderRadius.circular(30),
                 boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)],
               ),
               child: const Icon(Icons.tune_rounded, color: Colors.black),
@@ -97,49 +203,133 @@ class _AgentsScreenState extends State<AgentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    // Demande:
+    // - Pas d’icône noire sous le header.
+    // - GoogleMap en fond.
+    // - Cartes agents en overlay en bas.
+    return Stack(
       children: [
-        // 1. ZONE CARTE
-        SizedBox(
-          height: MediaQuery.of(context).size.height * 0.35,
-          width: double.infinity,
-          child: Stack(
-            children: [
-              Container(
-                color: Colors.grey[300],
-                width: double.infinity,
-                child: Image.asset('assets/images/map_placeholder.png', fit: BoxFit.cover, errorBuilder: (_,__,___) => const Icon(Icons.map, size: 50)),
-              ),
-              Positioned(top: 50, left: 100, child: _buildMapMarker()),
-              Positioned(top: 120, right: 80, child: _buildMapMarker()),
-              Positioned(bottom: 40, left: 150, child: _buildMapMarker()),
-              Positioned(top: 20, left: 0, right: 0, child: _buildFloatingSearchBar()),
-            ],
+        Positioned.fill(
+          child: GoogleMap(
+            initialCameraPosition: _initialCamera,
+            myLocationButtonEnabled: false,
+            myLocationEnabled: _currentLatLng != null,
+            compassEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            markers: _markers,
+            onMapCreated: (c) async {
+              _mapController = c;
+              final me = _currentLatLng;
+              if (me != null) {
+                await _animateTo(me);
+              }
+            },
           ),
         ),
-        // 2. LISTE DES AGENTS
-        Expanded(
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFFF9F9F9),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        Positioned(
+          top: 8,
+          left: 0,
+          right: 0,
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildFloatingSearchBar(),
+                if (_locating)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 14)],
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                          SizedBox(width: 10),
+                          Text('Localisation…', style: TextStyle(fontWeight: FontWeight.w900)),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            child: ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: _allAgents.length,
-              itemBuilder: (context, index) => AgentListTile(agent: _allAgents[index]),
+          ),
+        ),
+
+        // Bouton recentrer
+        Positioned(
+          right: 16,
+          bottom: 220,
+          child: SafeArea(
+            top: false,
+            child: FloatingActionButton(
+              heroTag: 'recenter',
+              backgroundColor: Colors.white,
+              elevation: 2,
+              onPressed: () async {
+                final me = _currentLatLng;
+                if (me == null) {
+                  await _initLocation();
+                  return;
+                }
+                await _animateTo(me);
+              },
+              child: const Icon(Icons.my_location, color: Colors.black),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: SafeArea(
+            top: false,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.10), blurRadius: 18, offset: const Offset(0, -6))],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Agents proches', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 180,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _allAgents.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        return SizedBox(
+                          width: 320,
+                          child: AgentListTile(agent: _allAgents[index]),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildMapMarker() {
-    return Container(
-      padding: const EdgeInsets.all(5),
-      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(blurRadius: 5, color: Colors.black26)]),
-      child: const Icon(Icons.person_pin_circle, color: Color(0xFFFFD400), size: 30),
     );
   }
 }
@@ -230,15 +420,25 @@ class _AgentFilterSheet extends StatefulWidget {
 class _AgentFilterSheetState extends State<_AgentFilterSheet> {
   static const _accent = Color(0xFFFFD400);
 
-  String _category = 'Tout';
-  double _maxDistanceKm = 10;
+  // Prix (range)
+  RangeValues _price = const RangeValues(2000, 15000);
+
+  // Distance rayon (km)
+  double _radiusKm = 10;
+
+  // Note minimale
   double _minRating = 4.0;
+
+  // Vérifié
   bool _verifiedOnly = true;
+
+  // Type mission
+  final Set<String> _types = {'File d’attente'};
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.72,
+      height: MediaQuery.of(context).size.height * 0.78,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
@@ -263,10 +463,13 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
               TextButton(
                 onPressed: () {
                   setState(() {
-                    _category = 'Tout';
-                    _maxDistanceKm = 10;
+                    _price = const RangeValues(2000, 15000);
+                    _radiusKm = 10;
                     _minRating = 4.0;
                     _verifiedOnly = true;
+                    _types
+                      ..clear()
+                      ..add('File d’attente');
                   });
                 },
                 child: const Text('Réinitialiser', style: TextStyle(color: Colors.black87)),
@@ -274,35 +477,56 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
             ],
           ),
           const SizedBox(height: 18),
-          const Text('Catégorie', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+
+          // Prix
+          Text(
+            'Prix (${_price.start.toStringAsFixed(0)} – ${_price.end.toStringAsFixed(0)} CFA)',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          RangeSlider(
+            values: _price,
+            min: 0,
+            max: 50000,
+            divisions: 100,
+            activeColor: _accent,
+            inactiveColor: Colors.grey[200],
+            onChanged: (v) => setState(() => _price = v),
+          ),
+
+          const SizedBox(height: 10),
+
+          // Type de mission
+          const Text('Type de mission', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 10),
           Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
-              _chip('Tout'),
-              _chip('Banque'),
-              _chip('Courses'),
-              _chip('Livraison'),
-              _chip('Admin'),
-              _chip('Santé'),
+              _typeChip('File d’attente'),
+              _typeChip('Service libre'),
+              _typeChip('Achat ticket'),
+              _typeChip('Livraison'),
             ],
           ),
+
           const SizedBox(height: 18),
-          Text('Distance maximale (${_maxDistanceKm.toStringAsFixed(0)} km)',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+
+          // Distance rayon
+          Text('Rayon (${_radiusKm.toStringAsFixed(0)} km)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           Slider(
-            value: _maxDistanceKm,
+            value: _radiusKm,
             max: 50,
             min: 1,
             divisions: 49,
             activeColor: _accent,
             inactiveColor: Colors.grey[200],
-            onChanged: (val) => setState(() => _maxDistanceKm = val),
+            onChanged: (val) => setState(() => _radiusKm = val),
           ),
+
           const SizedBox(height: 10),
-          Text('Note minimale (${_minRating.toStringAsFixed(1)})',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+
+          // Notation
+          Text('Note minimale (${_minRating.toStringAsFixed(1)})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           Slider(
             value: _minRating,
             max: 5,
@@ -312,11 +536,14 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
             inactiveColor: Colors.grey[200],
             onChanged: (val) => setState(() => _minRating = val),
           ),
+
           const SizedBox(height: 10),
+
+          // Vérifié
           Container(
             decoration: BoxDecoration(
               color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(30),
               border: Border.all(color: Colors.black.withOpacity(0.06)),
             ),
             child: SwitchListTile(
@@ -336,7 +563,7 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: _accent,
                 foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                 elevation: 0,
               ),
               child: const Text('APPLIQUER', style: TextStyle(fontWeight: FontWeight.w900)),
@@ -348,19 +575,27 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
     );
   }
 
-  Widget _chip(String label) {
-    final isSelected = _category == label;
+  Widget _typeChip(String label) {
+    final selected = _types.contains(label);
     return FilterChip(
       label: Text(label),
-      selected: isSelected,
-      onSelected: (_) => setState(() => _category = label),
+      selected: selected,
+      onSelected: (_) {
+        setState(() {
+          if (selected) {
+            _types.remove(label);
+          } else {
+            _types.add(label);
+          }
+        });
+      },
       backgroundColor: Colors.grey[100],
       selectedColor: _accent,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.black : Colors.grey[700],
+        color: selected ? Colors.black : Colors.grey[700],
         fontWeight: FontWeight.bold,
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
       showCheckmark: false,
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../widgets/custom_app_bar.dart';
 import 'widgets/step_5_tracking_view.dart';
+import '../../core/routes/app_routes.dart';
 
 class MissionDetailScreen extends StatelessWidget {
   const MissionDetailScreen({super.key});
@@ -91,7 +92,7 @@ class MissionDetailScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () => _confirmReleaseFunds(context),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
                       foregroundColor: Colors.white,
@@ -105,7 +106,7 @@ class MissionDetailScreen extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () => Navigator.pushNamed(context, AppRoutes.rating),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFFD400),
                       foregroundColor: Colors.black,
@@ -120,16 +121,51 @@ class MissionDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             OutlinedButton(
-              onPressed: () {},
+              onPressed: () => Navigator.pushNamed(context, AppRoutes.chat),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 54),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
-              child: const Text("APPELER L'AGENT", style: TextStyle(fontWeight: FontWeight.w900)),
+              child: const Text("OUVRIR LE CHAT", style: TextStyle(fontWeight: FontWeight.w900)),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  static Future<void> _confirmReleaseFunds(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: const Text('Libérer les fonds ?', style: TextStyle(fontWeight: FontWeight.w900)),
+          content: const Text(
+            "Confirmez que la mission a bien été réalisée. Les fonds seront transférés à l’agent.",
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Annuler')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFD400),
+                foregroundColor: Colors.black,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: const Text('Confirmer', style: TextStyle(fontWeight: FontWeight.w900)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Fonds libérés (simulation).')),
     );
   }
 

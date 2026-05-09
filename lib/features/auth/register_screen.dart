@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
-import '../../core/routes/app_routes.dart';
-
 class RegisterScreen extends StatelessWidget {
   const RegisterScreen({super.key});
 
@@ -71,8 +69,13 @@ class RegisterScreen extends StatelessWidget {
                           _buildTextField("Jean Dupont", Icons.person_outline),
                           const SizedBox(height: 16),
 
-                          // CHAMP EMAIL
-                          _buildInputLabel("EMAIL"),
+                          // CHAMP TÉLÉPHONE (obligatoire)
+                          _buildInputLabel("TÉLÉPHONE"),
+                          _buildTextField("+225 00 00 00 00", Icons.phone_outlined),
+                          const SizedBox(height: 16),
+
+                          // CHAMP EMAIL (optionnel)
+                          _buildInputLabel("EMAIL (OPTIONNEL)"),
                           _buildTextField("nom@exemple.com", Icons.mail_outline),
                           const SizedBox(height: 16),
 
