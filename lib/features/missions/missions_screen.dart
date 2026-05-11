@@ -216,7 +216,7 @@ class MissionsPromoQueueCard extends StatelessWidget {
               child: Image.asset(
                 'favicon.png',
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(Icons.hourglass_bottom, color: Color(0xFFFFD400)),
+                errorBuilder: (_, _, _) => const Icon(Icons.hourglass_bottom, color: Color(0xFFFFD400)),
               ),
             ),
           ),

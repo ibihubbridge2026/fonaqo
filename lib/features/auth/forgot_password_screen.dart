@@ -1,64 +1,335 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-import '../../widgets/custom_app_bar.dart';
+import '../../core/providers/auth_provider.dart';
+import 'widgets/input_card.dart';
 
-/// Écran “Mot de passe oublié”.
-class ForgotPasswordScreen extends StatelessWidget {
+class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
+
+  @override
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+}
+
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  bool _useEmail = true;
+  bool _isLoading = false;
+  String? _errorMessage;
+  String? _successMessage;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleForgotPassword() async {
+    final authProvider = context.read<AuthProvider>();
+    final identifier = _useEmail
+        ? _emailController.text.trim()
+        : _phoneController.text.trim();
+
+    if (identifier.isEmpty) {
+      setState(() {
+        _errorMessage = _useEmail
+            ? 'Veuillez entrer votre email'
+            : 'Veuillez entrer votre numéro de téléphone';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _successMessage = null;
+    });
+
+    try {
+      final success = await authProvider.forgotPassword({
+        'email': _useEmail
+            ? _emailController.text.trim()
+            : 'test@example.com', // TODO: trouver l'email associé au téléphone
+      });
+
+      if (success) {
+        setState(() {
+          _successMessage =
+              'Un code de récupération a été envoyé à votre ${_useEmail ? 'email' : 'numéro de téléphone'}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9),
-      appBar: const CustomAppBar.detailStack(
-        detailTitleWidget: Text('Mot de passe oublié', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        children: [
-          const Text(
-            'Réinitialisation',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            "Saisissez votre email ou numéro de téléphone. Nous vous enverrons un lien / code.",
-            style: TextStyle(color: Colors.grey),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 14)],
-            ),
-            child: const TextField(
-              decoration: InputDecoration(
-                hintText: 'Email ou téléphone',
-                border: InputBorder.none,
-                prefixIcon: Icon(Icons.alternate_email),
+      backgroundColor: const Color(0xFFFFD400),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Header
+            Container(
+              height: 200,
+              width: double.infinity,
+              color: const Color(0xFFFFD400),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Image.asset(
+                    'assets/icon/fonaco.png',
+                    width: 80,
+                    color: Colors.black,
+                    errorBuilder: (_, _, _) {
+                      return const Icon(
+                        Icons.bolt,
+                        color: Colors.black,
+                        size: 80,
+                      );
+                    },
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: () => Navigator.of(context).maybePop(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.black,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+
+            // Formulaire
+            Transform.translate(
+              offset: const Offset(0, -40),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Container(
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 20,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Mot de passe oublié",
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        "Entrez votre email ou numéro de téléphone pour recevoir un code de récupération",
+                        style: TextStyle(color: Color(0xFF5E5E5E)),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Toggle Email/Téléphone
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _useEmail = true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: _useEmail
+                                          ? Colors.black
+                                          : Colors.grey[300]!,
+                                      width: 2,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Email',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: _useEmail
+                                        ? Colors.black
+                                        : Colors.grey[600],
+                                    fontWeight: _useEmail
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _useEmail = false),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    bottom: BorderSide(
+                                      color: !_useEmail
+                                          ? Colors.black
+                                          : Colors.grey[300]!,
+                                      width: 2,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Téléphone',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: !_useEmail
+                                        ? Colors.black
+                                        : Colors.grey[600],
+                                    fontWeight: !_useEmail
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Champ Email ou Téléphone
+                      InputCard(
+                        child: TextField(
+                          controller: _useEmail
+                              ? _emailController
+                              : _phoneController,
+                          keyboardType: _useEmail
+                              ? TextInputType.emailAddress
+                              : TextInputType.phone,
+                          decoration: InputDecoration(
+                            hintText: _useEmail
+                                ? 'nom@exemple.com'
+                                : '+225 00 00 00 00',
+                            border: InputBorder.none,
+                            prefixIcon: Icon(
+                              _useEmail
+                                  ? Icons.mail_outline
+                                  : Icons.phone_outlined,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Messages d'erreur ou succès
+                      if (_errorMessage != null)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.red.shade50,
+                            border: Border.all(color: Colors.red.shade200),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(
+                              color: Colors.red.shade800,
+                              fontSize: 13,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+
+                      if (_successMessage != null)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 16),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            border: Border.all(color: Colors.green.shade200),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _successMessage!,
+                            style: TextStyle(
+                              color: Colors.green.shade800,
+                              fontSize: 13,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+
+                      // Bouton Envoyer le code
+                      SizedBox(
+                        width: double.infinity,
+                        height: 56,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _handleForgotPassword,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFD400),
+                            foregroundColor: Colors.black,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.black,
+                                  ),
+                                )
+                              : const Text(
+                                  "Envoyer le code",
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // Lien retour
+                      Center(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(
+                            "Retour à la connexion",
+                            style: TextStyle(
+                              color: const Color(0xFF715D00),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              child: const Text('ENVOYER', style: TextStyle(fontWeight: FontWeight.w900)),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
-

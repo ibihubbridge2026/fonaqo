@@ -119,7 +119,7 @@ class _AvatarEditor extends StatelessWidget {
                 width: 60,
                 height: 60,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.black54),
+                errorBuilder: (_, _, _) => const Icon(Icons.person, color: Colors.black54),
               ),
             ),
           ),

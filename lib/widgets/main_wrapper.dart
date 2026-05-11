@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../features/home/home_screen.dart';
 import '../features/missions/missions_screen.dart';
@@ -29,7 +30,8 @@ class MainShellScope extends InheritedWidget {
   }
 
   @override
-  bool updateShouldNotify(MainShellScope oldWidget) => currentIndex != oldWidget.currentIndex;
+  bool updateShouldNotify(MainShellScope oldWidget) =>
+      currentIndex != oldWidget.currentIndex;
 }
 
 /// Conteneur principal après authentification : app bar dynamique + 4 destinations + navigation basse.
@@ -43,6 +45,8 @@ class MainWrapper extends StatefulWidget {
 class _MainWrapperState extends State<MainWrapper> {
   int _currentIndex = 0;
   final ValueNotifier<bool> _showCreateMission = ValueNotifier<bool>(false);
+  bool _locationPermissionGranted = false;
+  bool _showLocationBanner = false;
 
   late final List<Widget> _pages = [
     HomeScreen(),
@@ -50,7 +54,51 @@ class _MainWrapperState extends State<MainWrapper> {
     AgentsScreen(),
     EventsScreen(),
     ProfileScreen(),
-  ];  
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _requestLocationPermission();
+  }
+
+  Future<void> _requestLocationPermission() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // Vérifier si le service de localisation est activé
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      setState(() {
+        _showLocationBanner = true;
+      });
+      return;
+    }
+
+    // Demander la permission de localisation
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        setState(() {
+          _showLocationBanner = true;
+        });
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      setState(() {
+        _showLocationBanner = true;
+      });
+      return;
+    }
+
+    setState(() {
+      _locationPermissionGranted = true;
+      _showLocationBanner = false;
+    });
+  }
 
   PreferredSizeWidget _appBarForIndex() {
     // Demande: mêmes header pour Missions/Agents/Événements/Profil que pour Home.
@@ -71,9 +119,65 @@ class _MainWrapperState extends State<MainWrapper> {
       child: Scaffold(
         backgroundColor: const Color(0xFFF9F9F9),
         appBar: _appBarForIndex(),
-        body: IndexedStack(
-          index: _currentIndex,
-          children: _pages,
+        body: Column(
+          children: [
+            // Bannière discrète si GPS refusé
+            if (_showLocationBanner)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.location_off_outlined,
+                      color: Colors.orange.shade700,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'La position est désactivée. Vous devrez saisir les adresses manuellement.',
+                        style: TextStyle(
+                          color: Colors.orange.shade700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _showLocationBanner = false;
+                        });
+                      },
+                      icon: Icon(
+                        Icons.close,
+                        color: Colors.orange.shade700,
+                        size: 16,
+                      ),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 24,
+                        minHeight: 24,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // Contenu principal
+            Expanded(
+              child: IndexedStack(index: _currentIndex, children: _pages),
+            ),
+          ],
         ),
         bottomNavigationBar: MainNavigationBar(
           currentIndex: _currentIndex,

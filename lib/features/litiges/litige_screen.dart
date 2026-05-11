@@ -28,7 +28,7 @@ class LitigeScreen extends StatelessWidget {
           const SizedBox(height: 16),
           _Card(
             child: DropdownButtonFormField<String>(
-              value: "Mairie d'Abidjan",
+              initialValue: "Mairie d'Abidjan",
               items: const [
                 DropdownMenuItem(value: "Mairie d'Abidjan", child: Text("Mairie d'Abidjan • En cours")),
                 DropdownMenuItem(value: "Poste de Cocody", child: Text("Poste de Cocody • En attente")),

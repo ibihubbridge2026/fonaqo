@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "943095261009",
+    "project_id": "fonaqo",
+    "storage_bucket": "fonaqo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:943095261009:android:84ebb0aca271a5b78fd570",
+        "android_client_info": {
+          "package_name": "com.example.fonaco"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBdk55s3R_CbNX2wPa57LX5bHNQgCqWo_o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

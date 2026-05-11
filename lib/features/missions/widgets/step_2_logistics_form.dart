@@ -4,19 +4,32 @@ class Step2LogisticsForm extends StatelessWidget {
   final String mode;
   final VoidCallback onNext;
 
-  const Step2LogisticsForm({super.key, required this.mode, required this.onNext});
+  const Step2LogisticsForm({
+    super.key,
+    required this.mode,
+    required this.onNext,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("Où et quand ?", 
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, fontStyle: FontStyle.italic)),
+        const Text(
+          "Où et quand ?",
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w900,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
         const SizedBox(height: 25),
-        
+
         // CHAMP LIEU
-        _buildInput(Icons.location_on, "Lieu (Mairie, Poste, etc.)"),
+        _buildInput(
+          Icons.location_on,
+          "Lieu (Mairie, Poste, etc.) ou saisissez l'adresse manuellement",
+        ),
         const SizedBox(height: 16),
 
         // MODULE PROCURATION (uniquement pour Service Libre)
@@ -34,7 +47,14 @@ class Step2LogisticsForm extends StatelessWidget {
                   children: [
                     Icon(Icons.gavel, color: Color(0xFFFFD400), size: 18),
                     SizedBox(width: 8),
-                    Text("Besoin d'une procuration ?", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                    Text(
+                      "Besoin d'une procuration ?",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 15),
@@ -44,7 +64,7 @@ class Step2LogisticsForm extends StatelessWidget {
                     const SizedBox(width: 10),
                     Expanded(child: _buildProcBtn("📤 Upload PDF")),
                   ],
-                )
+                ),
               ],
             ),
           ),
@@ -54,9 +74,18 @@ class Step2LogisticsForm extends StatelessWidget {
         // HEURE ET BUDGET
         Row(
           children: [
-            Expanded(child: _buildInput(Icons.access_time, "Heure", isHalf: true)),
+            Expanded(
+              child: _buildInput(Icons.access_time, "Heure", isHalf: true),
+            ),
             const SizedBox(width: 16),
-            Expanded(child: _buildInput(Icons.payments_outlined, "Budget", isHalf: true, value: "2500")),
+            Expanded(
+              child: _buildInput(
+                Icons.payments_outlined,
+                "Budget",
+                isHalf: true,
+                value: "2500",
+              ),
+            ),
           ],
         ),
 
@@ -66,15 +95,25 @@ class Step2LogisticsForm extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.black,
             minimumSize: const Size(double.infinity, 60),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
           ),
-          child: const Text("VALIDER LES DÉTAILS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900)),
-        )
+          child: const Text(
+            "VALIDER LES DÉTAILS",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildInput(IconData icon, String hint, {bool isHalf = false, String? value}) {
+  Widget _buildInput(
+    IconData icon,
+    String hint, {
+    bool isHalf = false,
+    String? value,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
       decoration: BoxDecoration(
@@ -97,8 +136,16 @@ class Step2LogisticsForm extends StatelessWidget {
   Widget _buildProcBtn(String label) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-      child: Center(child: Text(label, style: const TextStyle(color: Colors.white, fontSize: 10))),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Center(
+        child: Text(
+          label,
+          style: const TextStyle(color: Colors.white, fontSize: 10),
+        ),
+      ),
     );
   }
 }

@@ -75,7 +75,7 @@ class _SwitchTile extends StatelessWidget {
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12)],
       ),
       child: SwitchListTile(
-        activeColor: const Color(0xFFFFD400),
+        activeThumbColor: const Color(0xFFFFD400),
         value: value,
         onChanged: onChanged,
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),

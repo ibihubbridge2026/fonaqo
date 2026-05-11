@@ -31,7 +31,7 @@ class EventDetailScreen extends StatelessWidget {
               child: Image.asset(
                 imagePath,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (_, _, _) => Container(
                   color: Colors.grey[200],
                   alignment: Alignment.center,
                   child: const Icon(Icons.broken_image, color: Colors.grey, size: 48),

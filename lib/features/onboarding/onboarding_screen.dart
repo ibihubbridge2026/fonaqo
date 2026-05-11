@@ -16,17 +16,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final List<Map<String, String>> _onboardingData = [
     {
       "title": "Gagnez du temps en déléguant vos tâches",
-      "desc": "Ne faites plus jamais la queue. Nos agents s'en occupent pour vous.",
+      "desc":
+          "Ne faites plus jamais la queue. Nos agents s'en occupent pour vous.",
       "image": "assets/images/slide/slide-1.png",
     },
     {
       "title": "Découvrez nos services à la demande",
-      "desc": "Courses, documents, procedure, déléguez vos missions en un clic et occupez vous de votre travail.",
+      "desc":
+          "Courses, documents, procedure, déléguez vos missions en un clic et occupez vous de votre travail.",
       "image": "assets/images/slide/slide-2.png",
     },
     {
       "title": "Prêt pour L'aventure ? Démarrons ensemble",
-      "desc": "Rejoignez l'écosystème de services humains le plus rapide du pays.",
+      "desc":
+          "Rejoignez l'écosystème de services humains le plus rapide du pays.",
       "image": "assets/images/slide/slide-3.png",
     },
   ];
@@ -59,9 +62,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 top: 10, // Un peu d'espace sous la barre de statut
                 right: 20,
                 child: TextButton(
-                  onPressed: () => _pageController.animateToPage(2,
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.ease),
+                  onPressed: () => _pageController.animateToPage(
+                    2,
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.ease,
+                  ),
+                  style: TextButton.styleFrom(
+                    overlayColor: Colors.transparent,
+                    surfaceTintColor: Colors.transparent,
+                  ),
                   child: const Text(
                     "Passer",
                     style: TextStyle(
@@ -108,10 +117,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       onPressed: () {
                         if (_currentIndex < 2) {
                           _pageController.nextPage(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.ease);
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.ease,
+                          );
                         } else {
-                          Navigator.pushReplacementNamed(context, AppRoutes.login);
+                          Navigator.pushReplacementNamed(
+                            context,
+                            AppRoutes.login,
+                          );
                         }
                       },
                       style: ElevatedButton.styleFrom(
@@ -120,8 +133,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             : Colors.black.withOpacity(0.08),
                         foregroundColor: Colors.black,
                         elevation: 0,
+                        overlayColor: Colors.transparent,
+                        surfaceTintColor: Colors.transparent,
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: Text(
                         _currentIndex == 2 ? "Démarrer maintenant" : "Suivant",
@@ -185,7 +201,11 @@ class OnboardingSlideView extends StatelessWidget {
                   return Container(
                     color: const Color(0xFFE8E8E8),
                     alignment: Alignment.center,
-                    child: const Icon(Icons.photo_size_select_actual_outlined, color: Colors.grey, size: 64),
+                    child: const Icon(
+                      Icons.photo_size_select_actual_outlined,
+                      color: Colors.grey,
+                      size: 64,
+                    ),
                   );
                 },
               ),

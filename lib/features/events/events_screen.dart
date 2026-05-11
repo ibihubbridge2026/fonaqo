@@ -67,7 +67,7 @@ class EventsScreen extends StatelessWidget {
         child: Column(
           children: [
           // --- ZONE IMAGE ---
-          Container(
+          SizedBox(
             height: 160, // Augmenté un peu pour mieux voir l'image
             width: double.infinity,
             child: ClipRRect(
@@ -122,7 +122,7 @@ class EventsScreen extends StatelessWidget {
                         children: [
                           const Icon(Icons.calendar_today, size: 12, color: Colors.grey),
                           const SizedBox(width: 5),
-                          Text("$date", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          Text(date, style: const TextStyle(color: Colors.grey, fontSize: 12)),
                         ],
                       ),
                       Row(

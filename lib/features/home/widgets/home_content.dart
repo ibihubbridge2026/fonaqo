@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../../core/routes/app_routes.dart';
 import '../../../widgets/main_wrapper.dart';
+import '../../../core/providers/auth_provider.dart';
 
 /// Bloc corps de page d’accueil (carrousel auto, missions, suggestions, litige).
 /// Contient le [PageController], le métronome pour le slider et la liste des slides.
@@ -101,6 +103,31 @@ class _HomeContentState extends State<HomeContent> {
         const SizedBox(height: 10),
         const QuickHistoryEntries(),
         const SizedBox(height: 25),
+
+        // Section spéciale pour les agents - afficher seulement si l'utilisateur est un agent
+        Consumer<AuthProvider>(
+          builder: (context, authProvider, child) {
+            if (authProvider.currentUser?.isAgent == true) {
+              return Column(
+                children: [
+                  SectionTitleStrip(
+                    title: 'Missions disponibles',
+                    showSeeAll: false,
+                    onSeeAllPressed: () =>
+                        Navigator.pushNamed(context, '/missions-available'),
+                  ),
+                  const SizedBox(height: 12),
+                  const AvailableMissionsPreview(),
+                  const SizedBox(height: 25),
+                ],
+              );
+            } else {
+              // Ne rien afficher pour les clients
+              return const SizedBox.shrink();
+            }
+          },
+        ),
+
         const ReportLitigeCardPanel(),
         SizedBox(height: bottomReserve),
       ],
@@ -155,7 +182,9 @@ class HeroCarouselStrip extends StatelessWidget {
       child: PageView.builder(
         controller: pageController,
         itemBuilder: (context, index) {
-          return HeroCarouselSlide(assetPath: assetPaths[index % assetPaths.length]);
+          return HeroCarouselSlide(
+            assetPath: assetPaths[index % assetPaths.length],
+          );
         },
       ),
     );
@@ -194,7 +223,11 @@ class HeroCarouselSlide extends StatelessWidget {
             errorBuilder: (_, _, _) {
               return Container(
                 color: Colors.grey[300],
-                child: const Icon(Icons.broken_image, color: Colors.grey, size: 40),
+                child: const Icon(
+                  Icons.broken_image,
+                  color: Colors.grey,
+                  size: 40,
+                ),
               );
             },
           ),
@@ -210,7 +243,10 @@ class HeroCarouselSlide extends StatelessWidget {
             alignment: Alignment.bottomLeft,
             child: Text(
               overlayCaption,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
@@ -241,7 +277,9 @@ class PrimaryCreateMissionPanel extends StatelessWidget {
           backgroundColor: const Color(0xFFFFD400),
           foregroundColor: Colors.black,
           minimumSize: const Size(double.infinity, 55),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
           elevation: 0,
         ),
       ),
@@ -269,13 +307,19 @@ class SectionTitleStrip extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+          ),
           if (showSeeAll)
             TextButton(
               onPressed: onSeeAllPressed,
               child: const Text(
                 'Voir tous',
-                style: TextStyle(color: Color(0xFF715D00), fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Color(0xFF715D00),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
         ],
@@ -285,6 +329,120 @@ class SectionTitleStrip extends StatelessWidget {
 }
 
 /// Carte «Signaler un problème» en pied de page d’accueil.
+/// Aperçu des missions disponibles pour les agents
+class AvailableMissionsPreview extends StatelessWidget {
+  const AvailableMissionsPreview({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 120,
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.work_outline,
+                color: const Color(0xFFFFD400),
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Missions Disponibles',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF715D00),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Découvrez les missions près de chez vous',
+            style: TextStyle(fontSize: 14, color: Colors.grey),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: GridView.count(
+              crossAxisCount: 2,
+              childAspectRatio: 1.5,
+              children: List.generate(4, (index) {
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[50],
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[200]!),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.location_on_outlined,
+                        color: Colors.grey[400],
+                        size: 32,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Mission ${index + 1}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '2.5 km • 50€/h',
+                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () =>
+                  Navigator.pushNamed(context, '/missions-available'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFD400),
+                foregroundColor: Colors.black,
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              child: const Text(
+                'Voir toutes les missions',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Carte «Signaler un problème» en pied de page d'accueil.
 class ReportLitigeCardPanel extends StatelessWidget {
   const ReportLitigeCardPanel({super.key});
 
@@ -304,8 +462,14 @@ class ReportLitigeCardPanel extends StatelessWidget {
               children: [
                 Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(color: Color(0xFFFFD400), shape: BoxShape.circle),
-                  child: const Icon(Icons.gpp_maybe_rounded, color: Colors.black),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFFD400),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.gpp_maybe_rounded,
+                    color: Colors.black,
+                  ),
                 ),
                 const SizedBox(width: 15),
                 const Expanded(
@@ -336,10 +500,15 @@ class ReportLitigeCardPanel extends StatelessWidget {
                 backgroundColor: const Color(0xFFFFD400),
                 foregroundColor: Colors.black,
                 minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
                 elevation: 0,
               ),
-              child: const Text('OUVRIR UN LITIGE', style: TextStyle(fontWeight: FontWeight.w900)),
+              child: const Text(
+                'OUVRIR UN LITIGE',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
             ),
           ],
         ),
@@ -366,7 +535,10 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
   void initState() {
     super.initState();
     // Demande: slider qui défile de droite vers gauche en boucle sans arrêt.
-    _autoScrollTimer = Timer.periodic(const Duration(milliseconds: 1400), _onTick);
+    _autoScrollTimer = Timer.periodic(
+      const Duration(milliseconds: 1400),
+      _onTick,
+    );
   }
 
   void _onTick(Timer timer) {
@@ -434,101 +606,101 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
   }
 }
 
-  /// Carte individuelle d'un agent avec badge de certification.
-  class AgentCard extends StatelessWidget {
-    final String name;
-    final String role;
-    final String imagePath;
+/// Carte individuelle d'un agent avec badge de certification.
+class AgentCard extends StatelessWidget {
+  final String name;
+  final String role;
+  final String imagePath;
 
-    const AgentCard({
-      super.key,
-      required this.name,
-      required this.role,
-      required this.imagePath,
-    });
+  const AgentCard({
+    super.key,
+    required this.name,
+    required this.role,
+    required this.imagePath,
+  });
 
-    @override
-    Widget build(BuildContext context) {
-      return Container(
-        width: 160,
-        margin: const EdgeInsets.only(right: 15, bottom: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Stack(
-              alignment: Alignment.bottomRight,
-              children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Colors.grey[200],
-                  child: ClipOval(
-                    child: Image.asset(
-                      imagePath,
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) {
-                        return const Icon(Icons.person, color: Colors.black54, size: 40);
-                      },
-                    ),
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 160,
+      margin: const EdgeInsets.only(right: 15, bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              CircleAvatar(
+                radius: 40,
+                backgroundColor: Colors.grey[200],
+                child: ClipOval(
+                  child: Image.asset(
+                    imagePath,
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) {
+                      return const Icon(
+                        Icons.person,
+                        color: Colors.black54,
+                        size: 40,
+                      );
+                    },
                   ),
                 ),
-                // Badge de vérification style "Facebook/Blue Check"
-                Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  padding: const EdgeInsets.all(2),
-                  child: const Icon(
-                    Icons.verified,
-                    color: Colors.blue,
-                    size: 20,
-                  ),
+              ),
+              // Badge de vérification style "Facebook/Blue Check"
+              Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              name,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              role,
-              style: const TextStyle(color: Colors.grey, fontSize: 11),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 10),
-            // Petit bouton profil
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFD400),
-                borderRadius: BorderRadius.circular(10),
+                padding: const EdgeInsets.all(2),
+                child: const Icon(Icons.verified, color: Colors.blue, size: 20),
               ),
-              child: const Text(
-                'Voir Profil',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            name,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            role,
+            style: const TextStyle(color: Colors.grey, fontSize: 11),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 10),
+          // Petit bouton profil
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFD400),
+              borderRadius: BorderRadius.circular(10),
             ),
-          ],
-        ),
-      );
-    }
+            child: const Text(
+              'Voir Profil',
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
   }
+}
 
 /// Tuile pastel pour suggestion d'agent.
 class AgentSuggestionTile extends StatelessWidget {
@@ -560,7 +732,10 @@ class AgentSuggestionTile extends StatelessWidget {
         children: [
           Icon(icon, color: const Color(0xFFFFD400), size: 30),
           const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
         ],
       ),
     );
@@ -635,8 +810,17 @@ class OngoingMissionCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                Text('Agent: $agentName', style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  'Agent: $agentName',
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                ),
               ],
             ),
           ),
@@ -648,7 +832,11 @@ class OngoingMissionCard extends StatelessWidget {
             ),
             child: Text(
               statusLabel,
-              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.brown),
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                color: Colors.brown,
+              ),
             ),
           ),
         ],
@@ -665,9 +853,21 @@ class QuickHistoryEntries extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Column(
       children: [
-        HistoryEntryRow(title: 'Bureau de Poste', dateLine: 'Hier, 14:30', priceLabel: '12,50€'),
-        HistoryEntryRow(title: 'Billetterie Concert', dateLine: '12 Oct, 10:15', priceLabel: '25,00€'),
-        HistoryEntryRow(title: 'Banque Nationale', dateLine: 'Hier, 14:30', priceLabel: '12,50€'),
+        HistoryEntryRow(
+          title: 'Bureau de Poste',
+          dateLine: 'Hier, 14:30',
+          priceLabel: '12,50€',
+        ),
+        HistoryEntryRow(
+          title: 'Billetterie Concert',
+          dateLine: '12 Oct, 10:15',
+          priceLabel: '25,00€',
+        ),
+        HistoryEntryRow(
+          title: 'Banque Nationale',
+          dateLine: 'Hier, 14:30',
+          priceLabel: '12,50€',
+        ),
       ],
     );
   }
@@ -691,7 +891,10 @@ class HistoryEntryRow extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -705,8 +908,17 @@ class HistoryEntryRow extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  Text(dateLine, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    dateLine,
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                  ),
                 ],
               ),
             ],

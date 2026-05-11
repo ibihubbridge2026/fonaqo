@@ -46,7 +46,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                 boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12)],
               ),
               child: SwitchListTile(
-                activeColor: const Color(0xFFFFD400),
+                activeThumbColor: const Color(0xFFFFD400),
                 value: _biometricEnabled,
                 onChanged: (v) => setState(() => _biometricEnabled = v),
                 title: const Text('Biométrie', style: TextStyle(fontWeight: FontWeight.w800)),

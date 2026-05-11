@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../../core/models/mission_model.dart';
+import '../missions/mission_repository.dart';
+
 class AgentsScreen extends StatefulWidget {
   const AgentsScreen({super.key});
 
@@ -10,41 +13,9 @@ class AgentsScreen extends StatefulWidget {
 }
 
 class _AgentsScreenState extends State<AgentsScreen> {
-  // Données statiques des agents
-  final List<Map<String, dynamic>> _allAgents = [
-    {
-      'name': 'Marc-Antoine',
-      'role': 'Expert Administratif',
-      'rating': 4.8,
-      'distance': '0.8 km',
-      'image': 'assets/images/avatar/agent1.jpg',
-      'isVerified': true,
-    },
-    {
-      'name': 'Julie N.',
-      'role': 'Conciergerie & Courses',
-      'rating': 4.9,
-      'distance': '1.2 km',
-      'image': 'assets/images/avatar/agent2.jpg',
-      'isVerified': true,
-    },
-    {
-      'name': 'Thomas L.',
-      'role': 'Livraison Rapide',
-      'rating': 4.5,
-      'distance': '2.5 km',
-      'image': 'assets/images/avatar/agent3.jpg',
-      'isVerified': true,
-    },
-    {
-      'name': 'Awa Diop',
-      'role': 'Aide Ménagère',
-      'rating': 4.7,
-      'distance': '3.1 km',
-      'image': 'assets/images/avatar/agent1.jpg',
-      'isVerified': true,
-    },
-  ];
+  final MissionRepository _missionRepository = MissionRepository();
+  List<MissionModel> _missions = [];
+  bool _isLoadingMissions = false;
 
   static const Color _accent = Color(0xFFFFD400);
 
@@ -62,77 +33,126 @@ class _AgentsScreenState extends State<AgentsScreen> {
   @override
   void initState() {
     super.initState();
-    _initLocation();
+    // Attendre que l'UI soit prête avant de demander la position
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initLocation();
+      _loadMissions();
+    });
+  }
+
+  Future<void> _loadMissions() async {
+    if (!mounted) return;
+
+    setState(() => _isLoadingMissions = true);
+
+    try {
+      final missions = await _missionRepository.fetchAvailableMissions();
+      if (mounted) {
+        setState(() {
+          _missions = missions;
+          _isLoadingMissions = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingMissions = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Erreur lors du chargement des missions: ${e.toString()}',
+            ),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _initLocation() async {
+    if (!mounted) return;
+
     setState(() => _locating = true);
+
     try {
+      // Vérifier si le service de localisation est activé
       final enabled = await Geolocator.isLocationServiceEnabled();
       if (!enabled) {
-        setState(() => _locating = false);
+        if (mounted) setState(() => _locating = false);
         return;
       }
 
+      // Vérifier les permissions
       var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        setState(() => _locating = false);
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        if (mounted) setState(() => _locating = false);
         return;
       }
 
-      final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.high);
+      // Obtenir la position actuelle avec timeout
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy
+            .medium, // Réduire la précision pour éviter les timeouts
+        timeLimit: const Duration(seconds: 15), // Timeout explicite
+      );
+
+      if (!mounted) return;
+
       final me = LatLng(pos.latitude, pos.longitude);
       _currentLatLng = me;
       _markers = _buildMarkersAround(me);
 
-      setState(() => _locating = false);
+      if (mounted) setState(() => _locating = false);
 
       // Si la map est déjà prête, on centre immédiatement.
-      await _animateTo(me);
-    } catch (_) {
-      setState(() => _locating = false);
+      if (mounted) await _animateTo(me);
+    } catch (e) {
+      // Gérer les erreurs de localisation sans crasher l'app
+      print('Erreur de localisation: $e');
+
+      // Définir une position par défaut (Abidjan) en cas d'erreur
+      if (mounted) {
+        _currentLatLng = const LatLng(5.3600, -4.0083); // Coordonnées d'Abidjan
+        _markers = _buildMarkersAround(_currentLatLng!);
+        setState(() => _locating = false);
+      }
     }
   }
 
   Set<Marker> _buildMarkersAround(LatLng center) {
-    // Positionnement “demo” : 4 agents autour de l’utilisateur (petit offset).
-    const offsets = <LatLng>[
-      LatLng(0.0045, 0.0030),
-      LatLng(-0.0035, 0.0020),
-      LatLng(0.0020, -0.0040),
-      LatLng(-0.0040, -0.0030),
-    ];
+    final markers = <Marker>[];
 
-    final markers = <Marker>{};
+    // Créer des marqueurs pour les missions disponibles
+    for (var i = 0; i < _missions.length; i++) {
+      final mission = _missions[i];
 
-    // Marker utilisateur
-    markers.add(
-      Marker(
-        markerId: const MarkerId('me'),
-        position: center,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-        infoWindow: const InfoWindow(title: 'Vous'),
-      ),
-    );
+      // Vérifier si la mission a des coordonnées
+      if (mission.latitude != null && mission.longitude != null) {
+        final missionLatLng = LatLng(mission.latitude!, mission.longitude!);
 
-    for (var i = 0; i < _allAgents.length; i++) {
-      final agent = _allAgents[i];
-      final off = offsets[i % offsets.length];
-      final pos = LatLng(center.latitude + off.latitude, center.longitude + off.longitude);
-      markers.add(
-        Marker(
-          markerId: MarkerId('agent_$i'),
-          position: pos,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
-          infoWindow: InfoWindow(title: agent['name'], snippet: agent['role']),
-        ),
-      );
+        markers.add(
+          Marker(
+            markerId: MarkerId('mission_${mission.id}'),
+            position: missionLatLng,
+            infoWindow: InfoWindow(
+              title: mission.title,
+              snippet:
+                  '${mission.price.toStringAsFixed(0)} XOF • ${mission.formattedStatus}',
+            ),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              mission.status == MissionStatus.PENDING
+                  ? BitmapDescriptor.hueOrange
+                  : BitmapDescriptor.hueBlue,
+            ),
+          ),
+        );
+      }
     }
 
-    return markers;
+    return markers.toSet();
   }
 
   Future<void> _animateTo(LatLng target) async {
@@ -151,10 +171,10 @@ class _AgentsScreenState extends State<AgentsScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) {
         return Padding(
-          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-          child: const SingleChildScrollView(
-            child: _AgentFilterSheet(),
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
+          child: const SingleChildScrollView(child: _AgentFilterSheet()),
         );
       },
     );
@@ -172,7 +192,9 @@ class _AgentsScreenState extends State<AgentsScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(30),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
+                boxShadow: const [
+                  BoxShadow(color: Colors.black12, blurRadius: 10),
+                ],
               ),
               child: const TextField(
                 decoration: InputDecoration(
@@ -191,7 +213,9 @@ class _AgentsScreenState extends State<AgentsScreen> {
               decoration: BoxDecoration(
                 color: _accent,
                 borderRadius: BorderRadius.circular(30),
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)],
+                boxShadow: const [
+                  BoxShadow(color: Colors.black12, blurRadius: 5),
+                ],
               ),
               child: const Icon(Icons.tune_rounded, color: Colors.black),
             ),
@@ -240,18 +264,33 @@ class _AgentsScreenState extends State<AgentsScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(30),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 14)],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 14,
+                          ),
+                        ],
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
                           SizedBox(width: 10),
-                          Text('Localisation…', style: TextStyle(fontWeight: FontWeight.w900)),
+                          Text(
+                            'Localisation…',
+                            style: TextStyle(fontWeight: FontWeight.w900),
+                          ),
                         ],
                       ),
                     ),
@@ -293,8 +332,16 @@ class _AgentsScreenState extends State<AgentsScreen> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.10), blurRadius: 18, offset: const Offset(0, -6))],
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(30),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.10),
+                    blurRadius: 18,
+                    offset: const Offset(0, -6),
+                  ),
+                ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -304,22 +351,28 @@ class _AgentsScreenState extends State<AgentsScreen> {
                     child: Container(
                       width: 42,
                       height: 4,
-                      decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text('Agents proches', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  const Text(
+                    'Agents proches',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  ),
                   const SizedBox(height: 10),
                   SizedBox(
                     height: 180,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      itemCount: _allAgents.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemCount: _missions.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 12),
                       itemBuilder: (context, index) {
                         return SizedBox(
                           width: 320,
-                          child: AgentListTile(agent: _allAgents[index]),
+                          child: MissionListTile(mission: _missions[index]),
                         );
                       },
                     ),
@@ -334,9 +387,9 @@ class _AgentsScreenState extends State<AgentsScreen> {
   }
 }
 
-class AgentListTile extends StatelessWidget {
-  final Map<String, dynamic> agent;
-  const AgentListTile({super.key, required this.agent});
+class MissionListTile extends StatelessWidget {
+  final MissionModel mission;
+  const MissionListTile({super.key, required this.mission});
 
   @override
   Widget build(BuildContext context) {
@@ -346,7 +399,9 @@ class AgentListTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10),
+        ],
       ),
       child: Row(
         children: [
@@ -356,16 +411,19 @@ class AgentListTile extends StatelessWidget {
               CircleAvatar(
                 radius: 30,
                 child: ClipOval(
-                  child: Image.asset(
-                    agent['image'],
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Colors.black54),
-                  ),
+                  child: mission.avatarUrl != null
+                      ? Image.network(
+                          mission.avatarUrl!,
+                          width: 60,
+                          height: 60,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              const Icon(Icons.person, color: Colors.black54),
+                        )
+                      : const Icon(Icons.person, color: Colors.black54),
                 ),
               ),
-              if (agent['isVerified'])
+              if (mission.isVerified)
                 const CircleAvatar(
                   radius: 10,
                   backgroundColor: Colors.white,
@@ -378,18 +436,46 @@ class AgentListTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(agent['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Text(agent['role'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Text(
+                  mission.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  mission.description,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
                 const SizedBox(height: 5),
                 Row(
                   children: [
-                    const Icon(Icons.star, color: Colors.orange, size: 14),
-                    Text(" ${agent['rating']}", style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    const Icon(
+                      Icons.attach_money,
+                      color: Colors.orange,
+                      size: 14,
+                    ),
+                    Text(
+                      "${mission.price.toStringAsFixed(0)} XOF",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(width: 10),
-                    const Icon(Icons.location_searching, color: Colors.grey, size: 14),
-                    Text(" ${agent['distance']}", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    const Icon(
+                      Icons.location_searching,
+                      color: Colors.grey,
+                      size: 14,
+                    ),
+                    Text(
+                      mission.status == MissionStatus.PENDING
+                          ? 'Disponible'
+                          : 'En cours',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
                   ],
-                )
+                ),
               ],
             ),
           ),
@@ -399,11 +485,16 @@ class AgentListTile extends StatelessWidget {
               backgroundColor: const Color(0xFFFFD400),
               foregroundColor: Colors.black,
               elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               minimumSize: const Size(60, 35),
             ),
-            child: const Text("Choisir", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-          )
+            child: const Text(
+              "Choisir",
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
         ],
       ),
     );
@@ -451,14 +542,20 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
             child: Container(
               width: 40,
               height: 4,
-              decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           ),
           const SizedBox(height: 18),
           Row(
             children: [
               const Expanded(
-                child: Text('Filtres', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                child: Text(
+                  'Filtres',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                ),
               ),
               TextButton(
                 onPressed: () {
@@ -472,7 +569,10 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
                       ..add('File d’attente');
                   });
                 },
-                child: const Text('Réinitialiser', style: TextStyle(color: Colors.black87)),
+                child: const Text(
+                  'Réinitialiser',
+                  style: TextStyle(color: Colors.black87),
+                ),
               ),
             ],
           ),
@@ -496,7 +596,10 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
           const SizedBox(height: 10),
 
           // Type de mission
-          const Text('Type de mission', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const Text(
+            'Type de mission',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 10,
@@ -512,7 +615,10 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
           const SizedBox(height: 18),
 
           // Distance rayon
-          Text('Rayon (${_radiusKm.toStringAsFixed(0)} km)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            'Rayon (${_radiusKm.toStringAsFixed(0)} km)',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           Slider(
             value: _radiusKm,
             max: 50,
@@ -526,7 +632,10 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
           const SizedBox(height: 10),
 
           // Notation
-          Text('Note minimale (${_minRating.toStringAsFixed(1)})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            'Note minimale (${_minRating.toStringAsFixed(1)})',
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           Slider(
             value: _minRating,
             max: 5,
@@ -548,10 +657,16 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
             ),
             child: SwitchListTile(
               value: _verifiedOnly,
-              activeColor: _accent,
+              activeThumbColor: _accent,
               onChanged: (val) => setState(() => _verifiedOnly = val),
-              title: const Text('Agents vérifiés uniquement', style: TextStyle(fontWeight: FontWeight.w800)),
-              subtitle: const Text('Filtrer les profils certifiés', style: TextStyle(color: Colors.grey)),
+              title: const Text(
+                'Agents vérifiés uniquement',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: const Text(
+                'Filtrer les profils certifiés',
+                style: TextStyle(color: Colors.grey),
+              ),
             ),
           ),
           const Spacer(),
@@ -563,10 +678,15 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: _accent,
                 foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
                 elevation: 0,
               ),
-              child: const Text('APPLIQUER', style: TextStyle(fontWeight: FontWeight.w900)),
+              child: const Text(
+                'APPLIQUER',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
             ),
           ),
           const SizedBox(height: 10),

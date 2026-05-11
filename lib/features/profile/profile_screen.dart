@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/routes/app_routes.dart';
+import '../../core/providers/auth_provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -14,7 +16,7 @@ class ProfileScreen extends StatelessWidget {
           // --- SECTION HEADER PROFIL ---
           const ProfileHeader(),
           const SizedBox(height: 30),
-          
+
           // --- SECTION PARAMÈTRES ---
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -30,31 +32,40 @@ class ProfileScreen extends StatelessWidget {
                   icon: Icons.person_outline,
                   title: "Informations personnelles",
                   subtitle: "Modifier nom, email...",
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.profilePersonalInfo),
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    AppRoutes.profilePersonalInfo,
+                  ),
                 ),
                 ProfileParamItem(
                   icon: Icons.notifications_none,
                   title: "Notifications",
                   subtitle: "Gérer vos alertes",
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.profileNotifications),
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    AppRoutes.profileNotifications,
+                  ),
                 ),
                 ProfileParamItem(
                   icon: Icons.security,
                   title: "Sécurité",
                   subtitle: "Mot de passe, biométrie",
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.profileSecurity),
+                  onTap: () =>
+                      Navigator.pushNamed(context, AppRoutes.profileSecurity),
                 ),
                 ProfileParamItem(
                   icon: Icons.language,
                   title: "Langue",
                   subtitle: "Français (FR)",
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.profileLanguage),
+                  onTap: () =>
+                      Navigator.pushNamed(context, AppRoutes.profileLanguage),
                 ),
                 ProfileParamItem(
                   icon: Icons.help_outline,
                   title: "Centre d'aide",
                   subtitle: "FAQ et support",
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.profileHelp),
+                  onTap: () =>
+                      Navigator.pushNamed(context, AppRoutes.profileHelp),
                 ),
                 const SizedBox(height: 20),
                 ProfileParamItem(
@@ -62,7 +73,45 @@ class ProfileScreen extends StatelessWidget {
                   title: "Déconnexion",
                   subtitle: "Quitter l'application",
                   isLogout: true,
-                  onTap: () => Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (r) => false),
+                  onTap: () async {
+                    // Afficher une confirmation
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Déconnexion'),
+                        content: const Text(
+                          'Êtes-vous sûr de vouloir vous déconnecter ?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Annuler'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: const Text('Déconnexion'),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm == true) {
+                      // Appeler la méthode logout du AuthProvider
+                      final authProvider = Provider.of<AuthProvider>(
+                        context,
+                        listen: false,
+                      );
+                      await authProvider.logout();
+
+                      // Rediriger vers l'écran de login
+                      if (context.mounted) {
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          AppRoutes.login,
+                          (route) => false,
+                        );
+                      }
+                    }
+                  },
                 ),
               ],
             ),
@@ -72,7 +121,6 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
   }
-
 }
 
 /// Élément de menu dans Profil.
@@ -108,7 +156,9 @@ class ProfileParamItem extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(15),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10)],
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10),
+          ],
         ),
         child: Row(
           children: [
@@ -118,8 +168,14 @@ class ProfileParamItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
-                  Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text(
+                    title,
+                    style: TextStyle(fontWeight: FontWeight.bold, color: color),
+                  ),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
                 ],
               ),
             ),
@@ -150,32 +206,58 @@ class ProfileHeader extends StatelessWidget {
               ),
             ),
             InkWell(
-              onTap: () => Navigator.pushNamed(context, AppRoutes.profilePersonalInfo),
+              onTap: () =>
+                  Navigator.pushNamed(context, AppRoutes.profilePersonalInfo),
               borderRadius: BorderRadius.circular(99),
               child: Container(
                 padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
-                child: const Icon(Icons.edit, color: Color(0xFFFFD400), size: 18),
+                decoration: const BoxDecoration(
+                  color: Colors.black,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.edit,
+                  color: Color(0xFFFFD400),
+                  size: 18,
+                ),
               ),
             ),
           ],
         ),
         // ... (Avatar et nom restent identiques) ...
-        const Text("Thomas Kouassi", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-        const Text("Membre Premium", style: TextStyle(color: Color(0xFF715D00), fontWeight: FontWeight.bold, fontSize: 13)),
+        const Text(
+          "Thomas Kouassi",
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+        ),
+        const Text(
+          "Membre Premium",
+          style: TextStyle(
+            color: Color(0xFF715D00),
+            fontWeight: FontWeight.bold,
+            fontSize: 13,
+          ),
+        ),
         const SizedBox(height: 25),
-        
+
         // NOUVELLES STATISTIQUES
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: [
               Expanded(
-                child: _buildStatCard("48", "Missions créées", Icons.assignment_turned_in_rounded),
+                child: _buildStatCard(
+                  "48",
+                  "Missions créées",
+                  Icons.assignment_turned_in_rounded,
+                ),
               ),
               const SizedBox(width: 15),
               Expanded(
-                child: _buildStatCard("150.000 FCFA", "Montant dépensé", Icons.account_balance_wallet_rounded),
+                child: _buildStatCard(
+                  "150.000 FCFA",
+                  "Montant dépensé",
+                  Icons.account_balance_wallet_rounded,
+                ),
               ),
             ],
           ),
@@ -197,7 +279,10 @@ class ProfileHeader extends StatelessWidget {
         children: [
           Icon(icon, color: const Color(0xFFFFD400), size: 24),
           const SizedBox(height: 10),
-          Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+          ),
           Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
         ],
       ),

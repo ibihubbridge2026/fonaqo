@@ -35,4 +35,21 @@ abstract final class AppRoutes {
 
   /// Notation d’un agent (fin mission).
   static const String rating = '/rating';
+
+  /// Missions disponibles pour les agents.
+  static const String missionsAvailable = '/missions-available';
+
+  /// Centre d'aide
+  static const String helpCenter = '/help-center';
+
+  /// Paramètres de notifications
+  static const String notificationsSettings = '/notifications-settings';
+
+  /// Informations personnelles
+  static const String personalInfo = '/personal-info';
+
+  /// Paramètres de sécurité
+  static const String securitySettings = '/security-settings';
+
+  static const String language = '/language';
 }
