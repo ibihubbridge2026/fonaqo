@@ -10,16 +10,24 @@ class EventDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final args = (ModalRoute.of(context)?.settings.arguments as Map?)?.cast<String, dynamic>() ?? const {};
+    final args =
+        (ModalRoute.of(context)?.settings.arguments as Map?)
+            ?.cast<String, dynamic>() ??
+        const {};
     final title = (args['title'] as String?) ?? 'Événement';
     final date = (args['date'] as String?) ?? '';
     final place = (args['place'] as String?) ?? '';
-    final imagePath = (args['imagePath'] as String?) ?? 'assets/images/events/event-wle.webp';
+    final imagePath =
+        (args['imagePath'] as String?) ?? 'assets/images/events/event-wle.webp';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
       appBar: const CustomAppBar.detailStack(
-        detailTitleWidget: Text('Détail événement', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+        title: 'Détail événement',
+        detailTitleWidget: Text(
+          'Détail événement',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -34,13 +42,20 @@ class EventDetailScreen extends StatelessWidget {
                 errorBuilder: (_, _, _) => Container(
                   color: Colors.grey[200],
                   alignment: Alignment.center,
-                  child: const Icon(Icons.broken_image, color: Colors.grey, size: 48),
+                  child: const Icon(
+                    Icons.broken_image,
+                    color: Colors.grey,
+                    size: 48,
+                  ),
                 ),
               ),
             ),
           ),
           const SizedBox(height: 16),
-          Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900),
+          ),
           const SizedBox(height: 6),
           _MetaRow(icon: Icons.calendar_today, text: date),
           const SizedBox(height: 4),
@@ -51,7 +66,12 @@ class EventDetailScreen extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(18),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 14)],
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 14,
+                ),
+              ],
             ),
             child: const Text(
               "Récapitulatif rapide: choisissez une action pour déléguer l'attente ou l'achat.",
@@ -59,7 +79,10 @@ class EventDetailScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          const Text('Actions', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+          const Text(
+            'Actions',
+            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+          ),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -101,7 +124,9 @@ class _MetaRow extends StatelessWidget {
       children: [
         Icon(icon, size: 14, color: Colors.grey[700]),
         const SizedBox(width: 6),
-        Expanded(child: Text(text, style: const TextStyle(color: Colors.grey))),
+        Expanded(
+          child: Text(text, style: const TextStyle(color: Colors.grey)),
+        ),
       ],
     );
   }
@@ -130,7 +155,9 @@ class _ActionCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 14)],
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 14),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -146,11 +173,13 @@ class _ActionCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
             const SizedBox(height: 4),
-            Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            Text(
+              subtitle,
+              style: const TextStyle(color: Colors.grey, fontSize: 12),
+            ),
           ],
         ),
       ),
     );
   }
 }
-

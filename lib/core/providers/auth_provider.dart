@@ -142,6 +142,43 @@ class AuthProvider extends ChangeNotifier {
     _setError('Votre session a expiré. Veuillez vous reconnecter.');
   }
 
+  /// Formate les messages d'erreur pour l'utilisateur
+  String formatErrorMessage(dynamic e) {
+    final errorString = e.toString().toLowerCase();
+
+    // Erreur de duplicate key
+    if (errorString.contains('duplicate key') ||
+        errorString.contains('unique constraint') ||
+        errorString.contains('already exists')) {
+      return 'Ce numéro ou cet email est déjà utilisé.';
+    }
+
+    // Erreur 500 serveur
+    if (errorString.contains('500') ||
+        errorString.contains('internal server error') ||
+        errorString.contains('server error')) {
+      return 'Le serveur rencontre un problème technique. Réessayez plus tard.';
+    }
+
+    // Erreur de connexion
+    if (errorString.contains('connection') ||
+        errorString.contains('network') ||
+        errorString.contains('timeout') ||
+        errorString.contains('unreachable')) {
+      return 'Vérifiez votre connexion internet.';
+    }
+
+    // Erreur de validation
+    if (errorString.contains('validation') ||
+        errorString.contains('invalid') ||
+        errorString.contains('required')) {
+      return 'Veuillez vérifier les informations saisies.';
+    }
+
+    // Erreur par défaut
+    return 'Une erreur est survenue. Veuillez réessayer.';
+  }
+
   // =========================
   // LOGIN
   // =========================
@@ -532,5 +569,91 @@ class AuthProvider extends ChangeNotifier {
 
   Future<String?> getToken() async {
     return await _secureStorage.read(key: _tokenKey);
+  }
+
+  // =========================
+  // CHANGE PASSWORD
+  // =========================
+
+  Future<bool> changePassword(Map<String, dynamic> passwordData) async {
+    _clearError();
+    _setLoading(true);
+
+    try {
+      final response = await _baseClient.post(
+        '/api/v1/accounts/password/change/',
+        data: passwordData,
+      );
+
+      _logger.d('CHANGE PASSWORD STATUS CODE: ${response.statusCode}');
+      _logger.i('CHANGE PASSWORD RESPONSE DATA: ${response.data}');
+
+      if (response.statusCode != 200) {
+        final errorMessage = response.data is Map
+            ? response.data['message'] ??
+                  'Erreur lors du changement de mot de passe'
+            : 'Erreur lors du changement de mot de passe';
+        _setError(errorMessage);
+        return false;
+      }
+
+      return true;
+    } catch (e) {
+      _logger.e('Erreur CHANGE PASSWORD: ${e.toString()}');
+      _setError('Erreur lors du changement de mot de passe: ${e.toString()}');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // =========================
+  // UPDATE PROFILE
+  // =========================
+
+  Future<bool> updateProfile(Map<String, dynamic> profileData) async {
+    _clearError();
+    _setLoading(true);
+
+    try {
+      final response = await _baseClient.patch(
+        '/api/v1/accounts/profile/update/',
+        data: profileData,
+      );
+
+      _logger.d('UPDATE PROFILE STATUS CODE: ${response.statusCode}');
+      _logger.i('UPDATE PROFILE RESPONSE DATA: ${response.data}');
+
+      if (response.statusCode != 200) {
+        final errorMessage = response.data is Map
+            ? response.data['message'] ??
+                  'Erreur lors de la mise à jour du profil'
+            : 'Erreur lors de la mise à jour du profil';
+        _setError(errorMessage);
+        return false;
+      }
+
+      final responseData = response.data as Map<String, dynamic>;
+      final userData = responseData['data'] as Map<String, dynamic>?;
+
+      if (userData != null) {
+        // Update local user data
+        final updatedUser = UserModel.fromJson(userData);
+        _currentUser = updatedUser;
+
+        // Save updated user data to secure storage
+        await _secureStorage.write(key: _userKey, value: jsonEncode(userData));
+
+        notifyListeners();
+      }
+
+      return true;
+    } catch (e) {
+      _logger.e('Erreur UPDATE PROFILE: ${e.toString()}');
+      _setError('Erreur lors de la mise à jour du profil: ${e.toString()}');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
   }
 }

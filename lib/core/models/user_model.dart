@@ -9,6 +9,7 @@ class UserModel {
   final String role; // 'agent' ou 'client' - avec valeur par défaut 'client'
   final bool isVerified;
   final String? avatarUrl;
+  final double? walletBalance;
   final AgentProfile? agentProfile;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -22,6 +23,7 @@ class UserModel {
     required this.role,
     required this.isVerified,
     this.avatarUrl,
+    this.walletBalance,
     this.agentProfile,
     this.createdAt,
     this.updatedAt,
@@ -38,6 +40,7 @@ class UserModel {
       role: json['role']?.toString() ?? 'client',
       isVerified: json['is_verified'] as bool? ?? false,
       avatarUrl: json['avatar_url']?.toString(),
+      walletBalance: (json['wallet_balance'] as num?)?.toDouble(),
       agentProfile: json['agent_profile'] != null
           ? AgentProfile.fromJson(json['agent_profile'] as Map<String, dynamic>)
           : null,
@@ -48,6 +51,18 @@ class UserModel {
           ? DateTime.parse(json['updated_at'] as String)
           : null,
     );
+  }
+
+  /// Nom d'utilisateur complet (firstName + lastName ou email)
+  String get username {
+    if (firstName != null && lastName != null) {
+      return '$firstName $lastName';
+    }
+    if (firstName != null) {
+      return firstName!;
+    }
+    // Fallback: utiliser la partie avant @ de l'email
+    return email.split('@')[0];
   }
 
   /// Convertit le UserModel en JSON (requête API)
@@ -61,6 +76,7 @@ class UserModel {
       'role': role,
       'is_verified': isVerified,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
+      if (walletBalance != null) 'wallet_balance': walletBalance,
       if (agentProfile != null) 'agent_profile': agentProfile!.toJson(),
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
@@ -77,6 +93,7 @@ class UserModel {
     String? role,
     bool? isVerified,
     String? avatarUrl,
+    double? walletBalance,
     AgentProfile? agentProfile,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -90,6 +107,7 @@ class UserModel {
       role: role ?? this.role,
       isVerified: isVerified ?? this.isVerified,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      walletBalance: walletBalance ?? this.walletBalance,
       agentProfile: agentProfile ?? this.agentProfile,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -128,7 +146,8 @@ class UserModel {
         other.firstName == firstName &&
         other.lastName == lastName &&
         other.role == role &&
-        other.isVerified == isVerified;
+        other.isVerified == isVerified &&
+        other.walletBalance == walletBalance;
   }
 
   @override
@@ -139,7 +158,8 @@ class UserModel {
         firstName.hashCode ^
         lastName.hashCode ^
         role.hashCode ^
-        isVerified.hashCode;
+        isVerified.hashCode ^
+        walletBalance.hashCode;
   }
 }
 
@@ -154,6 +174,8 @@ class AgentProfile {
   final List<String> certifications;
   final double? hourlyRate;
   final DateTime? lastActive;
+  // TODO: Add is_internal field (Boolean, default: False) to filter confidential missions
+  // This will be used to filter missions marked as "confidentiel" in Step1TypeSelector
 
   const AgentProfile({
     this.bio,

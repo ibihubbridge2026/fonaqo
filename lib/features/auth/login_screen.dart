@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/routes/app_routes.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/models/country_model.dart' as country_model;
 import 'widgets/input_card.dart';
 import 'widgets/phone_input_card.dart';
 
@@ -20,8 +21,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _password = TextEditingController();
   bool _isPasswordVisible = false;
 
-  Country _country =
-      Country.benin(); // Bénin par défaut pour l'Afrique de l'Ouest
+  country_model.Country _country = country_model
+      .Country
+      .defaultCountry; // Bénin par défaut pour l'Afrique de l'Ouest
   final bool _usePhone = true; // Téléphone par défaut pour l'Afrique
 
   Future<void> _handleLogin() async {

@@ -7,10 +7,12 @@ class NotificationsSettingsScreen extends StatefulWidget {
   const NotificationsSettingsScreen({super.key});
 
   @override
-  State<NotificationsSettingsScreen> createState() => _NotificationsSettingsScreenState();
+  State<NotificationsSettingsScreen> createState() =>
+      _NotificationsSettingsScreenState();
 }
 
-class _NotificationsSettingsScreenState extends State<NotificationsSettingsScreen> {
+class _NotificationsSettingsScreenState
+    extends State<NotificationsSettingsScreen> {
   bool _pushEnabled = true;
   bool _emailEnabled = false;
   bool _smsEnabled = true;
@@ -20,7 +22,11 @@ class _NotificationsSettingsScreenState extends State<NotificationsSettingsScree
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
       appBar: const CustomAppBar.detailStack(
-        detailTitleWidget: Text('Notifications', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        title: 'Notifications',
+        detailTitleWidget: Text(
+          'Notifications',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
       ),
       body: SafeArea(
         child: ListView(
@@ -72,7 +78,9 @@ class _SwitchTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12),
+        ],
       ),
       child: SwitchListTile(
         activeThumbColor: const Color(0xFFFFD400),
@@ -84,4 +92,3 @@ class _SwitchTile extends StatelessWidget {
     );
   }
 }
-

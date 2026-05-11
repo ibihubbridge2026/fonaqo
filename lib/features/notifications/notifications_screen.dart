@@ -11,7 +11,11 @@ class NotificationsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
       appBar: const CustomAppBar.detailStack(
-        detailTitleWidget: Text('Notifications', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+        title: 'Notifications',
+        detailTitleWidget: Text(
+          'Notifications',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -62,7 +66,9 @@ class _NotifTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 14)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 14),
+        ],
       ),
       child: Row(
         children: [
@@ -80,17 +86,29 @@ class _NotifTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w900)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w900),
+                ),
                 const SizedBox(height: 2),
-                Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Text(
+                  subtitle,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
               ],
             ),
           ),
           const SizedBox(width: 10),
-          Text(time, style: const TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.w700)),
+          Text(
+            time,
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
   }
 }
-

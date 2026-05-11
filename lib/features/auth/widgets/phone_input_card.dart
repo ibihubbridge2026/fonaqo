@@ -1,23 +1,6 @@
 import 'package:flutter/material.dart';
 import 'input_card.dart';
-
-class Country {
-  final String name;
-  final String flag;
-  final String dialCode;
-
-  const Country({
-    required this.name,
-    required this.flag,
-    required this.dialCode,
-  });
-
-  factory Country.ci() =>
-      const Country(name: "Côte d'Ivoire", flag: '🇨🇮', dialCode: '+225');
-
-  factory Country.benin() =>
-      const Country(name: "Bénin", flag: '🇧🇯', dialCode: '+229');
-}
+import '../../../core/models/country_model.dart';
 
 class PhoneInputCard extends StatelessWidget {
   final Country country;
@@ -65,13 +48,7 @@ class PhoneInputCard extends StatelessWidget {
 }
 
 Future<Country?> pickCountry(BuildContext context, Country current) {
-  final countries = <Country>[
-    Country.ci(),
-    const Country(name: 'France', flag: '🇫🇷', dialCode: '+33'),
-    const Country(name: 'Sénégal', flag: '🇸🇳', dialCode: '+221'),
-    const Country(name: 'Cameroun', flag: '🇨🇲', dialCode: '+237'),
-    const Country(name: 'Mali', flag: '🇲🇱', dialCode: '+223'),
-  ];
+  final countries = Country.availableCountries;
 
   return showModalBottomSheet<Country>(
     context: context,

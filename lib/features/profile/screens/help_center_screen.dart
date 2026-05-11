@@ -11,17 +11,31 @@ class HelpCenterScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
       appBar: const CustomAppBar.detailStack(
-        detailTitleWidget: Text('Centre d’aide', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        title: 'Centre d\'aide',
+        detailTitleWidget: Text(
+          'Centre d\'aide',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
       ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: const [
-            _FaqTile(question: 'Comment créer une mission ?', answer: 'Depuis l’accueil, appuyez sur “CRÉER UNE MISSION”.'),
+            _FaqTile(
+              question: 'Comment créer une mission ?',
+              answer: 'Depuis l’accueil, appuyez sur “CRÉER UNE MISSION”.',
+            ),
             SizedBox(height: 12),
-            _FaqTile(question: 'Comment contacter un agent ?', answer: 'Ouvrez l’onglet Agents ou utilisez le chat.'),
+            _FaqTile(
+              question: 'Comment contacter un agent ?',
+              answer: 'Ouvrez l’onglet Agents ou utilisez le chat.',
+            ),
             SizedBox(height: 12),
-            _FaqTile(question: 'Paiement et facturation', answer: 'Les options de paiement seront disponibles dans une prochaine version.'),
+            _FaqTile(
+              question: 'Paiement et facturation',
+              answer:
+                  'Les options de paiement seront disponibles dans une prochaine version.',
+            ),
           ],
         ),
       ),
@@ -41,16 +55,18 @@ class _FaqTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12),
+        ],
       ),
       child: ExpansionTile(
-        title: Text(question, style: const TextStyle(fontWeight: FontWeight.w900)),
+        title: Text(
+          question,
+          style: const TextStyle(fontWeight: FontWeight.w900),
+        ),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        children: [
-          Text(answer, style: const TextStyle(color: Colors.black87)),
-        ],
+        children: [Text(answer, style: const TextStyle(color: Colors.black87))],
       ),
     );
   }
 }
-

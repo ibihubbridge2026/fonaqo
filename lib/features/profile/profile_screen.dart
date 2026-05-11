@@ -54,6 +54,14 @@ class ProfileScreen extends StatelessWidget {
                       Navigator.pushNamed(context, AppRoutes.profileSecurity),
                 ),
                 ProfileParamItem(
+                  icon: Icons.location_on_outlined,
+                  title: "Ma Localisation",
+                  subtitle: "Position actuelle et adresses",
+                  onTap: () {
+                    Navigator.pushNamed(context, AppRoutes.profileLocation);
+                  },
+                ),
+                ProfileParamItem(
                   icon: Icons.language,
                   title: "Langue",
                   subtitle: "Français (FR)",
@@ -192,6 +200,17 @@ class ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthProvider>().currentUser;
+
+    // Gestion utilisateur null
+    if (user == null) {
+      return const Center(
+        child: Text(
+          'Chargement du profil...',
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        ),
+      );
+    }
     return Column(
       children: [
         Stack(
@@ -224,14 +243,14 @@ class ProfileHeader extends StatelessWidget {
             ),
           ],
         ),
-        // ... (Avatar et nom restent identiques) ...
-        const Text(
-          "Thomas Kouassi",
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+        // Nom dynamique
+        Text(
+          user.username,
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
         ),
-        const Text(
-          "Membre Premium",
-          style: TextStyle(
+        Text(
+          user.role.toUpperCase(),
+          style: const TextStyle(
             color: Color(0xFF715D00),
             fontWeight: FontWeight.bold,
             fontSize: 13,
@@ -239,14 +258,14 @@ class ProfileHeader extends StatelessWidget {
         ),
         const SizedBox(height: 25),
 
-        // NOUVELLES STATISTIQUES
+        // STATISTIQUES UTILISATEUR
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: [
               Expanded(
                 child: _buildStatCard(
-                  "48",
+                  user.agentProfile?.totalMissions.toString() ?? "0",
                   "Missions créées",
                   Icons.assignment_turned_in_rounded,
                 ),
@@ -254,8 +273,8 @@ class ProfileHeader extends StatelessWidget {
               const SizedBox(width: 15),
               Expanded(
                 child: _buildStatCard(
-                  "150.000 FCFA",
-                  "Montant dépensé",
+                  "${(user.walletBalance ?? 0.0).toStringAsFixed(0)} FCFA",
+                  "Solde disponible",
                   Icons.account_balance_wallet_rounded,
                 ),
               ),

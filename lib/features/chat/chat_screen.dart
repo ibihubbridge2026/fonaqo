@@ -16,7 +16,10 @@ class ChatScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
       appBar: CustomAppBar.detailStack(
-        detailTitleWidget: _ChatConversationTitle(partnerAvatarUrl: _partnerAvatarUrl),
+        title: 'Conversation',
+        detailTitleWidget: _ChatConversationTitle(
+          partnerAvatarUrl: _partnerAvatarUrl,
+        ),
         detailTrailingActions: const [
           _ChatToolbarIcon(icon: Icons.call_outlined),
           _ChatToolbarIcon(icon: Icons.more_vert),
@@ -67,7 +70,10 @@ class _ChatToolbarIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(icon: Icon(icon, color: Colors.black), onPressed: () {});
+    return IconButton(
+      icon: Icon(icon, color: Colors.black),
+      onPressed: () {},
+    );
   }
 }
 
@@ -102,7 +108,11 @@ class _ChatConversationTitle extends StatelessWidget {
           children: [
             const Text(
               'Julien B.',
-              style: TextStyle(color: Colors.black, fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.black,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             Text(
               'En ligne',
@@ -132,7 +142,11 @@ class _ChatDateDivider extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+          ),
         ),
       ),
     );
@@ -167,7 +181,9 @@ class ChatMessageBubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: Column(
-        crossAxisAlignment: isFromCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: isFromCurrentUser
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           Container(
             constraints: const BoxConstraints(maxWidth: 280),
@@ -182,9 +198,15 @@ class ChatMessageBubble extends StatelessWidget {
               ),
               border: isFromCurrentUser
                   ? null
-                  : const Border(left: BorderSide(color: Color(0xFFFFD400), width: 4)),
+                  : const Border(
+                      left: BorderSide(color: Color(0xFFFFD400), width: 4),
+                    ),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5, offset: const Offset(0, 2)),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
+                ),
               ],
             ),
             child: Column(
@@ -192,7 +214,10 @@ class ChatMessageBubble extends StatelessWidget {
               children: [
                 Text(
                   message,
-                  style: TextStyle(color: isFromCurrentUser ? Colors.white : Colors.black, fontSize: 14),
+                  style: TextStyle(
+                    color: isFromCurrentUser ? Colors.white : Colors.black,
+                    fontSize: 14,
+                  ),
                 ),
                 if (inlineImageNetworkUrl != null) ...[
                   const SizedBox(height: 12),
@@ -206,7 +231,10 @@ class ChatMessageBubble extends StatelessWidget {
                           color: Colors.grey[200],
                           height: 120,
                           alignment: Alignment.center,
-                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                          child: const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                          ),
                         );
                       },
                     ),
@@ -218,7 +246,11 @@ class ChatMessageBubble extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             timestampLabel,
-            style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.grey,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -233,7 +265,12 @@ class ChatComposerPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, MediaQuery.paddingOf(context).bottom + 12),
+      padding: EdgeInsets.fromLTRB(
+        16,
+        12,
+        16,
+        MediaQuery.paddingOf(context).bottom + 12,
+      ),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
@@ -243,7 +280,10 @@ class ChatComposerPanel extends StatelessWidget {
         children: [
           CircleAvatar(
             backgroundColor: const Color(0xFFEEEEEE),
-            child: IconButton(icon: const Icon(Icons.add, color: Colors.black), onPressed: () {}),
+            child: IconButton(
+              icon: const Icon(Icons.add, color: Colors.black),
+              onPressed: () {},
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -264,7 +304,10 @@ class ChatComposerPanel extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           DecoratedBox(
-            decoration: const BoxDecoration(color: Color(0xFFFFD400), shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFD400),
+              shape: BoxShape.circle,
+            ),
             child: IconButton(
               icon: const Icon(Icons.send, color: Colors.black),
               onPressed: () {},

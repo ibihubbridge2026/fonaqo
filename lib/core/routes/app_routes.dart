@@ -15,11 +15,14 @@ abstract final class AppRoutes {
   static const profilePersonalInfo = '/profile/personal-info';
   static const profileNotifications = '/profile/notifications';
   static const profileSecurity = '/profile/security';
+  static const profileLocation = '/profile/location';
   static const profileLanguage = '/profile/language';
   static const profileHelp = '/profile/help';
 
   /// Messagerie (route empilée).
-  static const chat = '/chat';
+  static const String chat = '/chat';
+  static const String chatList = '/chat-list';
+  static const String chatDetail = '/chat-detail';
 
   /// Mission detail (route empilée).
   static const String missionDetail = '/mission-detail';

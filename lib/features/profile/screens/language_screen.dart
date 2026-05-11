@@ -18,7 +18,11 @@ class _LanguageScreenState extends State<LanguageScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
       appBar: const CustomAppBar.detailStack(
-        detailTitleWidget: Text('Langue', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        title: 'Langue',
+        detailTitleWidget: Text(
+          'Langue',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
       ),
       body: SafeArea(
         child: ListView(
@@ -63,7 +67,9 @@ class _RadioTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12),
+        ],
       ),
       child: RadioListTile<String>(
         activeColor: const Color(0xFFFFD400),
@@ -78,4 +84,3 @@ class _RadioTile extends StatelessWidget {
     );
   }
 }
-

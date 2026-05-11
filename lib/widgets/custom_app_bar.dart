@@ -27,7 +27,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// Comportement visuel principal du bandeau.
   final CustomAppBarVariant variant;
 
-  
   /// Titre centré lorsque `variant == mainShellSection`.
   final String? sectionTitle;
 
@@ -48,31 +47,32 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
     this.onNotificationsPressed,
     this.onChatPressed,
-  })  : variant = CustomAppBarVariant.mainShellHome,
-        sectionTitle = null,
-        detailTitleWidget = null,
-        detailTrailingActions = null,
-        leadingOnBackPressed = null;
+  }) : variant = CustomAppBarVariant.mainShellHome,
+       sectionTitle = null,
+       detailTitleWidget = null,
+       detailTrailingActions = null,
+       leadingOnBackPressed = null;
 
   const CustomAppBar.mainShellSection({
     super.key,
     required String this.sectionTitle,
-  })  : variant = CustomAppBarVariant.mainShellSection,
-        detailTitleWidget = null,
-        detailTrailingActions = null,
-        leadingOnBackPressed = null,
-        onNotificationsPressed = null,
-        onChatPressed = null;
+  }) : variant = CustomAppBarVariant.mainShellSection,
+       detailTitleWidget = null,
+       detailTrailingActions = null,
+       leadingOnBackPressed = null,
+       onNotificationsPressed = null,
+       onChatPressed = null;
 
   const CustomAppBar.detailStack({
     super.key,
     this.detailTitleWidget,
     this.leadingOnBackPressed,
     this.detailTrailingActions,
-  })  : variant = CustomAppBarVariant.detailStack,
-        sectionTitle = null,
-        onNotificationsPressed = null,
-        onChatPressed = null;
+    required String title,
+  }) : variant = CustomAppBarVariant.detailStack,
+       sectionTitle = null,
+       onNotificationsPressed = null,
+       onChatPressed = null;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -120,8 +120,13 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
       case CustomAppBarVariant.detailStack:
         return IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
-          onPressed: leadingOnBackPressed ?? () => Navigator.of(context).maybePop(),
+          icon: const Icon(
+            Icons.arrow_back_ios_new,
+            color: Colors.black,
+            size: 20,
+          ),
+          onPressed:
+              leadingOnBackPressed ?? () => Navigator.of(context).maybePop(),
         );
     }
   }
@@ -168,24 +173,31 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   List<Widget> _buildActions(BuildContext context) {
     switch (variant) {
       case CustomAppBarVariant.mainShellHome:
-        final chat = onChatPressed ?? () => Navigator.pushNamed(context, AppRoutes.chat);
-        final bell = onNotificationsPressed ?? () => Navigator.pushNamed(context, AppRoutes.notifications);
+        final chat =
+            onChatPressed ??
+            () => Navigator.pushNamed(context, AppRoutes.chatList);
+        final bell =
+            onNotificationsPressed ??
+            () => Navigator.pushNamed(context, AppRoutes.notifications);
         return [
           IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: Colors.black54),
+            icon: const Icon(
+              Icons.notifications_none_rounded,
+              color: Colors.black54,
+            ),
             onPressed: bell,
           ),
           IconButton(
-            icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.black54),
+            icon: const Icon(
+              Icons.chat_bubble_outline_rounded,
+              color: Colors.black54,
+            ),
             onPressed: chat,
           ),
         ];
 
       case CustomAppBarVariant.mainShellSection:
-        return const [
-          SizedBox(width: 48),
-          SizedBox(width: 48),
-        ];
+        return const [SizedBox(width: 48), SizedBox(width: 48)];
 
       case CustomAppBarVariant.detailStack:
         final extra = detailTrailingActions;

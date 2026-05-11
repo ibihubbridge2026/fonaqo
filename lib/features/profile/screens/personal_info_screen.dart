@@ -1,8 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 
 import '../../../widgets/custom_app_bar.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/models/user_model.dart';
 
-/// Écran de modification des informations personnelles (nom, email optionnel, téléphone, photo).
+/// Écran de modification des informations personnelles (nom, email, photo).
 class PersonalInfoScreen extends StatefulWidget {
   const PersonalInfoScreen({super.key});
 
@@ -11,16 +16,125 @@ class PersonalInfoScreen extends StatefulWidget {
 }
 
 class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
-  final TextEditingController _name = TextEditingController(text: 'Thomas Kouassi');
-  final TextEditingController _email = TextEditingController(text: 'thomas@exemple.com');
-  final TextEditingController _phone = TextEditingController(text: '+225 00 00 00 00');
+  final TextEditingController _firstName = TextEditingController();
+  final TextEditingController _lastName = TextEditingController();
+  final TextEditingController _email = TextEditingController();
+
+  File? _profileImage;
+  final ImagePicker _imagePicker = ImagePicker();
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  void _loadUserData() {
+    final user = Provider.of<AuthProvider>(context, listen: false).currentUser;
+    if (user != null) {
+      _firstName.text = user.firstName ?? '';
+      _lastName.text = user.lastName ?? '';
+      _email.text = user.email ?? '';
+    }
+  }
 
   @override
   void dispose() {
-    _name.dispose();
+    _firstName.dispose();
+    _lastName.dispose();
     _email.dispose();
-    _phone.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (pickedFile != null) {
+        setState(() {
+          _profileImage = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la sélection de l\'image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveProfile() async {
+    if (_firstName.text.trim().isEmpty || _lastName.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez remplir tous les champs obligatoires'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+    });
+
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+      Map<String, dynamic> profileData = {
+        'first_name': _firstName.text.trim(),
+        'last_name': _lastName.text.trim(),
+      };
+
+      // Add image if selected
+      if (_profileImage != null) {
+        // TODO: Implement image upload to server
+        // For now, we'll just update the text fields
+      }
+
+      final success = await authProvider.updateProfile(profileData);
+
+      if (mounted) {
+        if (success) {
+          authProvider.showSuccessSnackBar(
+            context,
+            'Profil mis à jour avec succès',
+          );
+          // Optionally navigate back
+          // Navigator.of(context).pop();
+        } else {
+          authProvider.showErrorSnackBar(
+            context,
+            authProvider.errorMessage ?? 'Erreur lors de la mise à jour',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur inattendue: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
   }
 
   @override
@@ -28,33 +142,67 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
       appBar: const CustomAppBar.detailStack(
-        detailTitleWidget: Text('Informations personnelles', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        title: 'Informations personnelles',
+        detailTitleWidget: Text(
+          'Informations personnelles',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
       ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             children: [
-              const _AvatarEditor(),
+              _AvatarEditor(
+                profileImage: _profileImage,
+                onPickImage: _pickImage,
+              ),
               const SizedBox(height: 12),
-              _FieldCard(label: 'Nom complet', controller: _name),
+              _FieldCard(
+                label: 'Prénom',
+                controller: _firstName,
+                keyboardType: TextInputType.name,
+              ),
               const SizedBox(height: 12),
-              _FieldCard(label: 'Email (optionnel)', controller: _email, keyboardType: TextInputType.emailAddress),
+              _FieldCard(
+                label: 'Nom',
+                controller: _lastName,
+                keyboardType: TextInputType.name,
+              ),
               const SizedBox(height: 12),
-              _FieldCard(label: 'Téléphone', controller: _phone, keyboardType: TextInputType.phone),
+              _FieldCard(
+                label: 'Email',
+                controller: _email,
+                keyboardType: TextInputType.emailAddress,
+                readOnly: true,
+              ),
               const Spacer(),
               SizedBox(
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () => Navigator.of(context).maybePop(),
+                  onPressed: _isSaving ? null : _saveProfile,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFFFD400),
                     foregroundColor: Colors.black,
                     elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
-                  child: const Text('ENREGISTRER', style: TextStyle(fontWeight: FontWeight.w900)),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.black,
+                          ),
+                        )
+                      : const Text(
+                          'ENREGISTRER',
+                          style: TextStyle(fontWeight: FontWeight.w900),
+                        ),
                 ),
               ),
             ],
@@ -69,11 +217,13 @@ class _FieldCard extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final TextInputType? keyboardType;
+  final bool readOnly;
 
   const _FieldCard({
     required this.label,
     required this.controller,
     this.keyboardType,
+    this.readOnly = false,
   });
 
   @override
@@ -83,14 +233,27 @@ class _FieldCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12),
+        ],
       ),
       child: TextField(
         controller: controller,
         keyboardType: keyboardType,
+        readOnly: readOnly,
+        style: TextStyle(
+          color: readOnly ? Colors.grey[600] : Colors.black,
+          fontWeight: readOnly ? FontWeight.normal : FontWeight.w500,
+        ),
         decoration: InputDecoration(
           labelText: label,
+          labelStyle: TextStyle(
+            color: readOnly ? Colors.grey[500] : Colors.black54,
+          ),
           border: InputBorder.none,
+          suffixIcon: readOnly
+              ? Icon(Icons.lock_outline, color: Colors.grey[400], size: 20)
+              : null,
         ),
       ),
     );
@@ -98,7 +261,10 @@ class _FieldCard extends StatelessWidget {
 }
 
 class _AvatarEditor extends StatelessWidget {
-  const _AvatarEditor();
+  final File? profileImage;
+  final VoidCallback onPickImage;
+
+  const _AvatarEditor({required this.profileImage, required this.onPickImage});
 
   @override
   Widget build(BuildContext context) {
@@ -107,20 +273,59 @@ class _AvatarEditor extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(30),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12),
+        ],
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 30,
-            child: ClipOval(
-              child: Image.asset(
-                'assets/images/avatar/user.png',
-                width: 60,
-                height: 60,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const Icon(Icons.person, color: Colors.black54),
-              ),
+          GestureDetector(
+            onTap: onPickImage,
+            child: Stack(
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: Colors.grey[200],
+                  child: profileImage != null
+                      ? ClipOval(
+                          child: Image.file(
+                            profileImage!,
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) =>
+                                const Icon(Icons.person, color: Colors.black54),
+                          ),
+                        )
+                      : ClipOval(
+                          child: Image.asset(
+                            'assets/images/avatar/user.png',
+                            width: 60,
+                            height: 60,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) =>
+                                const Icon(Icons.person, color: Colors.black54),
+                          ),
+                        ),
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFD400),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt,
+                      size: 12,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 14),
@@ -130,10 +335,9 @@ class _AvatarEditor extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.w900),
             ),
           ),
-          TextButton(onPressed: () {}, child: const Text('Modifier')),
+          TextButton(onPressed: onPickImage, child: const Text('Modifier')),
         ],
       ),
     );
   }
 }
-

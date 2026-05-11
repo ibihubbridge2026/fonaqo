@@ -11,7 +11,11 @@ class LitigeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
       appBar: const CustomAppBar.detailStack(
-        detailTitleWidget: Text('Ouvrir un litige', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+        title: 'Ouvrir un litige',
+        detailTitleWidget: Text(
+          'Ouvrir un litige',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -30,8 +34,14 @@ class LitigeScreen extends StatelessWidget {
             child: DropdownButtonFormField<String>(
               initialValue: "Mairie d'Abidjan",
               items: const [
-                DropdownMenuItem(value: "Mairie d'Abidjan", child: Text("Mairie d'Abidjan • En cours")),
-                DropdownMenuItem(value: "Poste de Cocody", child: Text("Poste de Cocody • En attente")),
+                DropdownMenuItem(
+                  value: "Mairie d'Abidjan",
+                  child: Text("Mairie d'Abidjan • En cours"),
+                ),
+                DropdownMenuItem(
+                  value: "Poste de Cocody",
+                  child: Text("Poste de Cocody • En attente"),
+                ),
               ],
               onChanged: (_) {},
               decoration: const InputDecoration(
@@ -65,7 +75,10 @@ class LitigeScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 const Expanded(
-                  child: Text('Ajouter une pièce jointe', style: TextStyle(fontWeight: FontWeight.w900)),
+                  child: Text(
+                    'Ajouter une pièce jointe',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
                 ),
                 TextButton(onPressed: () {}, child: const Text('Importer')),
               ],
@@ -81,9 +94,14 @@ class LitigeScreen extends StatelessWidget {
                 backgroundColor: Colors.black,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
               ),
-              child: const Text('SOUMETTRE', style: TextStyle(fontWeight: FontWeight.w900)),
+              child: const Text(
+                'SOUMETTRE',
+                style: TextStyle(fontWeight: FontWeight.w900),
+              ),
             ),
           ),
         ],
@@ -102,11 +120,12 @@ class _Card extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 14)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 14),
+        ],
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: child,
     );
   }
 }
-

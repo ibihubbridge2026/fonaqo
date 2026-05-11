@@ -18,21 +18,30 @@ class MissionRepository {
     double radius = 10.0, // Rayon par défaut en km
   }) async {
     try {
-      _logger.d('Récupération missions disponibles...');
+      _logger.i('Récupération missions disponibles...');
+
+      // Déterminer l'endpoint selon le rôle de l'utilisateur
+      final String endpoint;
+
+      // TODO: Récupérer le rôle depuis AuthProvider de manière plus propre
+      // Pour l'instant, on utilise l'endpoint client par défaut
+      endpoint =
+          '/missions/'; // Endpoint pour les clients (leurs propres missions)
 
       // Préparer les paramètres de requête
-      final queryParams = <String, dynamic>{};
-
+      final Map<String, String> requestParams = {};
       if (latitude != null && longitude != null) {
-        queryParams['latitude'] = latitude;
-        queryParams['longitude'] = longitude;
-        queryParams['radius'] = radius;
+        requestParams['latitude'] = latitude.toString();
+        requestParams['longitude'] = longitude.toString();
+      }
+      if (radius != 10.0) {
+        requestParams['radius'] = radius.toString();
       }
 
       // Appeler l'API pour récupérer les missions
       final response = await _baseClient.get(
-        '/missions/available/',
-        queryParameters: queryParams,
+        endpoint,
+        queryParameters: requestParams,
       );
 
       _logger.i('Missions récupérées: ${response.data}');
