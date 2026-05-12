@@ -7,12 +7,14 @@ class MissionLogisticsDraft {
   final double latitude;
   final double longitude;
   final double proposedBudget;
+  final bool requiresProcuration;
 
   const MissionLogisticsDraft({
     required this.address,
     required this.latitude,
     required this.longitude,
     required this.proposedBudget,
+    this.requiresProcuration = false,
   });
 }
 
@@ -27,11 +29,14 @@ class Step2LogisticsForm extends StatefulWidget {
   });
 
   @override
-  State<Step2LogisticsForm> createState() => _Step2LogisticsFormState();
+  State<Step2LogisticsForm> createState() =>
+      _Step2LogisticsFormState();
 }
 
-class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
-  final LocationService _locationService = LocationService();
+class _Step2LogisticsFormState
+    extends State<Step2LogisticsForm> {
+  final LocationService _locationService =
+      LocationService();
 
   final TextEditingController _locationController =
       TextEditingController();
@@ -80,11 +85,46 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
     }
   }
 
+  void _submit() {
+    final address = _locationController.text.trim();
+
+    final budget = double.tryParse(
+          _budgetController.text.trim(),
+        ) ??
+        0;
+
+    if (address.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "Veuillez renseigner une adresse",
+          ),
+        ),
+      );
+      return;
+    }
+
+    widget.onNext(
+      MissionLogisticsDraft(
+        address: address,
+        latitude:
+            _locationService.currentPosition?.latitude ??
+                0,
+        longitude:
+            _locationService.currentPosition?.longitude ??
+                0,
+        proposedBudget: budget,
+        requiresProcuration: false,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           // TITRE
           const Text(
@@ -102,9 +142,12 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
+              borderRadius:
+                  BorderRadius.circular(15),
               border: Border.all(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withOpacity(
+                  0.05,
+                ),
               ),
             ),
             child: TextField(
@@ -116,35 +159,39 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
                         width: 20,
                         height: 20,
                         child: Padding(
-                          padding: EdgeInsets.all(12.0),
-                          child: CircularProgressIndicator(
+                          padding:
+                              EdgeInsets.all(12.0),
+                          child:
+                              CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Color(0xFFFFD400),
+                            color: Color(
+                              0xFFFFD400,
+                            ),
                           ),
                         ),
                       )
                     : const Icon(
                         Icons.location_on,
-                        color: Color(0xFFFFD400),
+                        color: Color(
+                          0xFFFFD400,
+                        ),
                         size: 20,
                       ),
-
                 suffixIcon: IconButton(
                   icon: const Icon(
                     Icons.refresh,
                     color: Colors.grey,
                     size: 20,
                   ),
-                  tooltip: 'Rafraîchir la position',
-                  onPressed: _loadCurrentLocation,
+                  tooltip:
+                      'Rafraîchir la position',
+                  onPressed:
+                      _loadCurrentLocation,
                 ),
-
                 hintText: _isLoadingLocation
                     ? 'Chargement de votre position...'
                     : 'Lieu de départ',
-
                 border: InputBorder.none,
-
                 hintStyle: const TextStyle(
                   fontSize: 13,
                 ),
@@ -157,10 +204,16 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
           // PROCURATION
           if (widget.mode == 'service') ...[
             Container(
-              padding: const EdgeInsets.all(20),
+              padding:
+                  const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1C1C),
-                borderRadius: BorderRadius.circular(24),
+                color: const Color(
+                  0xFF1A1C1C,
+                ),
+                borderRadius:
+                    BorderRadius.circular(
+                  24,
+                ),
               ),
               child: Column(
                 crossAxisAlignment:
@@ -170,18 +223,19 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
                     children: [
                       Icon(
                         Icons.gavel,
-                        color: Color(0xFFFFD400),
+                        color: Color(
+                          0xFFFFD400,
+                        ),
                         size: 18,
                       ),
-
                       SizedBox(width: 8),
-
                       Text(
                         "Besoin d'une procuration ?",
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                          fontWeight:
+                              FontWeight.bold,
                         ),
                       ),
                     ],
@@ -192,15 +246,19 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
                   Row(
                     children: [
                       Expanded(
-                        child:
-                            _buildProcBtn("✍️ Signature"),
+                        child: _buildProcBtn(
+                          "✍️ Signature",
+                        ),
                       ),
 
-                      const SizedBox(width: 10),
+                      const SizedBox(
+                        width: 10,
+                      ),
 
                       Expanded(
-                        child:
-                            _buildProcBtn("📤 Upload PDF"),
+                        child: _buildProcBtn(
+                          "📤 Upload PDF",
+                        ),
                       ),
                     ],
                   ),
@@ -213,12 +271,16 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
 
           // URGENCE
           Container(
-            padding: const EdgeInsets.all(20),
+            padding:
+                const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
+              borderRadius:
+                  BorderRadius.circular(15),
               border: Border.all(
-                color: Colors.black.withOpacity(0.05),
+                color: Colors.black.withOpacity(
+                  0.05,
+                ),
               ),
             ),
             child: Row(
@@ -234,13 +296,15 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                        CrossAxisAlignment
+                            .start,
                     children: [
                       const Text(
                         "Mission urgente",
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight: FontWeight.w800,
+                          fontWeight:
+                              FontWeight.w800,
                         ),
                       ),
 
@@ -248,7 +312,8 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
                         "Les agents seront notifiés en priorité",
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color:
+                              Colors.grey[600],
                         ),
                       ),
                     ],
@@ -258,7 +323,9 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
                 Switch(
                   value: _isUrgent,
                   activeThumbColor:
-                      const Color(0xFFFFD400),
+                      const Color(
+                    0xFFFFD400,
+                  ),
                   onChanged: (value) {
                     setState(() {
                       _isUrgent = value;
@@ -278,7 +345,8 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
                 child: _buildInput(
                   Icons.access_time,
                   "Heure",
-                  controller: _timeController,
+                  controller:
+                      _timeController,
                   isHalf: true,
                 ),
               ),
@@ -289,7 +357,8 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
                 child: _buildInput(
                   Icons.euro,
                   "Budget proposé",
-                  controller: _budgetController,
+                  controller:
+                      _budgetController,
                   keyboardType:
                       TextInputType.number,
                   isHalf: true,
@@ -301,42 +370,42 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
           const SizedBox(height: 30),
 
           // BOUTON
-          ElevatedButton(
-            onPressed: () {
-              final pos = _locationService.currentPosition;
-              final lat = pos?.latitude ?? 5.36;
-              final lng = pos?.longitude ?? -4.0083;
-              final raw = _budgetController.text.trim();
-              final budget = double.tryParse(raw) ?? 2500;
-              final addr = _locationController.text.trim().isEmpty
-                  ? 'Adresse non précisée'
-                  : _locationController.text.trim();
-              widget.onNext(
-                MissionLogisticsDraft(
-                  address: addr,
-                  latitude: lat,
-                  longitude: lng,
-                  proposedBudget: budget,
+          SizedBox(
+            width: double.infinity,
+            height: 55,
+            child: ElevatedButton(
+              onPressed:
+                  _isLoadingLocation
+                      ? null
+                      : _submit,
+              style:
+                  ElevatedButton.styleFrom(
+                backgroundColor:
+                    const Color(
+                  0xFFFFD400,
                 ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
-              minimumSize:
-                  const Size(double.infinity, 60),
-              shape: RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.circular(15),
+                foregroundColor:
+                    Colors.black,
+                shape:
+                    RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(
+                    14,
+                  ),
+                ),
               ),
-            ),
-            child: const Text(
-              "VALIDER LES DÉTAILS",
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w900,
+              child: const Text(
+                "VALIDER",
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight:
+                      FontWeight.bold,
+                ),
               ),
             ),
           ),
+
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -345,20 +414,26 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
   Widget _buildInput(
     IconData icon,
     String hint, {
+    required TextEditingController
+        controller,
+    TextInputType keyboardType =
+        TextInputType.text,
     bool isHalf = false,
-    TextEditingController? controller,
-    TextInputType? keyboardType,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(
+      padding:
+          const EdgeInsets.symmetric(
         horizontal: 15,
         vertical: 5,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius:
+            BorderRadius.circular(15),
         border: Border.all(
-          color: Colors.black.withOpacity(0.05),
+          color: Colors.black.withOpacity(
+            0.05,
+          ),
         ),
       ),
       child: TextField(
@@ -367,7 +442,9 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
         decoration: InputDecoration(
           icon: Icon(
             icon,
-            color: const Color(0xFFFFD400),
+            color: const Color(
+              0xFFFFD400,
+            ),
             size: 20,
           ),
           hintText: hint,
@@ -382,12 +459,16 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
 
   Widget _buildProcBtn(String label) {
     return Container(
-      padding: const EdgeInsets.symmetric(
+      padding:
+          const EdgeInsets.symmetric(
         vertical: 12,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withOpacity(
+          0.1,
+        ),
+        borderRadius:
+            BorderRadius.circular(12),
       ),
       child: Center(
         child: Text(

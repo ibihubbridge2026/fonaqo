@@ -15,9 +15,12 @@ import 'features/onboarding/getting_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'widgets/main_wrapper.dart';
 import 'features/chat/chat_screen.dart';
+import 'features/chat/screens/chat_list_screen.dart';
+import 'features/chat/screens/chat_detail_screen.dart';
 import 'features/litiges/litige_screen.dart';
 import 'features/events/event_detail_screen.dart';
 import 'features/missions/mission_detail_screen.dart';
+import 'features/missions/missions_screen.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'features/profile/screens/personal_info_screen.dart';
 import 'features/profile/screens/security_settings_screen.dart';
@@ -45,7 +48,8 @@ void main() async {
   final isFirstTime = prefs.getBool('isFirstTime') ?? true;
   final isLoggedIn = prefs.getString('token') != null;
 
-  log.d('🚀 Démarrage FONACO | FirstTime: $isFirstTime | LoggedIn: $isLoggedIn');
+  log.d(
+      '🚀 Démarrage FONACO | FirstTime: $isFirstTime | LoggedIn: $isLoggedIn');
 
   runApp(FonacoApp(isFirstTime: isFirstTime, isLoggedIn: isLoggedIn));
 }
@@ -76,25 +80,28 @@ class FonacoApp extends StatelessWidget {
             initialRoute: _getInitialRoute(),
             routes: {
               AppRoutes.splash: (context) => GettingScreen(
-                onAuthChecked: () async {
-                  await SplashConfig.removeSplash();
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('isFirstTime', false);
-                  await authProvider.checkAuth();
+                    onAuthChecked: () async {
+                      await SplashConfig.removeSplash();
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('isFirstTime', false);
+                      await authProvider.checkAuth();
 
-                  // AJOUT DE LA VÉRIFICATION DE MONTAGE (MOUNTED)
-                  if (!context.mounted) return; 
+                      // AJOUT DE LA VÉRIFICATION DE MONTAGE (MOUNTED)
+                      if (!context.mounted) return;
 
-                  if (authProvider.isAuthenticated) {
-                    Navigator.pushReplacementNamed(context, AppRoutes.mainShell);
-                  } else {
-                    Navigator.pushReplacementNamed(context, AppRoutes.login);
-                  }
-                },
-              ),
+                      if (authProvider.isAuthenticated) {
+                        Navigator.pushReplacementNamed(
+                            context, AppRoutes.mainShell);
+                      } else {
+                        Navigator.pushReplacementNamed(
+                            context, AppRoutes.login);
+                      }
+                    },
+                  ),
               AppRoutes.login: (context) => const LoginScreen(),
               AppRoutes.register: (context) => const RegisterScreen(),
-              AppRoutes.forgotPassword: (context) => const ForgotPasswordScreen(),
+              AppRoutes.forgotPassword: (context) =>
+                  const ForgotPasswordScreen(),
               AppRoutes.onboarding: (context) => const OnboardingScreen(),
               AppRoutes.mainShell: (context) => const MainWrapper(),
               AppRoutes.missionDetail: (context) => const MissionDetailScreen(),
@@ -104,10 +111,20 @@ class FonacoApp extends StatelessWidget {
               AppRoutes.helpCenter: (context) => const HelpCenterScreen(),
               AppRoutes.profileLanguage: (context) => const LanguageScreen(),
               AppRoutes.personalInfo: (context) => const PersonalInfoScreen(),
-              AppRoutes.securitySettings: (context) => const SecuritySettingsScreen(),
-              AppRoutes.profileLocation: (context) => const LocationSettingsScreen(),
+              AppRoutes.securitySettings: (context) =>
+                  const SecuritySettingsScreen(),
+              AppRoutes.profileLocation: (context) =>
+                  const LocationSettingsScreen(),
               AppRoutes.rating: (context) => const RatingScreen(),
               AppRoutes.chat: (context) => const ChatScreen(),
+              AppRoutes.chatList: (context) => const ChatListScreen(),
+              AppRoutes.chatDetail: (context) => const ChatDetailScreen(
+                    chatId: '',
+                    userName: '',
+                  ),
+              AppRoutes.missionsAvailable: (context) => MissionsScreen(
+                    showCreateMissionListenable: ValueNotifier(false),
+                  ),
             },
           );
         },

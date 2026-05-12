@@ -36,7 +36,7 @@ class BaseClient {
     );
 
     // Ajout des intercepteurs
-    _dio.interceptors.add(_AuthInterceptor(_secureStorage, _logger));
+    _dio.interceptors.add(_AuthInterceptor(_secureStorage, _logger, _dio));
     _dio.interceptors.add(_LoggingInterceptor(_logger));
   }
 
@@ -257,9 +257,10 @@ class BaseClient {
 class _AuthInterceptor extends Interceptor {
   final FlutterSecureStorage _secureStorage;
   final Logger _logger;
+  final Dio _dio; // Ajout de l'instance Dio
   static const String _tokenKey = 'jwt_token';
 
-  _AuthInterceptor(this._secureStorage, this._logger);
+  _AuthInterceptor(this._secureStorage, this._logger, this._dio);
 
   bool _isPublicPath(String path) {
     return path.contains('accounts/login/') ||
@@ -286,15 +287,67 @@ class _AuthInterceptor extends Interceptor {
   }
 
   @override
-  void onError(DioException err, ErrorInterceptorHandler handler) {
+  void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
       final responseData = err.response?.data;
-      if (responseData is Map && responseData['code'] == 'token_not_valid') {
-        _logger.w('JWT expiré ou invalide : suppression du stockage token');
-        _secureStorage.delete(key: _tokenKey);
+
+      // Tenter de rafraîchir le token si c'est une erreur 401
+      if (responseData is Map && responseData['code'] != 'token_not_valid') {
+        _logger.w('Tentative de rafraîchissement du token JWT');
+        final refreshed = await _tryRefreshToken();
+
+        if (refreshed) {
+          // Réessayer la requête originale avec le nouveau token
+          final newToken = await _secureStorage.read(key: _tokenKey);
+          if (newToken != null) {
+            err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+
+            try {
+              final response = await _dio.fetch(err.requestOptions);
+              handler.resolve(response);
+              return;
+            } catch (e) {
+              _logger.e('Échec de la réessai après rafraîchissement: $e');
+            }
+          }
+        }
       }
+
+      // Si le rafraîchissement échoue ou si le token est invalide
+      _logger.w('JWT expiré ou invalide : suppression du stockage token');
+      await _secureStorage.delete(key: _tokenKey);
     }
     handler.next(err);
+  }
+
+  /// Tente de rafraîchir le token JWT
+  Future<bool> _tryRefreshToken() async {
+    try {
+      final refreshToken =
+          await _secureStorage.read(key: '${_tokenKey}_refresh');
+      if (refreshToken == null) return false;
+
+      final dio = Dio(BaseOptions(
+        baseUrl: 'http://192.168.1.73:8000/api/v1/',
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+      ));
+
+      final response = await dio.post(
+        'accounts/token/refresh/',
+        data: {'refresh': refreshToken},
+      );
+
+      if (response.statusCode == 200) {
+        final newAccessToken = response.data['access'];
+        await _secureStorage.write(key: _tokenKey, value: newAccessToken);
+        _logger.i('Token JWT rafraîchi avec succès');
+        return true;
+      }
+    } catch (e) {
+      _logger.e('Échec du rafraîchissement du token: $e');
+    }
+    return false;
   }
 }
 

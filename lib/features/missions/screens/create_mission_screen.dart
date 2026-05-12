@@ -40,6 +40,10 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
     return 'Mission $prefix — $short';
   }
 
+  // Variables pour la logique conditionnelle
+  bool _requiresProcuration = false;
+  String _targetAgentUsername = '';
+
   Future<void> _onPaymentValidated(MissionPaymentTotals totals) async {
     final wallet = context.read<WalletProvider>();
     if (!wallet.canAfford(totals.totalCfa)) {
@@ -53,21 +57,24 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
       return;
     }
 
-    final priceMission = totals.paySupplierDirectly
-        ? 1.0
-        : totals.purchaseBudgetCfa;
+    final priceMission =
+        totals.paySupplierDirectly ? 1.0 : totals.purchaseBudgetCfa;
 
     try {
       await _missionRepository.createMission(
         MissionCreatePayload(
           title: _missionTitle(),
-          description:
-              _description.trim().isEmpty ? _missionTitle() : _description.trim(),
+          description: _description.trim().isEmpty
+              ? _missionTitle()
+              : _description.trim(),
           address: _logisticsAddress,
           latitude: _logisticsLat,
           longitude: _logisticsLng,
           price: priceMission,
           serviceFee: totals.serviceFeeCfa,
+          requiresProcuration: _requiresProcuration,
+          targetAgentUsername:
+              _targetAgentUsername.isNotEmpty ? _targetAgentUsername : null,
         ),
       );
 
@@ -77,7 +84,8 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
       if (!ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Erreur lors de la mise à jour du portefeuille local.'),
+            content:
+                Text('Erreur lors de la mise à jour du portefeuille local.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -171,6 +179,7 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
               _logisticsAddress = draft.address;
               _logisticsLat = draft.latitude;
               _logisticsLng = draft.longitude;
+              _requiresProcuration = draft.requiresProcuration;
             });
             next();
           },
@@ -178,7 +187,12 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
       case 3:
         return Step3PaymentSummary(
           mode: _mode,
-          onPayAndValidate: _onPaymentValidated,
+          onPayAndValidate: (totals) async {
+            setState(() {
+              _targetAgentUsername = totals.targetAgentUsername ?? '';
+            });
+            await _onPaymentValidated(totals);
+          },
         );
       case 4:
         return Step4MatchingAgents(onConfirmed: next);

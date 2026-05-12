@@ -6,12 +6,14 @@ class MissionPaymentTotals {
   final double serviceFeeCfa;
   final double purchaseBudgetCfa;
   final bool paySupplierDirectly;
+  final String? targetAgentUsername;
 
   const MissionPaymentTotals({
     required this.totalCfa,
     required this.serviceFeeCfa,
     required this.purchaseBudgetCfa,
     required this.paySupplierDirectly,
+    this.targetAgentUsername,
   });
 }
 
@@ -33,6 +35,7 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
   bool _paySupplierDirectly = false;
   final TextEditingController _purchaseBudgetController =
       TextEditingController();
+  final TextEditingController _targetAgentController = TextEditingController();
 
   static const double _serviceFee = 500.0;
   static const double _defaultBudget = 2500.0;
@@ -41,6 +44,7 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
   @override
   void dispose() {
     _purchaseBudgetController.dispose();
+    _targetAgentController.dispose();
     super.dispose();
   }
 
@@ -59,15 +63,25 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
     return total;
   }
 
+  double _calculateServiceFee(double missionPrice) {
+    return missionPrice * 0.10; // 10% de frais de service
+  }
+
   Future<void> _onPayPressed() async {
     if (_submitting) return;
     setState(() => _submitting = true);
     try {
+      // Calcul des frais de service dynamiques
+      final missionPrice = _purchaseBudgetValue();
+      final calculatedServiceFee = _calculateServiceFee(missionPrice);
+      final targetAgent = _targetAgentController.text.trim();
+
       final totals = MissionPaymentTotals(
-        totalCfa: _calculateTotal(),
-        serviceFeeCfa: _serviceFee,
-        purchaseBudgetCfa: _purchaseBudgetValue(),
+        totalCfa: missionPrice + calculatedServiceFee,
+        serviceFeeCfa: calculatedServiceFee,
+        purchaseBudgetCfa: missionPrice,
         paySupplierDirectly: _paySupplierDirectly,
+        targetAgentUsername: targetAgent.isNotEmpty ? targetAgent : null,
       );
       await widget.onPayAndValidate(totals);
     } finally {
@@ -177,22 +191,57 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
                     keyboardType: TextInputType.number,
                     onChanged: (_) => setState(() {}),
                     decoration: InputDecoration(
-                      labelText: 'Budget achats',
-                      hintText: 'Montant pour les achats',
-                      prefixText: 'CFA ',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: Colors.grey.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFFFFD400)),
-                      ),
+                      labelText: 'Budget d\'achat',
+                      border: OutlineInputBorder(),
                     ),
                   ),
                 ],
+
+                const SizedBox(height: 20),
+
+                // Champ pour assigner à un agent spécifique
+                TextField(
+                  controller: _targetAgentController,
+                  decoration: const InputDecoration(
+                    labelText:
+                        'Assigner à un agent spécifique (Username) - Optionnel',
+                    hintText: 'Entrez le username de l\'agent',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_search),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // AFFICHAGE DÉTAILLÉ DES COÛTS
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: Colors.black.withOpacity(0.05)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Détail des coûts',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 15),
+                _buildSummaryRow('Prix mission',
+                    '${_purchaseBudgetValue().toStringAsFixed(2)} CFA'),
+                _buildSummaryRow('Frais de service (10%)',
+                    '${_calculateServiceFee(_purchaseBudgetValue()).toStringAsFixed(2)} CFA'),
+                const Divider(),
+                _buildSummaryRow(
+                  'TOTAL',
+                  '${(_purchaseBudgetValue() + _calculateServiceFee(_purchaseBudgetValue())).toStringAsFixed(2)} CFA',
+                  isTotal: true,
+                ),
               ],
             ),
           ),

@@ -398,7 +398,7 @@ class AuthProvider extends ChangeNotifier {
       if (response.statusCode != 200 && response.statusCode != 201) {
         final errorMessage = response.data is Map
             ? response.data['message'] ??
-                  'Erreur lors de l\'authentification Google'
+                'Erreur lors de l\'authentification Google'
             : 'Erreur lors de l\'authentification Google';
         _setError(errorMessage);
         return false;
@@ -599,7 +599,7 @@ class AuthProvider extends ChangeNotifier {
       if (response.statusCode != 200) {
         final errorMessage = response.data is Map
             ? response.data['message'] ??
-                  'Erreur lors du changement de mot de passe'
+                'Erreur lors du changement de mot de passe'
             : 'Erreur lors du changement de mot de passe';
         _setError(errorMessage);
         return false;
@@ -625,7 +625,7 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final response = await _baseClient.patch(
-        'accounts/profile/update/',
+        'accounts/profile/',
         data: profileData,
       );
 
@@ -635,7 +635,7 @@ class AuthProvider extends ChangeNotifier {
       if (response.statusCode != 200) {
         final errorMessage = response.data is Map
             ? response.data['message'] ??
-                  'Erreur lors de la mise à jour du profil'
+                'Erreur lors de la mise à jour du profil'
             : 'Erreur lors de la mise à jour du profil';
         _setError(errorMessage);
         return false;

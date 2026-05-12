@@ -13,6 +13,8 @@ class MissionCreatePayload {
   final double longitude;
   final double price;
   final double serviceFee;
+  final bool requiresProcuration;
+  final String? targetAgentUsername;
 
   const MissionCreatePayload({
     required this.title,
@@ -22,6 +24,8 @@ class MissionCreatePayload {
     required this.longitude,
     required this.price,
     required this.serviceFee,
+    this.requiresProcuration = false,
+    this.targetAgentUsername,
   });
 
   Map<String, dynamic> toJson() => {
@@ -32,6 +36,9 @@ class MissionCreatePayload {
         'longitude': longitude,
         'price': price,
         'service_fee': serviceFee,
+        'requires_procuration': requiresProcuration,
+        if (targetAgentUsername != null)
+          'target_agent_username': targetAgentUsername,
       };
 }
 
@@ -169,8 +176,7 @@ class MissionRepository {
 
   Future<bool> acceptMission(String missionId) async {
     try {
-      final response =
-          await _baseClient.post('missions/$missionId/accept/');
+      final response = await _baseClient.post('missions/$missionId/accept/');
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e, st) {
       _logger.e('acceptMission', error: e, stackTrace: st);
