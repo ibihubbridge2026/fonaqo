@@ -29,25 +29,19 @@ class Step2LogisticsForm extends StatefulWidget {
   });
 
   @override
-  State<Step2LogisticsForm> createState() =>
-      _Step2LogisticsFormState();
+  State<Step2LogisticsForm> createState() => _Step2LogisticsFormState();
 }
 
-class _Step2LogisticsFormState
-    extends State<Step2LogisticsForm> {
-  final LocationService _locationService =
-      LocationService();
+class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
+  final LocationService _locationService = LocationService();
 
-  final TextEditingController _locationController =
-      TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
 
-  final TextEditingController _budgetController =
-      TextEditingController(
+  final TextEditingController _budgetController = TextEditingController(
     text: '2500',
   );
 
-  final TextEditingController _timeController =
-      TextEditingController();
+  final TextEditingController _timeController = TextEditingController();
 
   bool _isLoadingLocation = false;
   bool _isUrgent = false;
@@ -78,8 +72,7 @@ class _Step2LogisticsFormState
         _isLoadingLocation = false;
 
         if (_locationService.currentAddress.isNotEmpty) {
-          _locationController.text =
-              _locationService.currentAddress;
+          _locationController.text = _locationService.currentAddress;
         }
       });
     }
@@ -107,12 +100,8 @@ class _Step2LogisticsFormState
     widget.onNext(
       MissionLogisticsDraft(
         address: address,
-        latitude:
-            _locationService.currentPosition?.latitude ??
-                0,
-        longitude:
-            _locationService.currentPosition?.longitude ??
-                0,
+        latitude: _locationService.currentPosition?.latitude ?? 0,
+        longitude: _locationService.currentPosition?.longitude ?? 0,
         proposedBudget: budget,
         requiresProcuration: false,
       ),
@@ -123,8 +112,7 @@ class _Step2LogisticsFormState
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // TITRE
           const Text(
@@ -142,12 +130,9 @@ class _Step2LogisticsFormState
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius:
-                  BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(15),
               border: Border.all(
-                color: Colors.black.withOpacity(
-                  0.05,
-                ),
+                color: Colors.black.withAlpha(51),
               ),
             ),
             child: TextField(
@@ -159,10 +144,8 @@ class _Step2LogisticsFormState
                         width: 20,
                         height: 20,
                         child: Padding(
-                          padding:
-                              EdgeInsets.all(12.0),
-                          child:
-                              CircularProgressIndicator(
+                          padding: EdgeInsets.all(12.0),
+                          child: CircularProgressIndicator(
                             strokeWidth: 2,
                             color: Color(
                               0xFFFFD400,
@@ -183,10 +166,8 @@ class _Step2LogisticsFormState
                     color: Colors.grey,
                     size: 20,
                   ),
-                  tooltip:
-                      'Rafraîchir la position',
-                  onPressed:
-                      _loadCurrentLocation,
+                  tooltip: 'Rafraîchir la position',
+                  onPressed: _loadCurrentLocation,
                 ),
                 hintText: _isLoadingLocation
                     ? 'Chargement de votre position...'
@@ -204,20 +185,17 @@ class _Step2LogisticsFormState
           // PROCURATION
           if (widget.mode == 'service') ...[
             Container(
-              padding:
-                  const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: const Color(
                   0xFF1A1C1C,
                 ),
-                borderRadius:
-                    BorderRadius.circular(
+                borderRadius: BorderRadius.circular(
                   24,
                 ),
               ),
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Row(
                     children: [
@@ -234,15 +212,12 @@ class _Step2LogisticsFormState
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 12,
-                          fontWeight:
-                              FontWeight.bold,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 15),
-
                   Row(
                     children: [
                       Expanded(
@@ -250,11 +225,9 @@ class _Step2LogisticsFormState
                           "✍️ Signature",
                         ),
                       ),
-
                       const SizedBox(
                         width: 10,
                       ),
-
                       Expanded(
                         child: _buildProcBtn(
                           "📤 Upload PDF",
@@ -265,22 +238,17 @@ class _Step2LogisticsFormState
                 ],
               ),
             ),
-
             const SizedBox(height: 16),
           ],
 
           // URGENCE
           Container(
-            padding:
-                const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius:
-                  BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(15),
               border: Border.all(
-                color: Colors.black.withOpacity(
-                  0.05,
-                ),
+                color: Colors.black.withAlpha(13),
               ),
             ),
             child: Row(
@@ -290,40 +258,31 @@ class _Step2LogisticsFormState
                   color: Colors.red[400],
                   size: 20,
                 ),
-
                 const SizedBox(width: 12),
-
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment
-                            .start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
                         "Mission urgente",
                         style: TextStyle(
                           fontSize: 16,
-                          fontWeight:
-                              FontWeight.w800,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-
                       Text(
                         "Les agents seront notifiés en priorité",
                         style: TextStyle(
                           fontSize: 12,
-                          color:
-                              Colors.grey[600],
+                          color: Colors.grey[600],
                         ),
                       ),
                     ],
                   ),
                 ),
-
                 Switch(
                   value: _isUrgent,
-                  activeThumbColor:
-                      const Color(
+                  activeThumbColor: const Color(
                     0xFFFFD400,
                   ),
                   onChanged: (value) {
@@ -345,22 +304,17 @@ class _Step2LogisticsFormState
                 child: _buildInput(
                   Icons.access_time,
                   "Heure",
-                  controller:
-                      _timeController,
+                  controller: _timeController,
                   isHalf: true,
                 ),
               ),
-
               const SizedBox(width: 16),
-
               Expanded(
                 child: _buildInput(
                   Icons.euro,
                   "Budget proposé",
-                  controller:
-                      _budgetController,
-                  keyboardType:
-                      TextInputType.number,
+                  controller: _budgetController,
+                  keyboardType: TextInputType.number,
                   isHalf: true,
                 ),
               ),
@@ -374,22 +328,14 @@ class _Step2LogisticsFormState
             width: double.infinity,
             height: 55,
             child: ElevatedButton(
-              onPressed:
-                  _isLoadingLocation
-                      ? null
-                      : _submit,
-              style:
-                  ElevatedButton.styleFrom(
-                backgroundColor:
-                    const Color(
+              onPressed: _isLoadingLocation ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(
                   0xFFFFD400,
                 ),
-                foregroundColor:
-                    Colors.black,
-                shape:
-                    RoundedRectangleBorder(
-                  borderRadius:
-                      BorderRadius.circular(
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
                     14,
                   ),
                 ),
@@ -398,8 +344,7 @@ class _Step2LogisticsFormState
                 "VALIDER",
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight:
-                      FontWeight.bold,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
@@ -414,26 +359,20 @@ class _Step2LogisticsFormState
   Widget _buildInput(
     IconData icon,
     String hint, {
-    required TextEditingController
-        controller,
-    TextInputType keyboardType =
-        TextInputType.text,
+    required TextEditingController controller,
+    TextInputType keyboardType = TextInputType.text,
     bool isHalf = false,
   }) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         horizontal: 15,
         vertical: 5,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius:
-            BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: Colors.black.withOpacity(
-            0.05,
-          ),
+          color: Colors.black.withAlpha(13),
         ),
       ),
       child: TextField(
@@ -459,16 +398,14 @@ class _Step2LogisticsFormState
 
   Widget _buildProcBtn(String label) {
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         vertical: 12,
       ),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(
           0.1,
         ),
-        borderRadius:
-            BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Center(
         child: Text(

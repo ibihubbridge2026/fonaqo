@@ -267,9 +267,7 @@ class _Step1TypeSelectorState extends State<Step1TypeSelector> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(15),
                 border: Border.all(
-                  color: Colors.black.withOpacity(
-                    0.05,
-                  ),
+                  color: Colors.black.withAlpha(153), //0.6
                 ),
               ),
               child: Row(
@@ -327,9 +325,7 @@ class _Step1TypeSelectorState extends State<Step1TypeSelector> {
               borderRadius: BorderRadius.circular(22),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(
-                    0.04,
-                  ),
+                  color: Colors.black.withAlpha(10), //0.04
                   blurRadius: 20,
                 ),
               ],
@@ -364,9 +360,7 @@ class _Step1TypeSelectorState extends State<Step1TypeSelector> {
                   : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.black,
-                disabledBackgroundColor: Colors.black.withOpacity(
-                  0.12,
-                ),
+                disabledBackgroundColor: Colors.black.withAlpha(30), //0.12
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -409,18 +403,13 @@ class _ServiceCard extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected
-                ? Colors.black
-                : Colors.black.withOpacity(
-                    0.06,
-                  ),
+            color:
+                isSelected ? Colors.black : Colors.black.withAlpha(15), //0.06
             width: isSelected ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(
-                0.04,
-              ),
+              color: Colors.black.withAlpha(10), //0.04
               blurRadius: 12,
             ),
           ],

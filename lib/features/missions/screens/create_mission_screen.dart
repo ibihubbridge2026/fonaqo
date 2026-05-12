@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/wallet_provider.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../widgets/main_wrapper.dart';
+import '../../../widgets/step_indicator.dart';
 import '../mission_repository.dart';
 import '../widgets/step_1_type_selector.dart';
 import '../widgets/step_2_logistics_form.dart';
@@ -123,39 +125,91 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            IconButton(
-              onPressed: () {
-                if (currentStep > 1) {
-                  back();
-                } else {
-                  MainShellScope.maybeOf(context)?.closeCreateMission();
-                }
-              },
-              icon: const Icon(Icons.close, color: Colors.black),
-            ),
-            Text(
-              'Étape $currentStep/5',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            AppTheme.backgroundColor,
+            AppTheme.surfaceColor,
           ],
         ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.only(top: 8, bottom: 20),
-            child: _buildStep(),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header avec Glassmorphism
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: AppTheme.glassDecoration(
+              color: Colors.white,
+              borderRadius: 0,
+            ),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () {
+                    if (currentStep > 1) {
+                      back();
+                    } else {
+                      MainShellScope.maybeOf(context)?.closeCreateMission();
+                    }
+                  },
+                  icon: const Icon(Icons.arrow_back),
+                ),
+                Expanded(
+                  child: StepIndicator(
+                    totalSteps: 5,
+                    currentStep: currentStep,
+                    titles: const [
+                      'Type',
+                      'Logistique',
+                      'Paiement',
+                      'Agents',
+                      'Suivi',
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 16),
+
+          // Contenu principal avec Glassmorphism
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.all(16),
+              decoration: AppTheme.glassDecoration(
+                color: Colors.white,
+                borderRadius: 20,
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: AnimatedSwitcher(
+                  duration: AppTheme.mediumAnimation,
+                  transitionBuilder: (child, animation) {
+                    return SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(1.0, 0.0),
+                        end: Offset.zero,
+                      ).animate(CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeInOut,
+                      )),
+                      child: FadeTransition(
+                        opacity: animation,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: _buildStep(),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

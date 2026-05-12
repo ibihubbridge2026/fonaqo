@@ -1,6 +1,7 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:logger/logger.dart';
+import 'dart:async';
 
 class LocationService {
   final Logger _logger = Logger();
@@ -45,16 +46,45 @@ class LocationService {
     _isLoading = true;
 
     try {
+      // Vérification que le service de localisation est activé
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _logger.w('Service de localisation désactivé');
+        _isLoading = false;
+        return;
+      }
+
       bool hasPermission = await checkLocationPermission();
       if (!hasPermission) {
         _isLoading = false;
         return;
       }
 
-      _currentPosition = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 10),
-      );
+      // Tentative de récupération de la position actuelle avec timeout augmenté
+      try {
+        _currentPosition = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            distanceFilter: 10,
+          ),
+        ).timeout(
+          const Duration(seconds: 30),
+          onTimeout: () => throw TimeoutException(
+              'GPS timeout après 30s', const Duration(seconds: 30)),
+        );
+      } catch (e) {
+        _logger.w(
+            'Échec getCurrentPosition, tentative avec getLastKnownPosition: $e');
+
+        // Fallback sur la dernière position connue
+        _currentPosition = await Geolocator.getLastKnownPosition();
+
+        if (_currentPosition == null) {
+          _logger.e('Aucune position disponible');
+          _isLoading = false;
+          return;
+        }
+      }
 
       await _getAddressFromLatLng(_currentPosition!);
     } catch (e, st) {
