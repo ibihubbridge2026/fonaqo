@@ -1,43 +1,76 @@
 name: fonaco
-description: "FONACO est une plateforme de mise en relation intelligente entre des personnes qui ont besoin d’un service et des personnes disponibles pour exécuter ces services (Agent)."
+
+description: >
+  FONACO est une plateforme de mise en relation intelligente
+  entre des personnes qui ont besoin d’un service et des personnes
+  disponibles pour exécuter ces services (Agent).
 
 publish_to: 'none'
 
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.11.5
+  sdk: ">=3.0.0 <4.0.0"
 
 dependencies:
-  font_awesome_flutter: ^10.7.0
   flutter:
     sdk: flutter
 
+  # =========================
+  # UI & DESIGN
+  # =========================
   cupertino_icons: ^1.0.8
-  flutter_launcher_icons: ^0.14.4
-  google_maps_flutter: ^2.7.0
-  flutter_map: ^7.0.2
-  latlong2: ^0.9.1
-  geolocator: ^13.0.1
-  geocoding: ^3.0.0
-  permission_handler: ^11.3.1
-  app_settings: ^5.1.1
-  dio: ^5.7.0
-  provider: ^6.1.2
-  flutter_secure_storage: ^9.2.2
-  shared_preferences: ^2.5.5
-  logger: ^2.4.0
+  font_awesome_flutter: ^10.8.0
   flutter_native_splash: ^2.4.7
+
+  # =========================
+  # CARTOGRAPHIE & GPS
+  # =========================
+  flutter_map: ^7.0.2
+
+  # IMPORTANT :
+  # version stable compatible Kotlin récent
+  google_maps_flutter: ^2.12.3
+
+  latlong2: ^0.9.1
+  geolocator: ^13.0.4
+  geocoding: ^3.0.0
+  permission_handler: ^11.4.0
+  app_settings: ^5.2.0
+
+  # =========================
+  # API & DONNÉES
+  # =========================
+  dio: ^5.8.0+1
+  provider: ^6.1.5
+  flutter_secure_storage: ^9.2.4
+  shared_preferences: ^2.5.3
+  logger: ^2.6.0
+
+  # =========================
+  # FIREBASE
+  # =========================
+  firebase_core: ^3.13.1
+  firebase_messaging: ^15.2.6
+
+  # IMPORTANT :
+  # version stable Android 15
+  flutter_local_notifications: ^17.2.4
+
+  # =========================
+  # OUTILS
+  # =========================
   image_picker: ^1.1.2
   local_auth: ^2.3.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+
+  flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
-
   uses-material-design: true
 
   assets:
@@ -47,10 +80,10 @@ flutter:
     - assets/images/avatar/
     - assets/images/events/
     - favicon.png
-#CONFIG ICON APP (IMPORTANT: ICI ET PAS DANS DEPENDENCIES)
+
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
-  image_path: "assets/icon/fonaco-icon.png" # Chemin vers ton icône
-  adaptive_icon_background: "#FFD400" # Ton jaune Fonaqo
+  image_path: "assets/icon/fonaco-icon.png"
+  adaptive_icon_background: "#FFD400"
   adaptive_icon_foreground: "assets/icon/fonaco-icon.png"

@@ -20,19 +20,19 @@ class ChatDetailScreen extends StatefulWidget {
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
   final List<ChatMessage> _messages = [
-    ChatMessage(
+    const ChatMessage(
       id: '1',
       text: 'Bonjour ! Je suis disponible pour la mission.',
       time: '14:23',
       isMe: false,
     ),
-    ChatMessage(
+    const ChatMessage(
       id: '2',
       text: 'Parfait, je vous envoie les documents.',
       time: '14:25',
       isMe: true,
     ),
-    ChatMessage(id: '3', text: 'Super, merci !', time: '14:26', isMe: false),
+    const ChatMessage(id: '3', text: 'Super, merci !', time: '14:26', isMe: false),
   ];
 
   @override
@@ -66,10 +66,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                 Expanded(
                   child: TextField(
                     controller: _messageController,
-                    decoration: InputDecoration(
+                    decoration: const InputDecoration(
                       hintText: 'Écrivez votre message...',
                       border: InputBorder.none,
-                      contentPadding: const EdgeInsets.all(12),
+                      contentPadding: EdgeInsets.all(12),
                     ),
                     maxLines: null,
                   ),
@@ -105,7 +105,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             CircleAvatar(
               radius: 16,
               backgroundColor: Colors.grey[300],
-              child: Icon(Icons.person, size: 16, color: Colors.white),
+              child: const Icon(Icons.person, size: 16, color: Colors.white),
             ),
             const SizedBox(width: 8),
           ],
@@ -136,7 +136,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             CircleAvatar(
               radius: 16,
               backgroundColor: Colors.grey[300],
-              child: Icon(Icons.person, size: 16, color: Colors.white),
+              child: const Icon(Icons.person, size: 16, color: Colors.white),
             ),
           ],
         ],

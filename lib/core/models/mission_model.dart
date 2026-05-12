@@ -1,7 +1,7 @@
 /// Modèle de mission pour l'application FONACO
-/// Reflète la structure du backend Django
+/// Reflète la structure du backend Django (UUID + coordonnées plates).
 class MissionModel {
-  final int id;
+  final String id;
   final String title;
   final String description;
   final double price;
@@ -35,21 +35,21 @@ class MissionModel {
     this.isVerified = false,
   });
 
-  /// Crée un MissionModel à partir d'un JSON (réponse API)
+  /// Crée un MissionModel à partir d'un JSON (réponse API).
   factory MissionModel.fromJson(Map<String, dynamic> json) {
     return MissionModel(
-      id: json['id'] as int? ?? 0,
+      id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       status: _parseMissionStatus(json['status']?.toString()),
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
+      latitude: _readDouble(json['latitude']),
+      longitude: _readDouble(json['longitude']),
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'].toString())
+          ? DateTime.tryParse(json['created_at'].toString())
           : null,
       updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'].toString())
+          ? DateTime.tryParse(json['updated_at'].toString())
           : null,
       clientName: json['client_name']?.toString(),
       agentName: json['agent_name']?.toString(),
@@ -60,7 +60,13 @@ class MissionModel {
     );
   }
 
-  /// Convertit le MissionModel en JSON (requête API)
+  static double? _readDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString());
+  }
+
+  /// Convertit le MissionModel en JSON (requête API).
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -79,7 +85,7 @@ class MissionModel {
     };
   }
 
-  /// Parse le statut de mission depuis une chaîne
+  /// Parse le statut de mission depuis une chaîne.
   static MissionStatus _parseMissionStatus(String? status) {
     switch (status?.toLowerCase()) {
       case 'pending':
@@ -97,9 +103,9 @@ class MissionModel {
     }
   }
 
-  /// Crée une copie du MissionModel avec des champs modifiés
+  /// Crée une copie du MissionModel avec des champs modifiés.
   MissionModel copyWith({
-    int? id,
+    String? id,
     String? title,
     String? description,
     double? price,
@@ -130,7 +136,7 @@ class MissionModel {
     );
   }
 
-  /// Retourne le statut formaté pour l'affichage
+  /// Retourne le statut formaté pour l'affichage.
   String get formattedStatus {
     switch (status) {
       case MissionStatus.PENDING:
@@ -172,7 +178,7 @@ class MissionModel {
   }
 }
 
-/// Énumération des statuts de mission
+/// Énumération des statuts de mission.
 enum MissionStatus {
   PENDING,
   ACCEPTED,
@@ -180,7 +186,7 @@ enum MissionStatus {
   COMPLETED,
   CANCELLED;
 
-  /// Retourne le nom formaté du statut
+  /// Retourne le nom formaté du statut.
   String get name {
     switch (this) {
       case PENDING:
@@ -196,7 +202,7 @@ enum MissionStatus {
     }
   }
 
-  /// Retourne le libellé du statut en français
+  /// Retourne le libellé du statut en français.
   String get label {
     switch (this) {
       case PENDING:

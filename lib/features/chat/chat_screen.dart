@@ -15,12 +15,12 @@ class ChatScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
-      appBar: CustomAppBar.detailStack(
+      appBar: const CustomAppBar.detailStack(
         title: 'Conversation',
         detailTitleWidget: _ChatConversationTitle(
           partnerAvatarUrl: _partnerAvatarUrl,
         ),
-        detailTrailingActions: const [
+        detailTrailingActions: [
           _ChatToolbarIcon(icon: Icons.call_outlined),
           _ChatToolbarIcon(icon: Icons.more_vert),
         ],
@@ -96,7 +96,7 @@ class _ChatConversationTitle extends StatelessWidget {
               width: 40,
               height: 40,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) {
+              errorBuilder: (_, __, ___) {
                 return const Icon(Icons.person, color: Colors.white70);
               },
             ),
@@ -226,7 +226,7 @@ class ChatMessageBubble extends StatelessWidget {
                     child: Image.network(
                       inlineImageNetworkUrl!,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) {
+                      errorBuilder: (_, __, ___) {
                         return Container(
                           color: Colors.grey[200],
                           height: 120,

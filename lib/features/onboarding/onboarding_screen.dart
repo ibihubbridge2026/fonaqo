@@ -23,11 +23,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     {
       "title": "Découvrez nos services à la demande",
       "desc":
-          "Courses, documents, procedure, déléguez vos missions en un clic et occupez vous de votre travail.",
+          "Courses, documents, procédure : déléguez vos missions en un clic et occupez-vous de votre travail.",
       "image": "assets/images/slide/slide-2.png",
     },
     {
-      "title": "Prêt pour L'aventure ? Démarrons ensemble",
+      "title": "Prêt pour l'aventure ? Démarrons ensemble",
       "desc":
           "Rejoignez l'écosystème de services humains le plus rapide du pays.",
       "image": "assets/images/slide/slide-3.png",
@@ -197,7 +197,7 @@ class OnboardingSlideView extends StatelessWidget {
                 imageAssetPath,
                 fit: BoxFit.cover,
                 alignment: Alignment.bottomCenter,
-                errorBuilder: (_, _, _) {
+                errorBuilder: (_, __, ___) {
                   return Container(
                     color: const Color(0xFFE8E8E8),
                     alignment: Alignment.center,

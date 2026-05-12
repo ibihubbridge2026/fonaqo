@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../api/base_client.dart';
 import '../models/user_model.dart';
+import '../services/notification_service.dart';
 
 /// Provider pour gérer l'état d'authentification
 class AuthProvider extends ChangeNotifier {
@@ -135,7 +136,7 @@ class AuthProvider extends ChangeNotifier {
 
   /// Gère la déconnexion automatique lors de l'expiration du token
   void handleTokenExpired() {
-    print('DEBUG - Déconnexion automatique due à token expiré');
+    _logger.w('Déconnexion automatique : token expiré');
     logout();
 
     // Afficher un message d'erreur propre
@@ -189,7 +190,7 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final response = await _baseClient.post(
-        '/accounts/login/',
+        'accounts/login/',
         data: credentials,
       );
 
@@ -230,9 +231,7 @@ class AuthProvider extends ChangeNotifier {
       // Forcer le nettoyage des anciens tokens
       await _secureStorage.deleteAll();
 
-      // Debug: Afficher les heures
-      print('DEBUG - Heure téléphone: ${DateTime.now().toIso8601String()}');
-      print('DEBUG - Token reçu: $accessToken');
+      _logger.d('Connexion réussie à ${DateTime.now().toIso8601String()}');
 
       // Sauvegarder le token
       await _secureStorage.write(key: _tokenKey, value: accessToken);
@@ -246,6 +245,9 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = user;
 
       _isAuthenticated = true;
+
+      // Envoyer le FCM token au backend après connexion réussie
+      await NotificationService().sendTokenToBackend(accessToken);
 
       notifyListeners();
 
@@ -271,11 +273,10 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
 
     try {
-      // Debug du payload envoyé à Django
-      print('DEBUG REGISTER PAYLOAD: $userData');
+      _logger.d('Inscription : envoi des champs (sans mot de passe)');
 
       final response = await _baseClient.post(
-        '/accounts/register/',
+        'accounts/register/',
         data: userData,
       );
 
@@ -324,7 +325,7 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final response = await _baseClient.post(
-        '/accounts/forgot-password/',
+        'accounts/forgot-password/',
         data: data,
       );
 
@@ -381,7 +382,7 @@ class AuthProvider extends ChangeNotifier {
 
       // Étape 2: Envoyer les informations à notre backend Django
       final response = await _baseClient.post(
-        '/accounts/google-auth/',
+        'accounts/google-auth/',
         data: {
           'email': 'test@example.com', // TODO: Remplacer par l'email Google
           'name': 'Test User', // TODO: Remplacer par le nom Google
@@ -394,7 +395,7 @@ class AuthProvider extends ChangeNotifier {
       _logger.i('Data reçue Google Auth: ${response.data}');
 
       // Vérifier si la réponse contient les données attendues
-      if (response.statusCode != 200) {
+      if (response.statusCode != 200 && response.statusCode != 201) {
         final errorMessage = response.data is Map
             ? response.data['message'] ??
                   'Erreur lors de l\'authentification Google'
@@ -411,9 +412,16 @@ class AuthProvider extends ChangeNotifier {
 
         // Sauvegarder le token et les données utilisateur
         await _secureStorage.write(key: _tokenKey, value: accessToken);
-        await _secureStorage.write(key: _userKey, value: jsonEncode(userData));
+        final userMap = Map<String, dynamic>.from(userData as Map);
+        await _secureStorage.write(key: _userKey, value: jsonEncode(userMap));
 
-        _logger.i('Authentification Google réussie: ${userData['email']}');
+        _currentUser = UserModel.fromJson(userMap);
+        _isAuthenticated = true;
+
+        await NotificationService().sendTokenToBackend(accessToken);
+
+        _logger.i('Authentification Google réussie: ${userMap['email']}');
+        notifyListeners();
         return true;
       } else {
         _setError(
@@ -515,7 +523,7 @@ class AuthProvider extends ChangeNotifier {
       }
 
       final response = await _baseClient.get(
-        '/missions/available/',
+        'missions/available/',
         queryParameters: queryParams,
       );
 
@@ -581,7 +589,7 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final response = await _baseClient.post(
-        '/api/v1/accounts/password/change/',
+        'accounts/password/change/',
         data: passwordData,
       );
 
@@ -617,7 +625,7 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final response = await _baseClient.patch(
-        '/api/v1/accounts/profile/update/',
+        'accounts/profile/update/',
         data: profileData,
       );
 

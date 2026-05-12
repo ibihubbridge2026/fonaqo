@@ -1,156 +1,180 @@
+import 'package:dio/dio.dart';
 import 'package:logger/logger.dart';
 
 import '../../core/api/base_client.dart';
 import '../../core/models/mission_model.dart';
 
-/// Repository pour la gestion des missions
-/// Centralise les appels API liés aux missions
+/// Données pour créer une mission (POST /missions/).
+class MissionCreatePayload {
+  final String title;
+  final String description;
+  final String address;
+  final double latitude;
+  final double longitude;
+  final double price;
+  final double serviceFee;
+
+  const MissionCreatePayload({
+    required this.title,
+    required this.description,
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+    required this.price,
+    required this.serviceFee,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'description': description,
+        'address': address,
+        'latitude': latitude,
+        'longitude': longitude,
+        'price': price,
+        'service_fee': serviceFee,
+      };
+}
+
+/// Repository pour la gestion des missions.
 class MissionRepository {
   final BaseClient _baseClient;
   final Logger _logger = Logger();
 
-  MissionRepository() : _baseClient = BaseClient();
+  MissionRepository({BaseClient? baseClient})
+      : _baseClient = baseClient ?? BaseClient();
 
-  /// Récupère les missions disponibles autour de l'utilisateur
+  List<dynamic> _extractListFromEnvelope(dynamic body) {
+    if (body is! Map) return [];
+    final data = body['data'];
+    if (data is List<dynamic>) return data;
+    if (data is Map<String, dynamic> && data['results'] is List<dynamic>) {
+      return data['results'] as List<dynamic>;
+    }
+    return [];
+  }
+
+  Map<String, dynamic> _extractObjectFromEnvelope(dynamic body) {
+    if (body is! Map<String, dynamic>) {
+      throw Exception('Réponse JSON invalide');
+    }
+    final data = body['data'];
+    if (data is Map<String, dynamic>) return data;
+    throw Exception('Réponse sans objet « data »');
+  }
+
+  /// Missions disponibles pour les agents (proximité optionnelle).
   Future<List<MissionModel>> fetchAvailableMissions({
     double? latitude,
     double? longitude,
-    double radius = 10.0, // Rayon par défaut en km
   }) async {
     try {
-      _logger.i('Récupération missions disponibles...');
-
-      // Déterminer l'endpoint selon le rôle de l'utilisateur
-      final String endpoint;
-
-      // TODO: Récupérer le rôle depuis AuthProvider de manière plus propre
-      // Pour l'instant, on utilise l'endpoint client par défaut
-      endpoint =
-          '/missions/'; // Endpoint pour les clients (leurs propres missions)
-
-      // Préparer les paramètres de requête
-      final Map<String, String> requestParams = {};
+      _logger.i('Récupération missions disponibles (agents)...');
+      final Map<String, dynamic> query = {};
       if (latitude != null && longitude != null) {
-        requestParams['latitude'] = latitude.toString();
-        requestParams['longitude'] = longitude.toString();
-      }
-      if (radius != 10.0) {
-        requestParams['radius'] = radius.toString();
+        query['lat'] = latitude.toString();
+        query['lng'] = longitude.toString();
       }
 
-      // Appeler l'API pour récupérer les missions
       final response = await _baseClient.get(
-        endpoint,
-        queryParameters: requestParams,
+        'missions/available/',
+        queryParameters: query.isEmpty ? null : query,
       );
 
-      _logger.i('Missions récupérées: ${response.data}');
-
-      if (response.statusCode == 200) {
-        final responseData = response.data as Map<String, dynamic>;
-        final missionsData = responseData['data'] as List<dynamic>? ?? [];
-        final missions = missionsData
-            .map(
-              (missionJson) =>
-                  MissionModel.fromJson(missionJson as Map<String, dynamic>),
-            )
-            .toList();
-
-        _logger.d('Nombre de missions: ${missions.length}');
-        return missions;
-      } else {
-        final errorMessage = response.data is Map
-            ? response.data['message'] ??
-                  'Erreur lors de la récupération des missions'
-            : 'Erreur lors de la récupération des missions';
-        _logger.e('Erreur missions: $errorMessage');
-        throw Exception(errorMessage);
+      if (response.statusCode != 200) {
+        throw Exception('Erreur HTTP ${response.statusCode}');
       }
-    } catch (e) {
-      _logger.e('Exception lors de fetchAvailableMissions: $e');
-      throw Exception('Erreur de connexion: ${e.toString()}');
+
+      final raw = response.data;
+      List<dynamic> rows;
+      if (raw is Map && raw['data'] is List) {
+        rows = raw['data'] as List<dynamic>;
+      } else {
+        rows = _extractListFromEnvelope(raw);
+      }
+
+      return rows
+          .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e, st) {
+      _logger.e('fetchAvailableMissions', error: e, stackTrace: st);
+      rethrow;
     }
   }
 
-  /// Récupère les détails d'une mission spécifique
-  Future<MissionModel> fetchMissionDetails(int missionId) async {
+  /// Liste paginée ou missions du client (GET /missions/).
+  Future<List<MissionModel>> fetchMissionsList({
+    double? latitude,
+    double? longitude,
+  }) async {
     try {
-      _logger.d('Récupération détails mission: $missionId');
-
-      final response = await _baseClient.get('/missions/$missionId/');
-
-      if (response.statusCode == 200) {
-        final missionData = response.data['data'] as Map<String, dynamic>;
-        final mission = MissionModel.fromJson(missionData);
-
-        _logger.i('Détails mission récupérés: ${mission.title}');
-        return mission;
-      } else {
-        final errorMessage = response.data is Map
-            ? response.data['message'] ?? 'Mission non trouvée'
-            : 'Mission non trouvée';
-        _logger.e('Erreur détails mission: $errorMessage');
-        throw Exception(errorMessage);
+      final Map<String, dynamic> query = {};
+      if (latitude != null && longitude != null) {
+        query['lat'] = latitude.toString();
+        query['lng'] = longitude.toString();
       }
-    } catch (e) {
-      _logger.e('Exception lors de fetchMissionDetails: $e');
-      throw Exception('Erreur de connexion: ${e.toString()}');
+
+      final response = await _baseClient.get(
+        'missions/',
+        queryParameters: query.isEmpty ? null : query,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Erreur HTTP ${response.statusCode}');
+      }
+
+      final rows = _extractListFromEnvelope(response.data);
+      return rows
+          .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e, st) {
+      _logger.e('fetchMissionsList', error: e, stackTrace: st);
+      rethrow;
     }
   }
 
-  /// Accepte une mission
-  Future<bool> acceptMission(int missionId) async {
+  Future<MissionModel> fetchMissionDetails(String missionId) async {
     try {
-      _logger.d('Acceptation mission: $missionId');
-
-      final response = await _baseClient.post('/missions/$missionId/accept/');
-
-      if (response.statusCode == 200) {
-        _logger.i('Mission acceptée avec succès');
-        return true;
-      } else {
-        final errorMessage = response.data is Map
-            ? response.data['message'] ??
-                  "Erreur lors de l'acceptation de la mission"
-            : "Erreur lors de l'acceptation de la mission";
-        _logger.e('Erreur acceptation mission: $errorMessage');
-        throw Exception(errorMessage);
+      final response = await _baseClient.get('missions/$missionId/');
+      if (response.statusCode != 200) {
+        throw Exception('Mission non trouvée');
       }
-    } catch (e) {
-      _logger.e('Exception lors de acceptMission: $e');
-      throw Exception('Erreur de connexion: ${e.toString()}');
+      final missionMap = _extractObjectFromEnvelope(response.data);
+      return MissionModel.fromJson(missionMap);
+    } catch (e, st) {
+      _logger.e('fetchMissionDetails', error: e, stackTrace: st);
+      rethrow;
     }
   }
 
-  /// Annule une mission
-  Future<bool> cancelMission(int missionId, {String? reason}) async {
+  Future<MissionModel> createMission(MissionCreatePayload payload) async {
     try {
-      _logger.d('Annulation mission: $missionId');
-
-      final data = <String, dynamic>{};
-      if (reason != null && reason.isNotEmpty) {
-        data['reason'] = reason;
-      }
-
       final response = await _baseClient.post(
-        '/missions/$missionId/cancel/',
-        data: data,
+        'missions/',
+        data: payload.toJson(),
       );
-
-      if (response.statusCode == 200) {
-        _logger.i('Mission annulée avec succès');
-        return true;
-      } else {
-        final errorMessage = response.data is Map
-            ? response.data['message'] ??
-                  "Erreur lors de l'annulation de la mission"
-            : "Erreur lors de l'annulation de la mission";
-        _logger.e('Erreur annulation mission: $errorMessage');
-        throw Exception(errorMessage);
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw DioException(
+          requestOptions: response.requestOptions,
+          response: response,
+          message: 'Création mission refusée',
+        );
       }
-    } catch (e) {
-      _logger.e('Exception lors de cancelMission: $e');
-      throw Exception('Erreur de connexion: ${e.toString()}');
+      final missionMap = _extractObjectFromEnvelope(response.data);
+      return MissionModel.fromJson(missionMap);
+    } catch (e, st) {
+      _logger.e('createMission', error: e, stackTrace: st);
+      rethrow;
+    }
+  }
+
+  Future<bool> acceptMission(String missionId) async {
+    try {
+      final response =
+          await _baseClient.post('missions/$missionId/accept/');
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e, st) {
+      _logger.e('acceptMission', error: e, stackTrace: st);
+      rethrow;
     }
   }
 }

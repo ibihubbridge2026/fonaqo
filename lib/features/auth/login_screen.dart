@@ -102,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     'assets/icon/fonaco.png',
                     width: 120,
                     color: Colors.black,
-                    errorBuilder: (_, _, _) =>
+                    errorBuilder: (_, __, ___) =>
                         const Icon(Icons.bolt, color: Colors.black, size: 120),
                   ),
                 ],
@@ -190,7 +190,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               decoration: InputDecoration(
                                 hintText: '••••••••',
                                 border: InputBorder.none,
-                                prefixIcon: Icon(Icons.lock_outline),
+                                prefixIcon: const Icon(Icons.lock_outline),
                                 suffixIcon: IconButton(
                                   icon: Icon(
                                     _isPasswordVisible

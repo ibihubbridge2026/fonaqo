@@ -106,7 +106,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                   fit: BoxFit.cover,
                   width: 40,
                   height: 40,
-                  errorBuilder: (_, _, _) {
+                  errorBuilder: (_, __, ___) {
                     return const Icon(Icons.person, color: Colors.black54);
                   },
                 ),

@@ -12,11 +12,11 @@ class HomeScreen extends StatelessWidget {
     final shell = MainShellScope.maybeOf(context);
 
     return Scaffold(
-      body: SafeArea(
+      body: const SafeArea(
         bottom: false,
         child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: const HomeContent(),
+          physics: BouncingScrollPhysics(),
+          child: HomeContent(),
         ),
       ),
       floatingActionButton: FloatingActionButton(

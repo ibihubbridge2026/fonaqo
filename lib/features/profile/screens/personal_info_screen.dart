@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 
 import '../../../widgets/custom_app_bar.dart';
 import '../../../core/providers/auth_provider.dart';
-import '../../../core/models/user_model.dart';
 
 /// Écran de modification des informations personnelles (nom, email, photo).
 class PersonalInfoScreen extends StatefulWidget {
@@ -293,7 +292,7 @@ class _AvatarEditor extends StatelessWidget {
                             width: 60,
                             height: 60,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) =>
+                            errorBuilder: (_, __, ___) =>
                                 const Icon(Icons.person, color: Colors.black54),
                           ),
                         )
@@ -303,7 +302,7 @@ class _AvatarEditor extends StatelessWidget {
                             width: 60,
                             height: 60,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) =>
+                            errorBuilder:(_, __, ___) =>
                                 const Icon(Icons.person, color: Colors.black54),
                           ),
                         ),

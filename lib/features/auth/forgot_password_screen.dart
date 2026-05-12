@@ -90,7 +90,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     'assets/icon/fonaco.png',
                     width: 80,
                     color: Colors.black,
-                    errorBuilder: (_, _, _) {
+                    errorBuilder: (_, __, ___) {
                       return const Icon(
                         Icons.bolt,
                         color: Colors.black,
@@ -313,10 +313,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       Center(
                         child: TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: Text(
+                          child: const Text(
                             "Retour à la connexion",
                             style: TextStyle(
-                              color: const Color(0xFF715D00),
+                              color: Color(0xFF715D00),
                               fontWeight: FontWeight.bold,
                             ),
                           ),

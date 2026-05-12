@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
@@ -14,6 +15,7 @@ class LocationSettingsScreen extends StatefulWidget {
 }
 
 class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
+  final Logger _log = Logger();
   Position? _currentPosition;
   bool _isLoading = false;
   bool _isPermissionDenied = false;
@@ -125,9 +127,8 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
           });
         }
       }
-    } catch (e) {
-      print('Erreur lors du geocoding: $e');
-      // Ne pas bloquer l'UI si le geocoding échoue
+    } catch (e, st) {
+      _log.e('Géocodage paramètres lieu', error: e, stackTrace: st);
     }
   }
 
@@ -329,10 +330,10 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          Icon(
+                          const Icon(
                             Icons.location_on,
                             size: 48,
-                            color: const Color(0xFFFFD400),
+                            color: Color(0xFFFFD400),
                           ),
                           const SizedBox(height: 16),
                           // Adresse lisible (principal)

@@ -93,7 +93,7 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = currentIndex == index;
-    final activeColor = const Color(0xFFFFD400);
+    const activeColor = Color(0xFFFFD400);
     final inactiveColor = Colors.grey[400];
 
     return GestureDetector(

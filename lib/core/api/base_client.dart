@@ -5,8 +5,8 @@ import 'package:logger/logger.dart';
 /// Client HTTP centralisé pour toutes les appels API
 /// Utilise Dio avec intercepteurs pour authentification et logging
 class BaseClient {
-  // Pour émulateur Android: http://10.0.2.2:8000/api/v1/
-  // Pour vrai téléphone sur réseau local: http://192.168.x.x:8000/api/v1/
+  /// Base API (suffixe /api/v1/). Les chemins passés à Dio sont relatifs, ex. `accounts/login/`.
+  /// Émulateur Android : http://10.0.2.2:8000/api/v1/
   static const String _baseUrl = 'http://192.168.1.73:8000/api/v1/';
   static const Duration _connectTimeout = Duration(seconds: 30);
   static const Duration _receiveTimeout = Duration(seconds: 30);
@@ -36,7 +36,7 @@ class BaseClient {
     );
 
     // Ajout des intercepteurs
-    _dio.interceptors.add(_AuthInterceptor(_secureStorage));
+    _dio.interceptors.add(_AuthInterceptor(_secureStorage, _logger));
     _dio.interceptors.add(_LoggingInterceptor(_logger));
   }
 
@@ -171,7 +171,6 @@ class BaseClient {
         );
 
       case DioExceptionType.unknown:
-      default:
         return ApiException(
           message: 'Une erreur inattendue est survenue',
           type: ApiErrorType.unknown,
@@ -257,22 +256,28 @@ class BaseClient {
 /// Intercepteur pour ajouter le token JWT aux requêtes
 class _AuthInterceptor extends Interceptor {
   final FlutterSecureStorage _secureStorage;
+  final Logger _logger;
   static const String _tokenKey = 'jwt_token';
 
-  _AuthInterceptor(this._secureStorage);
+  _AuthInterceptor(this._secureStorage, this._logger);
+
+  bool _isPublicPath(String path) {
+    return path.contains('accounts/login/') ||
+        path.contains('accounts/register/') ||
+        path.contains('accounts/forgot-password/') ||
+        path.contains('accounts/google-auth/');
+  }
 
   @override
   void onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    // Ne pas ajouter de token pour l'endpoint de login
-    if (options.path.contains('login/')) {
+    if (_isPublicPath(options.path)) {
       handler.next(options);
       return;
     }
 
-    // Ajouter le token JWT s'il existe
     final token = await _secureStorage.read(key: _tokenKey);
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
@@ -282,27 +287,14 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    // Si erreur 401 avec token_not_valid, supprimer le token et logger
     if (err.response?.statusCode == 401) {
       final responseData = err.response?.data;
       if (responseData is Map && responseData['code'] == 'token_not_valid') {
-        print('DEBUG - Token expiré détecté, suppression du token');
+        _logger.w('JWT expiré ou invalide : suppression du stockage token');
         _secureStorage.delete(key: _tokenKey);
-
-        // Déclencher la déconnexion automatique
-        _handleTokenExpired();
       }
     }
     handler.next(err);
-  }
-
-  void _handleTokenExpired() {
-    // Notifier l'AuthProvider pour gérer la déconnexion
-    print('DEBUG - Token expiré, notification du AuthProvider');
-
-    // Importer et utiliser le AuthProvider pour gérer la déconnexion
-    // Note: Cette implémentation nécessite une refactorisation pour accéder au AuthProvider
-    // Pour l'instant, on supprime juste le token
   }
 }
 

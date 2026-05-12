@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/auth_provider.dart';
@@ -15,6 +16,8 @@ class GettingScreen extends StatefulWidget {
 }
 
 class _GettingScreenState extends State<GettingScreen> {
+  final Logger _log = Logger();
+
   @override
   void initState() {
     super.initState();
@@ -27,20 +30,13 @@ class _GettingScreenState extends State<GettingScreen> {
   }
 
   void _startTimer() async {
-    print('DEBUG: GettingScreen timer démarré, attente 2.5 secondes...');
+    _log.d('Splash : attente 2,5 s avant vérification session');
 
-    // Laisse l'écran jaune affiché pendant 2.5 secondes
     Timer(const Duration(milliseconds: 2500), () async {
       if (mounted) {
-        print('DEBUG: GettingScreen timer terminé, vérification auth...');
-
-        // Vérifier l'authentification
         final authProvider = context.read<AuthProvider>();
         await authProvider.checkAuth();
-
-        print('DEBUG: Auth vérifiée, appel du callback onAuthChecked');
-
-        // Appeler le callback pour gérer la navigation
+        _log.d('Splash : session vérifiée, navigation');
         widget.onAuthChecked();
       }
     });
@@ -70,7 +66,7 @@ class _GettingScreenState extends State<GettingScreen> {
                     width: 80,
                     height: 80,
                     color: Colors.white,
-                    errorBuilder: (_, _, _) {
+                    errorBuilder: (_, __, ___) {
                       return const Icon(
                         Icons.bolt,
                         color: Colors.white,

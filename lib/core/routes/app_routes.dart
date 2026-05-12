@@ -43,16 +43,16 @@ abstract final class AppRoutes {
   static const String missionsAvailable = '/missions-available';
 
   /// Centre d'aide
-  static const String helpCenter = '/help-center';
+  static const String helpCenter = '/profile/help';
 
   /// Paramètres de notifications
   static const String notificationsSettings = '/notifications-settings';
 
   /// Informations personnelles
-  static const String personalInfo = '/personal-info';
+  static const String personalInfo = '/profile/personal-info';
 
   /// Paramètres de sécurité
-  static const String securitySettings = '/security-settings';
+  static const String securitySettings = '/profile/security';
 
-  static const String language = '/language';
+  static const String language = '/profile/language';
 }

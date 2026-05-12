@@ -1,12 +1,28 @@
 import 'package:flutter/material.dart';
 
+/// Montants validés à l’étape paiement (avant appel API + portefeuille simulé).
+class MissionPaymentTotals {
+  final double totalCfa;
+  final double serviceFeeCfa;
+  final double purchaseBudgetCfa;
+  final bool paySupplierDirectly;
+
+  const MissionPaymentTotals({
+    required this.totalCfa,
+    required this.serviceFeeCfa,
+    required this.purchaseBudgetCfa,
+    required this.paySupplierDirectly,
+  });
+}
+
 class Step3PaymentSummary extends StatefulWidget {
   final String mode;
-  final VoidCallback onPaid;
+  final Future<void> Function(MissionPaymentTotals totals) onPayAndValidate;
+
   const Step3PaymentSummary({
     super.key,
     required this.mode,
-    required this.onPaid,
+    required this.onPayAndValidate,
   });
 
   @override
@@ -18,9 +34,9 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
   final TextEditingController _purchaseBudgetController =
       TextEditingController();
 
-  // Dynamic amounts (TODO: Make API-driven)
   static const double _serviceFee = 500.0;
   static const double _defaultBudget = 2500.0;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -28,190 +44,215 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Paiement sécurisé",
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Carte Récapitulative (Design paiement.html)
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
-          ),
-          child: Column(
-            children: [
-              _buildSummaryRow(
-                "Type de mission",
-                widget.mode == 'queue' ? "File d'attente" : "Service libre",
-              ),
-              _buildSummaryRow(
-                "Frais de service",
-                "${_serviceFee.toInt()} CFA",
-              ),
-
-              // Budget Achats (conditionnel)
-              if (!_paySupplierDirectly) ...[
-                _buildSummaryRow(
-                  "Budget Achats",
-                  "${_purchaseBudgetController.text.isEmpty ? _defaultBudget.toInt() : int.parse(_purchaseBudgetController.text)} CFA",
-                ),
-              ],
-
-              const Divider(height: 30),
-              _buildSummaryRow(
-                "Total à payer",
-                "${(_calculateTotal()).toInt()} CFA",
-                isTotal: true,
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 30),
-
-        // QUESTION PAIEMENT DIRECT FOURNISSEUR
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.account_balance_wallet,
-                    color: const Color(0xFFFFD400),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          "Je paie les frais d'achat directement au fournisseur",
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        Text(
-                          "Le séquestre ne concernera que les frais de service",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              Checkbox(
-                value: _paySupplierDirectly,
-                onChanged: (value) =>
-                    setState(() => _paySupplierDirectly = value ?? false),
-                activeColor: const Color(0xFFFFD400),
-              ),
-
-              // CHAMP BUDGET ACHATS (conditionnel)
-              if (!_paySupplierDirectly) ...[
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _purchaseBudgetController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: "Budget Achats",
-                    hintText: "Entrez le montant pour les achats",
-                    prefixText: "CFA ",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Colors.grey.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFFFFD400)),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 30),
-        const Text(
-          "Choisir un moyen de paiement",
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-        ),
-        const SizedBox(height: 15),
-
-        // Liste des moyens de paiement
-        _buildPaymentMethod(
-          "Orange Money",
-          "assets/icons/orange.png",
-          Colors.orange,
-        ),
-        _buildPaymentMethod("Moov Money", "assets/icons/moov.png", Colors.blue),
-        _buildPaymentMethod(
-          "Wave",
-          "assets/icons/wave.png",
-          Colors.lightBlueAccent,
-        ),
-        _buildPaymentMethod(
-          "Carte Bancaire",
-          null,
-          Colors.black,
-          iconData: Icons.credit_card,
-        ),
-
-        const SizedBox(height: 30),
-        ElevatedButton(
-          onPressed: widget.onPaid,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF1A1C1C),
-            minimumSize: const Size(double.infinity, 60),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-          ),
-          child: const Text(
-            "PAYER ET VALIDER",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900),
-          ),
-        ),
-      ],
-    );
+  double _purchaseBudgetValue() {
+    if (_paySupplierDirectly) return 0;
+    final t = _purchaseBudgetController.text.trim();
+    if (t.isEmpty) return _defaultBudget;
+    return double.tryParse(t) ?? _defaultBudget;
   }
 
   double _calculateTotal() {
-    double total = _serviceFee;
+    var total = _serviceFee;
     if (!_paySupplierDirectly) {
-      double purchaseBudget = _purchaseBudgetController.text.isEmpty
-          ? _defaultBudget
-          : (double.tryParse(_purchaseBudgetController.text) ?? 0);
-      total += purchaseBudget;
+      total += _purchaseBudgetValue();
     }
     return total;
+  }
+
+  Future<void> _onPayPressed() async {
+    if (_submitting) return;
+    setState(() => _submitting = true);
+    try {
+      final totals = MissionPaymentTotals(
+        totalCfa: _calculateTotal(),
+        serviceFeeCfa: _serviceFee,
+        purchaseBudgetCfa: _purchaseBudgetValue(),
+        paySupplierDirectly: _paySupplierDirectly,
+      );
+      await widget.onPayAndValidate(totals);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Paiement sécurisé',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+            ),
+            child: Column(
+              children: [
+                _buildSummaryRow(
+                  'Type de mission',
+                  widget.mode == 'queue' ? "File d'attente" : 'Service libre',
+                ),
+                _buildSummaryRow(
+                  'Frais de service',
+                  '${_serviceFee.toInt()} CFA',
+                ),
+                if (!_paySupplierDirectly) ...[
+                  _buildSummaryRow(
+                    'Budget achats',
+                    '${_purchaseBudgetValue().toInt()} CFA',
+                  ),
+                ],
+                const Divider(height: 30),
+                _buildSummaryRow(
+                  'Total à payer',
+                  '${_calculateTotal().toInt()} CFA',
+                  isTotal: true,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 30),
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.account_balance_wallet,
+                      color: Color(0xFFFFD400),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Je paie les frais d'achat directement au fournisseur",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            'Le séquestre ne concernera que les frais de service',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                Checkbox(
+                  value: _paySupplierDirectly,
+                  onChanged: (value) =>
+                      setState(() => _paySupplierDirectly = value ?? false),
+                  activeColor: const Color(0xFFFFD400),
+                ),
+                if (!_paySupplierDirectly) ...[
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _purchaseBudgetController,
+                    keyboardType: TextInputType.number,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      labelText: 'Budget achats',
+                      hintText: 'Montant pour les achats',
+                      prefixText: 'CFA ',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Colors.grey.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFFFD400)),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 30),
+          const Text(
+            'Choisir un moyen de paiement',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+          ),
+          const SizedBox(height: 15),
+          _buildPaymentMethod(
+            'Orange Money',
+            'assets/icons/orange.png',
+            Colors.orange,
+          ),
+          _buildPaymentMethod(
+            'Moov Money',
+            'assets/icons/moov.png',
+            Colors.blue,
+          ),
+          _buildPaymentMethod(
+            'Wave',
+            'assets/icons/wave.png',
+            Colors.lightBlueAccent,
+          ),
+          _buildPaymentMethod(
+            'Carte bancaire',
+            null,
+            Colors.black,
+            iconData: Icons.credit_card,
+          ),
+          const SizedBox(height: 30),
+          ElevatedButton(
+            onPressed: _submitting ? null : _onPayPressed,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF1A1C1C),
+              minimumSize: const Size(double.infinity, 60),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+            child: _submitting
+                ? const SizedBox(
+                    height: 22,
+                    width: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text(
+                    'PAYER ET VALIDER',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSummaryRow(String label, String value, {bool isTotal = false}) {

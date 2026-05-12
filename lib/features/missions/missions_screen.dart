@@ -17,8 +17,8 @@ class MissionsScreen extends StatelessWidget {
       valueListenable: showCreateMissionListenable,
       builder: (context, isCreating, _) {
         if (isCreating) {
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+          return const Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 100),
             child: SizedBox.expand(
               child: CreateMissionScreen(),
             ),
@@ -50,9 +50,9 @@ class MissionsScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 10),
-                  _CategoryChip(label: "En cours", isActive: true),
-                  _CategoryChip(label: "Terminées", isActive: false),
-                  _CategoryChip(label: "Annulées", isActive: false),
+                  const _CategoryChip(label: "En cours", isActive: true),
+                  const _CategoryChip(label: "Terminées", isActive: false),
+                  const _CategoryChip(label: "Annulées", isActive: false),
                 ],
               ),
             ),
@@ -216,7 +216,7 @@ class MissionsPromoQueueCard extends StatelessWidget {
               child: Image.asset(
                 'favicon.png',
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const Icon(Icons.hourglass_bottom, color: Color(0xFFFFD400)),
+                errorBuilder: (_, __, ___)=> const Icon(Icons.hourglass_bottom, color: Color(0xFFFFD400)),
               ),
             ),
           ),

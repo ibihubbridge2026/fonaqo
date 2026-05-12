@@ -49,11 +49,11 @@ class _MainWrapperState extends State<MainWrapper> {
   bool _showLocationBanner = false;
 
   late final List<Widget> _pages = [
-    HomeScreen(),
+    const HomeScreen(),
     MissionsScreen(showCreateMissionListenable: _showCreateMission),
-    AgentsScreen(),
-    EventsScreen(),
-    ProfileScreen(),
+    const AgentsScreen(),
+    const EventsScreen(),
+    const ProfileScreen(),
   ];
 
   @override

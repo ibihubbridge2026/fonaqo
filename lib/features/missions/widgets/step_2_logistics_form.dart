@@ -1,9 +1,24 @@
 import 'package:flutter/material.dart';
 import '../../../core/services/location_service.dart';
 
+/// Données collectées à l’étape logistique (adresse + budget + GPS).
+class MissionLogisticsDraft {
+  final String address;
+  final double latitude;
+  final double longitude;
+  final double proposedBudget;
+
+  const MissionLogisticsDraft({
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+    required this.proposedBudget,
+  });
+}
+
 class Step2LogisticsForm extends StatefulWidget {
   final String mode;
-  final VoidCallback onNext;
+  final void Function(MissionLogisticsDraft draft) onNext;
 
   const Step2LogisticsForm({
     super.key,
@@ -287,7 +302,24 @@ class _Step2LogisticsFormState extends State<Step2LogisticsForm> {
 
           // BOUTON
           ElevatedButton(
-            onPressed: widget.onNext,
+            onPressed: () {
+              final pos = _locationService.currentPosition;
+              final lat = pos?.latitude ?? 5.36;
+              final lng = pos?.longitude ?? -4.0083;
+              final raw = _budgetController.text.trim();
+              final budget = double.tryParse(raw) ?? 2500;
+              final addr = _locationController.text.trim().isEmpty
+                  ? 'Adresse non précisée'
+                  : _locationController.text.trim();
+              widget.onNext(
+                MissionLogisticsDraft(
+                  address: addr,
+                  latitude: lat,
+                  longitude: lng,
+                  proposedBudget: budget,
+                ),
+              );
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black,
               minimumSize:

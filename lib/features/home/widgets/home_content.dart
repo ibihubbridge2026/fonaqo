@@ -220,7 +220,7 @@ class HeroCarouselSlide extends StatelessWidget {
           Image.asset(
             assetPath,
             fit: BoxFit.cover,
-            errorBuilder: (_, _, _) {
+            errorBuilder: (_, __, ___) {
               return Container(
                 color: Colors.grey[300],
                 child: const Icon(
@@ -351,15 +351,15 @@ class AvailableMissionsPreview extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Row(
+          const Row(
             children: [
               Icon(
                 Icons.work_outline,
-                color: const Color(0xFFFFD400),
+                color: Color(0xFFFFD400),
                 size: 24,
               ),
-              const SizedBox(width: 12),
-              const Text(
+              SizedBox(width: 12),
+              Text(
                 'Missions Disponibles',
                 style: TextStyle(
                   fontSize: 16,
@@ -650,7 +650,7 @@ class AgentCard extends StatelessWidget {
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) {
+                    errorBuilder: (_, __, ___) {
                       return const Icon(
                         Icons.person,
                         color: Colors.black54,

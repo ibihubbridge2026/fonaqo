@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:logger/logger.dart';
 
 import '../../core/models/mission_model.dart';
 import '../missions/mission_repository.dart';
@@ -13,6 +14,7 @@ class AgentsScreen extends StatefulWidget {
 }
 
 class _AgentsScreenState extends State<AgentsScreen> {
+  final Logger _log = Logger();
   final MissionRepository _missionRepository = MissionRepository();
   List<MissionModel> _missions = [];
   bool _isLoadingMissions = false;
@@ -109,9 +111,8 @@ class _AgentsScreenState extends State<AgentsScreen> {
 
       // Si la map est déjà prête, on centre immédiatement.
       if (mounted) await _animateTo(me);
-    } catch (e) {
-      // Gérer les erreurs de localisation sans crasher l'app
-      print('Erreur de localisation: $e');
+    } catch (e, st) {
+      _log.e('Localisation agents', error: e, stackTrace: st);
 
       // Définir une position par défaut (Abidjan) en cas d'erreur
       if (mounted) {
@@ -368,7 +369,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
                       itemCount: _missions.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 12),
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
                       itemBuilder: (context, index) {
                         return SizedBox(
                           width: 320,
@@ -417,7 +418,7 @@ class MissionListTile extends StatelessWidget {
                           width: 60,
                           height: 60,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) =>
+                          errorBuilder: (_, __, ___) =>
                               const Icon(Icons.person, color: Colors.black54),
                         )
                       : const Icon(Icons.person, color: Colors.black54),

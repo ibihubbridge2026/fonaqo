@@ -30,7 +30,7 @@ class MissionDetailScreen extends StatelessWidget {
                 child: Image.asset(
                   'assets/images/hero/img-2.jpg',
                   fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => Container(
+                  errorBuilder:(_, __, ___) => Container(
                     color: Colors.grey[200],
                     alignment: Alignment.center,
                     child: const Icon(

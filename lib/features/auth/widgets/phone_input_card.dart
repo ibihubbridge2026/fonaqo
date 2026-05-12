@@ -48,7 +48,7 @@ class PhoneInputCard extends StatelessWidget {
 }
 
 Future<Country?> pickCountry(BuildContext context, Country current) {
-  final countries = Country.availableCountries;
+  const countries = Country.availableCountries;
 
   return showModalBottomSheet<Country>(
     context: context,

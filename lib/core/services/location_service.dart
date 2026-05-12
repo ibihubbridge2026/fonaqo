@@ -1,7 +1,9 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:logger/logger.dart';
 
 class LocationService {
+  final Logger _logger = Logger();
   static final LocationService _instance = LocationService._internal();
   factory LocationService() => _instance;
   LocationService._internal();
@@ -55,8 +57,8 @@ class LocationService {
       );
 
       await _getAddressFromLatLng(_currentPosition!);
-    } catch (e) {
-      print('Erreur lors de l\'obtention de la localisation: $e');
+    } catch (e, st) {
+      _logger.e('Localisation', error: e, stackTrace: st);
     } finally {
       _isLoading = false;
     }
@@ -73,8 +75,8 @@ class LocationService {
         Placemark place = placemarks[0];
         _currentAddress = _formatAddress(place);
       }
-    } catch (e) {
-      print('Erreur lors du geocoding: $e');
+    } catch (e, st) {
+      _logger.e('Géocodage', error: e, stackTrace: st);
       _currentAddress = 'Adresse inconnue';
     }
   }

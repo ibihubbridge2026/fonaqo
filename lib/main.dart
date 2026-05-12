@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:fonaco/core/config/splash_config.dart';
-import 'package:fonaco/features/profile/screens/help_center_screen.dart';
+import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_core/firebase_core.dart'; // Ajouté
 
 import 'core/providers/auth_provider.dart';
+import 'core/providers/wallet_provider.dart';
 import 'core/routes/app_routes.dart';
 import 'features/auth/forgot_password_screen.dart';
 import 'features/auth/login_screen.dart';
@@ -15,39 +17,35 @@ import 'widgets/main_wrapper.dart';
 import 'features/chat/chat_screen.dart';
 import 'features/litiges/litige_screen.dart';
 import 'features/events/event_detail_screen.dart';
-// import 'features/help/help_center_screen.dart'; // Déplacé dans profile/screens
-// import 'features/help/language_screen.dart'; // Déplacé dans profile/screens
 import 'features/missions/mission_detail_screen.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'features/profile/screens/personal_info_screen.dart';
 import 'features/profile/screens/security_settings_screen.dart';
 import 'features/profile/screens/location_settings_screen.dart';
 import 'features/profile/screens/language_screen.dart';
+import 'features/profile/screens/help_center_screen.dart';
 import 'features/rating/rating_screen.dart';
 
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  final log = Logger();
 
-  // Initialiser le splash natif
-  SplashConfig.initializeSplash(widgetsBinding);
-
-  // Nettoyage manuel en mode debug
-  if (const bool.fromEnvironment('dart.vm.product') == false) {
-    print('DEBUG MODE: Nettoyage SharedPreferences pour tests');
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-
-    // Forcer les valeurs de test
-    await prefs.setBool('isFirstTime', true);
-    await prefs.remove('token');
+  // 1. Initialisation de Firebase obligatoire
+  try {
+    await Firebase.initializeApp();
+    log.i('✅ Firebase initialisé avec succès');
+  } catch (e) {
+    log.e('❌ Échec initialisation Firebase : $e');
+    // On continue quand même, mais les notifications ne marcheront pas
   }
 
-  // Vérifier l'état de l'utilisateur
+  SplashConfig.initializeSplash(widgetsBinding);
+
   final prefs = await SharedPreferences.getInstance();
   final isFirstTime = prefs.getBool('isFirstTime') ?? true;
   final isLoggedIn = prefs.getString('token') != null;
 
-  print('DEBUG MAIN: isFirstTime = $isFirstTime, isLoggedIn = $isLoggedIn');
+  log.d('🚀 Démarrage FONACO | FirstTime: $isFirstTime | LoggedIn: $isLoggedIn');
 
   runApp(FonacoApp(isFirstTime: isFirstTime, isLoggedIn: isLoggedIn));
 }
@@ -65,33 +63,30 @@ class FonacoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => AuthProvider())],
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => WalletProvider()),
+      ],
       child: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
-          // Sécurisation des accès à l'utilisateur
-          final user = authProvider.currentUser;
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'FONACO',
+            theme: ThemeData(useMaterial3: true),
             initialRoute: _getInitialRoute(),
             routes: {
               AppRoutes.splash: (context) => GettingScreen(
                 onAuthChecked: () async {
-                  // Supprimer le splash natif après vérification
                   await SplashConfig.removeSplash();
-
-                  // Marquer que ce n'est plus la première fois
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.setBool('isFirstTime', false);
-
-                  // Attendre que AuthProvider soit initialisé
                   await authProvider.checkAuth();
 
+                  // AJOUT DE LA VÉRIFICATION DE MONTAGE (MOUNTED)
+                  if (!context.mounted) return; 
+
                   if (authProvider.isAuthenticated) {
-                    Navigator.pushReplacementNamed(
-                      context,
-                      AppRoutes.mainShell,
-                    );
+                    Navigator.pushReplacementNamed(context, AppRoutes.mainShell);
                   } else {
                     Navigator.pushReplacementNamed(context, AppRoutes.login);
                   }
@@ -99,8 +94,7 @@ class FonacoApp extends StatelessWidget {
               ),
               AppRoutes.login: (context) => const LoginScreen(),
               AppRoutes.register: (context) => const RegisterScreen(),
-              AppRoutes.forgotPassword: (context) =>
-                  const ForgotPasswordScreen(),
+              AppRoutes.forgotPassword: (context) => const ForgotPasswordScreen(),
               AppRoutes.onboarding: (context) => const OnboardingScreen(),
               AppRoutes.mainShell: (context) => const MainWrapper(),
               AppRoutes.missionDetail: (context) => const MissionDetailScreen(),
@@ -109,13 +103,9 @@ class FonacoApp extends StatelessWidget {
               AppRoutes.notifications: (context) => const NotificationsScreen(),
               AppRoutes.helpCenter: (context) => const HelpCenterScreen(),
               AppRoutes.profileLanguage: (context) => const LanguageScreen(),
-              // AppRoutes.notificationsSettings: (context) =>
-              //     const NotificationsSettingsScreen(),
               AppRoutes.personalInfo: (context) => const PersonalInfoScreen(),
-              AppRoutes.securitySettings: (context) =>
-                  const SecuritySettingsScreen(),
-              AppRoutes.profileLocation: (context) =>
-                  const LocationSettingsScreen(),
+              AppRoutes.securitySettings: (context) => const SecuritySettingsScreen(),
+              AppRoutes.profileLocation: (context) => const LocationSettingsScreen(),
               AppRoutes.rating: (context) => const RatingScreen(),
               AppRoutes.chat: (context) => const ChatScreen(),
             },
@@ -126,19 +116,8 @@ class FonacoApp extends StatelessWidget {
   }
 
   String _getInitialRoute() {
-    // Debug SharedPreferences
-    print('DEBUG INIT: isFirstTime = $isFirstTime, isLoggedIn = $isLoggedIn');
-
-    // Forcer le Onboarding si isFirstTime est null
-    if (isFirstTime == true) {
-      print('DEBUG: Redirection vers splash/onboarding');
-      return AppRoutes.splash;
-    } else if (isLoggedIn == true) {
-      print('DEBUG: Redirection vers main shell');
-      return AppRoutes.mainShell;
-    } else {
-      print('DEBUG: Redirection vers login');
-      return AppRoutes.login;
-    }
+    if (isFirstTime) return AppRoutes.splash;
+    if (isLoggedIn) return AppRoutes.mainShell;
+    return AppRoutes.login;
   }
 }
