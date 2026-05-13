@@ -54,8 +54,8 @@ class MainNavigationBar extends StatelessWidget {
           _NavItem(
             index: 3,
             currentIndex: currentIndex,
-            icon: Icons.event_rounded,
-            label: 'Événements',
+            icon: Icons.lightbulb_rounded,
+            label: 'Opportunités',
             onTap: onTap,
           ),
           _NavItem(

@@ -43,6 +43,13 @@ class _HomeContentState extends State<HomeContent> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadDashboard());
   }
 
+  @override
+  void didUpdateWidget(HomeContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Recharger les données lorsque le widget est mis à jour (retour sur la page)
+    _loadDashboard();
+  }
+
   Future<void> _loadDashboard() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (!auth.isAuthenticated) {
@@ -103,9 +110,13 @@ class _HomeContentState extends State<HomeContent> {
 
   List<MissionModel> _historyMissions() {
     return _missions
-        .where((m) => m.status == MissionStatus.COMPLETED)
-        .take(5)
-        .toList();
+        .where((m) =>
+            m.status == MissionStatus.COMPLETED ||
+            m.status == MissionStatus.CANCELLED)
+        .take(4)
+        .toList()
+      ..sort((a, b) => (b.createdAt ?? DateTime.now())
+          .compareTo(a.createdAt ?? DateTime.now()));
   }
 
   @override
@@ -132,14 +143,17 @@ class _HomeContentState extends State<HomeContent> {
         ),
         const SizedBox(height: 25),
         PrimaryCreateMissionPanel(
-          onPressed: () {
+          onPressed: () async {
             if (shell != null) {
+              // Naviguer vers l'onglet missions et attendre un retour avec valeur true
               shell.setIndex(1);
-              shell.openCreateMission();
-              return;
+              await Future.delayed(const Duration(milliseconds: 100));
+              // La logique de rafraîchissement sera gérée par didUpdateWidget
+              // quand l'utilisateur reviendra sur cet onglet
+            } else {
+              // Fallback si le contenu est utilisé hors shell.
+              Navigator.pushNamed(context, AppRoutes.missionDetail);
             }
-            // Fallback si le contenu est utilisé hors shell.
-            Navigator.pushNamed(context, AppRoutes.missionDetail);
           },
         ),
         SectionTitleStrip(
@@ -185,31 +199,6 @@ class _HomeContentState extends State<HomeContent> {
         else
           QuickHistoryEntries(missions: _historyMissions()),
         const SizedBox(height: 25),
-
-        // Section spéciale pour les agents - afficher seulement si l'utilisateur est un agent
-        Consumer<AuthProvider>(
-          builder: (context, authProvider, child) {
-            if (authProvider.currentUser?.isAgent == true) {
-              return Column(
-                children: [
-                  SectionTitleStrip(
-                    title: 'Missions disponibles',
-                    showSeeAll: false,
-                    onSeeAllPressed: () =>
-                        Navigator.pushNamed(context, '/missions-available'),
-                  ),
-                  const SizedBox(height: 12),
-                  const AvailableMissionsPreview(),
-                  const SizedBox(height: 25),
-                ],
-              );
-            } else {
-              // Ne rien afficher pour les clients
-              return const SizedBox.shrink();
-            }
-          },
-        ),
-
         const ReportLitigeCardPanel(),
         SizedBox(height: bottomReserve),
       ],
@@ -272,7 +261,7 @@ class HeroCarouselStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 180,
+      height: 160, // Reduced from 180 for better flexibility
       child: PageView.builder(
         controller: pageController,
         itemBuilder: (context, index) {
@@ -430,7 +419,8 @@ class AvailableMissionsPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 120,
+      constraints: const BoxConstraints(
+          minHeight: 100, maxHeight: 140), // Flexible height range
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -666,7 +656,7 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
     final rows = widget.agents;
     if (rows.isEmpty) {
       return const SizedBox(
-        height: 100,
+        height: 90, // Reduced from 100 for better flexibility
         child: Center(
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 24),
@@ -695,7 +685,7 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
     }
 
     return SizedBox(
-      height: 200,
+      height: 180, // Reduced from 200 for better flexibility
       child: ListView.builder(
         controller: _scrollController,
         scrollDirection: Axis.horizontal,
@@ -860,7 +850,7 @@ class OngoingMissionStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     if (missions.isEmpty) {
       return const SizedBox(
-        height: 72,
+        height: 70, // Reduced from 72 for better flexibility
         child: Center(
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 24),
@@ -891,7 +881,7 @@ class OngoingMissionStrip extends StatelessWidget {
 
     // Si plusieurs missions, afficher en horizontal
     return SizedBox(
-      height: 85,
+      height: 80, // Reduced from 85 for better flexibility
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -942,7 +932,7 @@ class OngoingMissionCard extends StatelessWidget {
         width: isFullWidth ? double.infinity : 260,
         margin:
             isFullWidth ? EdgeInsets.zero : const EdgeInsets.only(right: 15),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(18),
@@ -963,17 +953,27 @@ class OngoingMissionCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                  Flexible(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Text(
-                    'Agent: $agentName',
-                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                  const SizedBox(height: 4),
+                  Flexible(
+                    child: Text(
+                      'Agent: $agentName',
+                      style: const TextStyle(color: Colors.grey, fontSize: 11),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),

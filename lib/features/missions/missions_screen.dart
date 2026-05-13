@@ -24,13 +24,20 @@ class _MissionsScreenState extends State<MissionsScreen> {
   List<MissionModel> _allMissions = [];
   List<MissionModel> _filteredMissions = [];
   bool _isLoading = true;
-  String _selectedFilter = "En cours";
+  String _selectedFilter = "Toutes";
 
-  final List<String> _filters = ["En cours", "Terminées", "Annulées", "Toutes"];
+  final List<String> _filters = ["Toutes", "En cours", "Terminées", "Annulées"];
 
   @override
   void initState() {
     super.initState();
+    _loadMissions();
+  }
+
+  @override
+  void didUpdateWidget(MissionsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Recharger les missions lorsque le widget est mis à jour (retour sur la page)
     _loadMissions();
   }
 

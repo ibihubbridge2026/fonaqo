@@ -1,10 +1,51 @@
 import 'package:flutter/material.dart';
 
 import '../../widgets/custom_app_bar.dart';
+import '../../core/models/mission_model.dart';
+import '../missions/mission_repository.dart';
 
-/// Écran d’ouverture d’un litige depuis le dashboard.
-class LitigeScreen extends StatelessWidget {
+/// Écran d'ouverture d'un litige depuis le dashboard.
+class LitigeScreen extends StatefulWidget {
   const LitigeScreen({super.key});
+
+  @override
+  State<LitigeScreen> createState() => _LitigeScreenState();
+}
+
+class _LitigeScreenState extends State<LitigeScreen> {
+  final MissionRepository _missionRepository = MissionRepository();
+  List<MissionModel> _eligibleMissions = [];
+  bool _isLoading = false;
+  String? _selectedMissionId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEligibleMissions();
+  }
+
+  Future<void> _loadEligibleMissions() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final missions = await _missionRepository.fetchMissionsList();
+      final eligible = missions.where((mission) {
+        // Seulement les missions en cours ou annulées peuvent avoir des litiges
+        return mission.status == MissionStatus.ACCEPTED ||
+            mission.status == MissionStatus.ON_THE_WAY ||
+            mission.status == MissionStatus.ARRIVED ||
+            mission.status == MissionStatus.IN_PROGRESS ||
+            mission.status == MissionStatus.CANCELLED;
+      }).toList();
+
+      setState(() {
+        _eligibleMissions = eligible;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,24 +72,34 @@ class LitigeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _Card(
-            child: DropdownButtonFormField<String>(
-              initialValue: "Mairie d'Abidjan",
-              items: const [
-                DropdownMenuItem(
-                  value: "Mairie d'Abidjan",
-                  child: Text("Mairie d'Abidjan • En cours"),
-                ),
-                DropdownMenuItem(
-                  value: "Poste de Cocody",
-                  child: Text("Poste de Cocody • En attente"),
-                ),
-              ],
-              onChanged: (_) {},
-              decoration: const InputDecoration(
-                labelText: 'Mission',
-                border: InputBorder.none,
-              ),
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : DropdownButtonFormField<String>(
+                    value: _selectedMissionId,
+                    items: _eligibleMissions.isEmpty
+                        ? [
+                            const DropdownMenuItem(
+                              value: null,
+                              child: Text("Aucune mission éligible"),
+                            ),
+                          ]
+                        : _eligibleMissions.map((mission) {
+                            return DropdownMenuItem(
+                              value: mission.id,
+                              child: Text(
+                                  "${mission.title} • ${mission.formattedStatus}"),
+                            );
+                          }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedMissionId = value;
+                      });
+                    },
+                    decoration: const InputDecoration(
+                      labelText: 'Mission',
+                      border: InputBorder.none,
+                    ),
+                  ),
           ),
           const SizedBox(height: 12),
           const _Card(

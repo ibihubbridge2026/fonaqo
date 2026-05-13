@@ -51,6 +51,8 @@ class AuthProvider extends ChangeNotifier {
 
   AuthProvider() {
     _loadUserData();
+    // Configurer le callback pour gérer l'expiration du token
+    _baseClient.setOnTokenExpiredCallback(handleTokenExpired);
   }
 
   // =========================

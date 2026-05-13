@@ -16,6 +16,9 @@ class MissionModel {
   final String? category;
   final String? avatarUrl;
   final bool isVerified;
+  final bool isConfidential;
+  final bool isUrgent;
+  final List<String>? tags;
 
   const MissionModel({
     required this.id,
@@ -33,6 +36,9 @@ class MissionModel {
     this.category,
     this.avatarUrl,
     this.isVerified = false,
+    this.isConfidential = false,
+    this.isUrgent = false,
+    this.tags,
   });
 
   /// Crée un MissionModel à partir d'un JSON (réponse API).
@@ -57,6 +63,11 @@ class MissionModel {
       category: json['category']?.toString(),
       avatarUrl: json['avatar_url']?.toString(),
       isVerified: json['is_verified'] as bool? ?? false,
+      isConfidential: json['is_confidential'] as bool? ?? false,
+      isUrgent: json['is_urgent'] as bool? ?? false,
+      tags: json['tags'] != null
+          ? (json['tags'] as List<dynamic>).map((e) => e.toString()).toList()
+          : null,
     );
   }
 

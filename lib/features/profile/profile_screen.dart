@@ -216,12 +216,18 @@ class ProfileHeader extends StatelessWidget {
         Stack(
           alignment: Alignment.bottomRight,
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               radius: 55,
               backgroundColor: Color(0xFFFFD400),
               child: CircleAvatar(
+                key: ValueKey(user.avatarUrl), // Force rebuild when URL changes
                 radius: 52,
-                backgroundImage: AssetImage('assets/images/avatar/user.png'),
+                backgroundImage: user.avatarUrl != null
+                    ? NetworkImage(
+                            "${user.avatarUrl}?t=${DateTime.now().millisecondsSinceEpoch}")
+                        as ImageProvider
+                    : const AssetImage('assets/images/avatar/user.png'),
+                backgroundColor: Colors.grey[200],
               ),
             ),
             InkWell(

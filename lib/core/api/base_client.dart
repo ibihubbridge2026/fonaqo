@@ -31,6 +31,15 @@ class BaseClient {
     _initializeDio();
   }
 
+  /// Set the callback for token expiration
+  void setOnTokenExpiredCallback(Function()? callback) {
+    // Remove existing auth interceptor and add new one with callback
+    _dio.interceptors
+        .removeWhere((interceptor) => interceptor is _AuthInterceptor);
+    _dio.interceptors.add(_AuthInterceptor(_secureStorage, _logger, _dio,
+        onTokenExpired: callback));
+  }
+
   void _initializeDio() {
     _dio = Dio(
       BaseOptions(
@@ -267,9 +276,11 @@ class _AuthInterceptor extends Interceptor {
   final FlutterSecureStorage _secureStorage;
   final Logger _logger;
   final Dio _dio; // Ajout de l'instance Dio
+  final Function()? onTokenExpired;
   static const String _tokenKey = 'jwt_token';
 
-  _AuthInterceptor(this._secureStorage, this._logger, this._dio);
+  _AuthInterceptor(this._secureStorage, this._logger, this._dio,
+      {this.onTokenExpired});
 
   bool _isPublicPath(String path) {
     return path.contains('accounts/login/') ||
@@ -296,17 +307,17 @@ class _AuthInterceptor extends Interceptor {
   }
 
   @override
-  void onError(DioException err, ErrorInterceptorHandler handler) async {
+  void onError(DioException err, ErrorInterceptorHandler handler) {
     if (err.response?.statusCode == 401) {
       final responseData = err.response?.data;
 
       // Token expiré ou invalide - nettoyer et rediriger vers login
       _logger.w('JWT expiré ou invalide : suppression du stockage token');
-      await _secureStorage.delete(key: _tokenKey);
-      await _secureStorage.delete(key: 'user_data');
+      _secureStorage.delete(key: _tokenKey);
+      _secureStorage.delete(key: 'user_data');
 
       // Notifier l'application pour rediriger vers l'écran de login
-      // TODO: Ajouter un callback pour notifier l'AuthProvider
+      onTokenExpired?.call();
     }
     handler.next(err);
   }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../../widgets/main_wrapper.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/providers/mission_provider.dart';
 import '../mission_repository.dart';
 import '../widgets/create_mission_step_type.dart';
 import '../widgets/create_mission_step_details.dart';
@@ -110,9 +113,8 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
 
   String _recapSummaryLines() {
     final buf = StringBuffer();
-    buf.writeln(_flowType == 'queue'
-        ? "Type : file d'attente"
-        : 'Type : service');
+    buf.writeln(
+        _flowType == 'queue' ? "Type : file d'attente" : 'Type : service');
     if (_flowType == 'service') {
       buf.writeln('Catégorie : ${_categoryName.isEmpty ? '—' : _categoryName}');
       buf.writeln('Procuration : ${_needsProcuration ? 'oui' : 'non'}');
@@ -135,16 +137,18 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
       await _repo.createMission(
         MissionCreatePayload(
           title: _missionTitle(),
-          description:
-              _missionDescription().trim().isEmpty ? _missionTitle() : _missionDescription(),
+          description: _missionDescription().trim().isEmpty
+              ? _missionTitle()
+              : _missionDescription(),
           address: _address.text.trim(),
           latitude: _defaultLat,
           longitude: _defaultLng,
           price: price,
           serviceFee: price * 0.10,
           requiresProcuration: _needsProcuration,
-          targetAgentUsername:
-              _targetAgent.text.trim().isEmpty ? null : _targetAgent.text.trim(),
+          targetAgentUsername: _targetAgent.text.trim().isEmpty
+              ? null
+              : _targetAgent.text.trim(),
         ),
       );
       if (!mounted) return;
@@ -154,7 +158,20 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
           backgroundColor: Colors.green,
         ),
       );
-      _cancelAndHome();
+
+      // Rafraîchir explicitement les missions avant de retourner à l'accueil
+      if (mounted) {
+        try {
+          await Provider.of<MissionProvider>(context, listen: false)
+              .refreshMissions();
+        } catch (e) {
+          // Le refresh a échoué mais on continue quand même
+          print('Refresh missions failed: $e');
+        }
+      }
+
+      // Rafraîchir la liste des missions en naviguant vers l'accueil avec indicateur de rafraîchissement
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

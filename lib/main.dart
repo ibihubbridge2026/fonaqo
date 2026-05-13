@@ -3,16 +3,20 @@ import 'package:fonaco/core/config/splash_config.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_core/firebase_core.dart'; // Ajouté
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'core/providers/auth_provider.dart';
 import 'core/providers/wallet_provider.dart';
+import 'core/providers/mission_provider.dart';
 import 'core/routes/app_routes.dart';
 import 'features/auth/forgot_password_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/register_screen.dart';
 import 'features/onboarding/getting_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
+import 'features/agents/agents_screen.dart';
+import 'features/agents/screens/agent_profile_screen.dart';
 import 'widgets/main_wrapper.dart';
 import 'features/chat/chat_screen.dart';
 import 'features/chat/screens/chat_list_screen.dart';
@@ -30,6 +34,71 @@ import 'features/profile/screens/language_screen.dart';
 import 'features/profile/screens/help_center_screen.dart';
 import 'features/rating/rating_screen.dart';
 
+/// Initialise Firebase Cloud Messaging et configure les listeners
+Future<void> _initializeFirebaseMessaging(Logger log) async {
+  final FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+  try {
+    // Demander la permission pour les notifications (iOS)
+    NotificationSettings settings = await messaging.requestPermission(
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
+    );
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      log.i('✅ Permission notifications accordée');
+    } else if (settings.authorizationStatus ==
+        AuthorizationStatus.provisional) {
+      log.i('⚠️ Permission notifications provisoire');
+    } else {
+      log.i('❌ Permission notifications refusée');
+    }
+
+    // Obtenir le token FCM
+    String? token = await messaging.getToken();
+    log.i('🔑 FCM Token: $token');
+
+    // Listener pour les messages quand l'app est au premier plan
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      log.i(
+          '📨 Notification reçue en premier plan: ${message.notification?.title}');
+
+      // Afficher uneSnackBar pour confirmer la réception
+      // Note: Ceci est juste pour le debug, en production on utilisera une notification locale
+      _showNotificationDebug(message, log);
+    });
+
+    // Listener pour les messages quand l'app est en arrière-plan mais ouverte
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      log.i('📱 Notification cliquée: ${message.notification?.title}');
+      // TODO: Naviguer vers l'écran approprié selon le message
+    });
+
+    // Gérer les messages quand l'app est complètement fermée
+    RemoteMessage? initialMessage = await messaging.getInitialMessage();
+    if (initialMessage != null) {
+      log.i(
+          '🚀 App ouverte depuis notification: ${initialMessage.notification?.title}');
+      // TODO: Naviguer vers l'écran approprié
+    }
+  } catch (e) {
+    log.e('❌ Erreur initialisation FCM: $e');
+  }
+}
+
+/// Affiche un message de debug pour les notifications (à remplacer par de vraies notifications)
+void _showNotificationDebug(RemoteMessage message, Logger log) {
+  // Pour l'instant, on log juste. En production, utiliser flutter_local_notifications
+  log.d('🔔 Notification Debug - Titre: ${message.notification?.title}');
+  log.d('🔔 Notification Debug - Corps: ${message.notification?.body}');
+  log.d('🔔 Notification Debug - Données: ${message.data}');
+}
+
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   final log = Logger();
@@ -38,6 +107,9 @@ void main() async {
   try {
     await Firebase.initializeApp();
     log.i('✅ Firebase initialisé avec succès');
+
+    // 2. Initialisation de Firebase Cloud Messaging
+    await _initializeFirebaseMessaging(log);
   } catch (e) {
     log.e('❌ Échec initialisation Firebase : $e');
     // On continue quand même, mais les notifications ne marcheront pas
@@ -47,30 +119,43 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
   final isFirstTime = prefs.getBool('isFirstTime') ?? true;
-  final isLoggedIn = prefs.getString('token') != null;
 
-  log.d(
-      '🚀 Démarrage FONACO | FirstTime: $isFirstTime | LoggedIn: $isLoggedIn');
+  log.d('🚀 Démarrage FONACO | FirstTime: $isFirstTime');
 
-  runApp(FonacoApp(isFirstTime: isFirstTime, isLoggedIn: isLoggedIn));
+  // Créer AuthProvider pour vérifier la session avec FlutterSecureStorage
+  final authProvider = AuthProvider();
+  await authProvider.checkAuth(); // Attendre la vérification de la session
+
+  final isLoggedIn = authProvider.isAuthenticated;
+  log.d('🔐 Session vérifiée | LoggedIn: $isLoggedIn');
+
+  runApp(FonacoApp(
+      isFirstTime: isFirstTime,
+      isLoggedIn: isLoggedIn,
+      authProvider: authProvider));
 }
 
 class FonacoApp extends StatelessWidget {
   final bool isFirstTime;
   final bool isLoggedIn;
+  final AuthProvider authProvider;
 
   const FonacoApp({
     super.key,
     required this.isFirstTime,
     required this.isLoggedIn,
+    required this.authProvider,
   });
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider.value(
+            value: authProvider), // Use existing instance
         ChangeNotifierProvider(create: (_) => WalletProvider()),
+        ChangeNotifierProvider(
+            create: (_) => MissionProvider()), // Add MissionProvider
       ],
       child: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
@@ -136,6 +221,14 @@ class FonacoApp extends StatelessWidget {
               AppRoutes.missionsAvailable: (context) => MissionsScreen(
                     showCreateMissionListenable: ValueNotifier(false),
                   ),
+              '/agent-profile': (context) {
+                final args = ModalRoute.of(context)?.settings.arguments
+                    as Map<String, dynamic>?;
+                return AgentProfileScreen(
+                  agentId: args?['agentId'] ?? '',
+                  agent: args?['agent'],
+                );
+              },
             },
           );
         },

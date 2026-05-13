@@ -143,12 +143,25 @@ class MissionRepository {
     try {
       final response = await _baseClient.get('missions/$missionId/');
       if (response.statusCode != 200) {
-        throw Exception('Mission non trouvée');
+        throw Exception('Mission non trouvée (status: ${response.statusCode})');
       }
-      final missionMap = _extractObjectFromEnvelope(response.data);
+
+      // Essayer différents formats de réponse
+      Map<String, dynamic> missionMap;
+      try {
+        missionMap = _extractObjectFromEnvelope(response.data);
+      } catch (e) {
+        // Si l'enveloppe ne fonctionne pas, essayer directement
+        if (response.data is Map<String, dynamic>) {
+          missionMap = response.data as Map<String, dynamic>;
+        } else {
+          throw Exception('Format de réponse invalide: $e');
+        }
+      }
+
       return MissionModel.fromJson(missionMap);
     } catch (e, st) {
-      _logger.e('fetchMissionDetails', error: e, stackTrace: st);
+      _logger.e('fetchMissionDetails - Erreur: $e', error: e, stackTrace: st);
       rethrow;
     }
   }
@@ -186,7 +199,8 @@ class MissionRepository {
 
   /// Démarre la mission (agent) → IN_PROGRESS + notification WebSocket.
   Future<MissionModel> startMission(String missionId) async {
-    final response = await _baseClient.post('missions/$missionId/start_mission/');
+    final response =
+        await _baseClient.post('missions/$missionId/start_mission/');
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception('Impossible de démarrer la mission');
     }

@@ -47,7 +47,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
-      appBar: const CustomAppBar.detailStack(title: 'Messages'),
+      appBar: const CustomAppBar.detailStack(title: 'Discussion'),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _chats.length,

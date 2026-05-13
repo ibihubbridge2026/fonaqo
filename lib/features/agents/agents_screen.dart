@@ -151,20 +151,60 @@ class _AgentsScreenState extends State<AgentsScreen> {
     }
   }
 
+  /// Parse les coordonnées GPS de manière robuste
+  double? _parseCoordinate(dynamic value) {
+    if (value == null) return null;
+
+    // Si c'est déjà un nombre
+    if (value is num) return value.toDouble();
+
+    // Si c'est une chaîne, essayer de la parser
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return null;
+
+      // Parser en double
+      final parsed = double.tryParse(trimmed);
+      return parsed;
+    }
+
+    return null;
+  }
+
   Set<Marker> _buildMarkersAround(LatLng center) {
     final markers = <Marker>[];
     final agentsToShow = _filteredAgents;
+
+    // Ajouter le marqueur bleu pour la position de l'utilisateur
+    markers.add(
+      Marker(
+        markerId: const MarkerId('user_position'),
+        position: center,
+        infoWindow: const InfoWindow(
+          title: 'Ma position',
+          snippet: 'Vous êtes ici',
+        ),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+      ),
+    );
 
     // Créer des marqueurs pour les agents disponibles
     for (var i = 0; i < agentsToShow.length; i++) {
       final agent = agentsToShow[i];
 
-      // Vérifier si l'agent a des coordonnées
-      if (agent['latitude'] != null && agent['longitude'] != null) {
-        final agentLat = double.tryParse(agent['latitude'].toString());
-        final agentLng = double.tryParse(agent['longitude'].toString());
+      // Vérifier si l'agent a des coordonnées avec parsing robuste
+      final latValue = agent['latitude'];
+      final lngValue = agent['longitude'];
 
-        if (agentLat != null && agentLng != null) {
+      if (latValue != null && lngValue != null) {
+        final agentLat = _parseCoordinate(latValue);
+        final agentLng = _parseCoordinate(lngValue);
+
+        if (agentLat != null &&
+            agentLng != null &&
+            agentLat.abs() <= 90 &&
+            agentLng.abs() <= 180) {
+          // Validation des coordonnées
           final agentLatLng = LatLng(agentLat, agentLng);
           final name =
               '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
@@ -182,9 +222,13 @@ class _AgentsScreenState extends State<AgentsScreen> {
               ),
               icon: BitmapDescriptor.defaultMarkerWithHue(
                 agent['is_verified'] == true
-                    ? BitmapDescriptor.hueGreen
+                    ? BitmapDescriptor.hueYellow
                     : BitmapDescriptor.hueOrange,
               ),
+              onTap: () {
+                // Mettre à jour la liste pour sélectionner l'agent correspondant
+                _onAgentMarkerTapped(agent);
+              },
             ),
           );
         }
@@ -192,6 +236,39 @@ class _AgentsScreenState extends State<AgentsScreen> {
     }
 
     return markers.toSet();
+  }
+
+  void _onAgentMarkerTapped(Map<String, dynamic> agent) {
+    final name =
+        '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
+    final specialty = agent['specialty'] ?? 'Agent terrain';
+
+    // Afficher un message de confirmation avec bouton d'action
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$name • $specialty'),
+        duration: const Duration(seconds: 4),
+        action: SnackBarAction(
+          label: 'Voir profil',
+          textColor: Colors.white,
+          onPressed: () {
+            _navigateToAgentProfile(agent);
+          },
+        ),
+      ),
+    );
+  }
+
+  void _navigateToAgentProfile(Map<String, dynamic> agent) {
+    // Navigation vers le profil de l'agent
+    Navigator.pushNamed(
+      context,
+      '/agent-profile',
+      arguments: {
+        'agentId': agent['id'],
+        'agent': agent,
+      },
+    );
   }
 
   Future<void> _animateTo(LatLng target) async {
@@ -266,193 +343,205 @@ class _AgentsScreenState extends State<AgentsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Demande:
-    // - Pas d’icône noire sous le header.
-    // - GoogleMap en fond.
-    // - Cartes agents en overlay en bas.
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GoogleMap(
-            initialCameraPosition: _initialCamera,
-            myLocationButtonEnabled: false,
-            myLocationEnabled: _currentLatLng != null,
-            compassEnabled: false,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
-            markers: _markers,
-            onMapCreated: (c) async {
-              _mapController = c;
-              final me = _currentLatLng;
-              if (me != null) {
-                await _animateTo(me);
-              }
-            },
-          ),
-        ),
-        Positioned(
-          top: 8,
-          left: 0,
-          right: 0,
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildFloatingSearchBar(),
-                if (_locating)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 14,
-                          ),
-                        ],
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                          SizedBox(width: 10),
-                          Text(
-                            'Localisation…',
-                            style: TextStyle(fontWeight: FontWeight.w900),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-
-        // Bouton recentrer
-        Positioned(
-          right: 16,
-          bottom: 220,
-          child: SafeArea(
-            top: false,
-            child: FloatingActionButton(
-              heroTag: 'recenter',
-              backgroundColor: Colors.white,
-              elevation: 2,
-              onPressed: () async {
+    return Scaffold(
+      body: Stack(
+        children: [
+          // Map toujours visible en fond
+          Positioned.fill(
+            child: GoogleMap(
+              initialCameraPosition: _initialCamera,
+              myLocationButtonEnabled: false,
+              myLocationEnabled: _currentLatLng != null,
+              compassEnabled: false,
+              zoomControlsEnabled: false,
+              mapToolbarEnabled: false,
+              markers: _markers,
+              onMapCreated: (c) async {
+                _mapController = c;
                 final me = _currentLatLng;
-                if (me == null) {
-                  await _initLocation();
-                  return;
+                if (me != null) {
+                  await _animateTo(me);
                 }
-                await _animateTo(me);
               },
-              child: const Icon(Icons.my_location, color: Colors.black),
             ),
           ),
-        ),
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: 0,
-          child: SafeArea(
-            top: false,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(30),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.10),
-                    blurRadius: 18,
-                    offset: const Offset(0, -6),
-                  ),
-                ],
-              ),
+
+          // Barre de recherche et filtres toujours visibles en haut
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
               child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 42,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(10),
+                  _buildFloatingSearchBar(),
+                  if (_locating)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 14,
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            SizedBox(width: 10),
+                            Text(
+                              'Localisation…',
+                              style: TextStyle(fontWeight: FontWeight.w900),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Agents proches',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w900, fontSize: 16),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: DropdownButton<String>(
-                          value: _selectedFilter,
-                          underline: const SizedBox(),
-                          isDense: true,
-                          items: _filterOptions.map((filter) {
-                            return DropdownMenuItem(
-                              value: filter,
-                              child: Text(
-                                filter,
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                _selectedFilter = value;
-                                _markers = _buildMarkersAround(_currentLatLng!);
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _filteredAgents.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      return AgentListTile(agent: _filteredAgents[index]);
-                    },
-                  ),
                 ],
               ),
             ),
           ),
-        ),
-      ],
+
+          // Bouton recentrer
+          Positioned(
+            right: 16,
+            bottom: 220,
+            child: SafeArea(
+              top: false,
+              child: FloatingActionButton(
+                heroTag: 'recenter',
+                backgroundColor: Colors.white,
+                elevation: 2,
+                onPressed: () async {
+                  final me = _currentLatLng;
+                  if (me == null) {
+                    await _initLocation();
+                    return;
+                  }
+                  await _animateTo(me);
+                },
+                child: const Icon(Icons.my_location, color: Colors.black),
+              ),
+            ),
+          ),
+
+          // Container des agents avec scroll vertical
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: Container(
+                height: 300, // Hauteur fixe pour garantir la visibilité
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(30),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.10),
+                      blurRadius: 18,
+                      offset: const Offset(0, -6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    // Poignée pour indiquer que c'est scrollable
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Center(
+                        child: Container(
+                          width: 42,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Header avec filtres
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Agents proches',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w900, fontSize: 16),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: DropdownButton<String>(
+                              value: _selectedFilter,
+                              underline: const SizedBox(),
+                              isDense: true,
+                              items: _filterOptions.map((filter) {
+                                return DropdownMenuItem(
+                                  value: filter,
+                                  child: Text(
+                                    filter,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setState(() {
+                                    _selectedFilter = value;
+                                    _markers =
+                                        _buildMarkersAround(_currentLatLng!);
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Liste des agents avec scroll
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                        itemCount: _filteredAgents.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          return AgentListTile(agent: _filteredAgents[index]);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -514,6 +603,7 @@ class AgentListTile extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   name.isNotEmpty ? name : 'Agent',
@@ -521,10 +611,14 @@ class AgentListTile extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   specialty,
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 5),
                 Row(
@@ -534,11 +628,14 @@ class AgentListTile extends StatelessWidget {
                       color: Colors.orange[700],
                       size: 14,
                     ),
-                    Text(
-                      "${reliability.toStringAsFixed(0)}%",
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                    Flexible(
+                      child: Text(
+                        "${reliability.toStringAsFixed(0)}%",
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -547,35 +644,84 @@ class AgentListTile extends StatelessWidget {
                       color: Colors.grey,
                       size: 14,
                     ),
-                    Text(
-                      distance != null ? '${distance} km' : city,
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    Flexible(
+                      child: Text(
+                        distance != null ? '${distance} km' : city,
+                        style:
+                            const TextStyle(fontSize: 12, color: Colors.grey),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-          ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                    content: Text('Contact agent bientôt disponible')),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFFD400),
-              foregroundColor: Colors.black,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Bouton Voir profil
+              SizedBox(
+                width: 80,
+                height: 32,
+                child: ElevatedButton(
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('Profil agent bientôt disponible')),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.grey[200],
+                    foregroundColor: Colors.black,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Profil',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                ),
               ),
-              minimumSize: const Size(60, 35),
-            ),
-            child: const Text(
-              "Choisir",
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-            ),
+              const SizedBox(height: 6),
+              // Bouton Contacter
+              SizedBox(
+                width: 80,
+                height: 32,
+                child: ElevatedButton(
+                  onPressed: () {
+                    // Démarrer une conversation chat avec l'agent sans mission
+                    Navigator.pushNamed(
+                      context,
+                      '/chat-detail',
+                      arguments: {
+                        'chatId': 'chat_${agent['id']}',
+                        'userName': name.isNotEmpty ? name : 'Agent',
+                        'agentAvatar':
+                            agent['image'] ?? 'assets/images/avatar/user.png',
+                        'missionId': null, // Pas de mission liée
+                      },
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFD400),
+                    foregroundColor: Colors.black,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    minimumSize: const Size(60, 35),
+                  ),
+                  child: const Text(
+                    'Contacter',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -611,168 +757,170 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.78,
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
       ),
       padding: const EdgeInsets.all(22),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Filtres',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _price = const RangeValues(2000, 15000);
+                      _radiusKm = 10;
+                      _minRating = 4.0;
+                      _verifiedOnly = true;
+                      _types
+                        ..clear()
+                        ..add('File d’attente');
+                    });
+                  },
+                  child: const Text(
+                    'Réinitialiser',
+                    style: TextStyle(color: Colors.black87),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+
+            // Prix
+            Text(
+              'Prix (${_price.start.toStringAsFixed(0)} – ${_price.end.toStringAsFixed(0)} CFA)',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            RangeSlider(
+              values: _price,
+              min: 0,
+              max: 50000,
+              divisions: 100,
+              activeColor: _accent,
+              inactiveColor: Colors.grey[200],
+              onChanged: (v) => setState(() => _price = v),
+            ),
+
+            const SizedBox(height: 10),
+
+            // Type de mission
+            const Text(
+              'Type de mission',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _typeChip('File d’attente'),
+                _typeChip('Service libre'),
+                _typeChip('Achat ticket'),
+                _typeChip('Livraison'),
+              ],
+            ),
+
+            const SizedBox(height: 18),
+
+            // Distance rayon
+            Text(
+              'Rayon (${_radiusKm.toStringAsFixed(0)} km)',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            Slider(
+              value: _radiusKm,
+              max: 50,
+              min: 1,
+              divisions: 49,
+              activeColor: _accent,
+              inactiveColor: Colors.grey[200],
+              onChanged: (val) => setState(() => _radiusKm = val),
+            ),
+
+            const SizedBox(height: 10),
+
+            // Notation
+            Text(
+              'Note minimale (${_minRating.toStringAsFixed(1)})',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            Slider(
+              value: _minRating,
+              max: 5,
+              min: 1,
+              divisions: 40,
+              activeColor: _accent,
+              inactiveColor: Colors.grey[200],
+              onChanged: (val) => setState(() => _minRating = val),
+            ),
+
+            const SizedBox(height: 10),
+
+            // Vérifié
+            Container(
               decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(10),
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: Colors.black.withOpacity(0.06)),
               ),
-            ),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Filtres',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+              child: SwitchListTile(
+                value: _verifiedOnly,
+                activeThumbColor: _accent,
+                onChanged: (val) => setState(() => _verifiedOnly = val),
+                title: const Text(
+                  'Agents vérifiés uniquement',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: const Text(
+                  'Filtrer les profils certifiés',
+                  style: TextStyle(color: Colors.grey),
                 ),
               ),
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _price = const RangeValues(2000, 15000);
-                    _radiusKm = 10;
-                    _minRating = 4.0;
-                    _verifiedOnly = true;
-                    _types
-                      ..clear()
-                      ..add('File d’attente');
-                  });
-                },
+            ),
+            const Spacer(),
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accent,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  elevation: 0,
+                ),
                 child: const Text(
-                  'Réinitialiser',
-                  style: TextStyle(color: Colors.black87),
+                  'APPLIQUER',
+                  style: TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 18),
-
-          // Prix
-          Text(
-            'Prix (${_price.start.toStringAsFixed(0)} – ${_price.end.toStringAsFixed(0)} CFA)',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          RangeSlider(
-            values: _price,
-            min: 0,
-            max: 50000,
-            divisions: 100,
-            activeColor: _accent,
-            inactiveColor: Colors.grey[200],
-            onChanged: (v) => setState(() => _price = v),
-          ),
-
-          const SizedBox(height: 10),
-
-          // Type de mission
-          const Text(
-            'Type de mission',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _typeChip('File d’attente'),
-              _typeChip('Service libre'),
-              _typeChip('Achat ticket'),
-              _typeChip('Livraison'),
-            ],
-          ),
-
-          const SizedBox(height: 18),
-
-          // Distance rayon
-          Text(
-            'Rayon (${_radiusKm.toStringAsFixed(0)} km)',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          Slider(
-            value: _radiusKm,
-            max: 50,
-            min: 1,
-            divisions: 49,
-            activeColor: _accent,
-            inactiveColor: Colors.grey[200],
-            onChanged: (val) => setState(() => _radiusKm = val),
-          ),
-
-          const SizedBox(height: 10),
-
-          // Notation
-          Text(
-            'Note minimale (${_minRating.toStringAsFixed(1)})',
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          Slider(
-            value: _minRating,
-            max: 5,
-            min: 1,
-            divisions: 40,
-            activeColor: _accent,
-            inactiveColor: Colors.grey[200],
-            onChanged: (val) => setState(() => _minRating = val),
-          ),
-
-          const SizedBox(height: 10),
-
-          // Vérifié
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: Colors.black.withOpacity(0.06)),
             ),
-            child: SwitchListTile(
-              value: _verifiedOnly,
-              activeThumbColor: _accent,
-              onChanged: (val) => setState(() => _verifiedOnly = val),
-              title: const Text(
-                'Agents vérifiés uniquement',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              subtitle: const Text(
-                'Filtrer les profils certifiés',
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
-          ),
-          const Spacer(),
-          SizedBox(
-            width: double.infinity,
-            height: 55,
-            child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _accent,
-                foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                elevation: 0,
-              ),
-              child: const Text(
-                'APPLIQUER',
-                style: TextStyle(fontWeight: FontWeight.w900),
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
+            const SizedBox(height: 10),
+          ],
+        ),
       ),
     );
   }

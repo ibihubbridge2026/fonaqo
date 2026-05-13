@@ -59,10 +59,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
       try {
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
+        // Nettoyer le username pour qu'il soit valide selon Django (lettres, chiffres, @/./+/-/_)
+        String cleanUsername = _nameController.text
+            .trim()
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-zA-Z0-9@./+/-/_]'), '_')
+            .replaceAll(RegExp(r'\s+'), '_')
+            .replaceAll(RegExp(r'_+'), '_')
+            .replaceAll(RegExp(r'^_|_$'), '');
+
         final registerData = {
           'phone_number':
               '${_selectedCountry.dialCode}${_phoneController.text.trim()}',
-          'username': _nameController.text.trim(),
+          'username': cleanUsername.isEmpty
+              ? 'user_${DateTime.now().millisecondsSinceEpoch}'
+              : cleanUsername,
           'password': _passwordController.text.trim(),
           'role': _selectedRole,
           'email': _emailController.text.trim(),

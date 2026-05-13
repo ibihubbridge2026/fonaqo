@@ -15,45 +15,42 @@ class MissionDetailScreen extends StatefulWidget {
 class _MissionDetailScreenState extends State<MissionDetailScreen> {
   final MissionRepository _missionRepository = MissionRepository();
   MissionModel? _mission;
-  bool _isLoading = true;
+  bool _isLoading = false;
   String? _errorMessage;
   String? _missionId;
 
   @override
   void initState() {
     super.initState();
+    // Attendre que le widget soit complètement initialisé avant d'accéder aux arguments
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadMissionId();
+      _loadMissionIdAndData();
     });
   }
 
-  void _loadMissionId() {
-    final args = ModalRoute.of(context)?.settings.arguments;
-    if (args is Map<String, dynamic>) {
-      _missionId = args['missionId']?.toString();
-      if (_missionId != null && _missionId!.isNotEmpty) {
-        _loadMissionDetails();
-      } else {
+  void _loadMissionIdAndData() {
+    if (!mounted) return;
+
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    _missionId = args?['missionId']?.toString();
+
+    if (_missionId != null) {
+      _loadMissionDetails();
+    } else {
+      if (mounted) {
         setState(() {
-          _isLoading = false;
           _errorMessage = 'ID de mission non fourni';
         });
       }
-    } else {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Arguments de navigation invalides';
-      });
     }
   }
 
   Future<void> _loadMissionDetails() async {
-    if (_missionId == null || _missionId!.isEmpty) return;
+    if (_missionId == null) return;
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    setState(() => _isLoading = true);
+    _errorMessage = null;
 
     try {
       final missionData =
@@ -67,8 +64,9 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
+          _errorMessage =
+              'Erreur lors du chargement de la mission: ${e.toString()}';
           _isLoading = false;
-          _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
         });
       }
     }
@@ -122,6 +120,15 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
   String _formatDate(DateTime? date) {
     if (date == null) return 'Non spécifiée';
     return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  bool _hasAgentAccepted() {
+    if (_mission == null) return false;
+    return _mission!.status == MissionStatus.ACCEPTED ||
+        _mission!.status == MissionStatus.ON_THE_WAY ||
+        _mission!.status == MissionStatus.ARRIVED ||
+        _mission!.status == MissionStatus.IN_PROGRESS ||
+        _mission!.status == MissionStatus.COMPLETED;
   }
 
   @override
@@ -185,7 +192,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Image de contexte (avant le lieu)
+          // Image de contexte
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: AspectRatio(
@@ -217,119 +224,215 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
             child: Text(
               _mission!.formattedStatus,
               style: TextStyle(
-                  color: Colors.blue,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 10,
-                ),
+                color: _getStatusColor(_mission!.status),
+                fontWeight: FontWeight.w900,
+                fontSize: 10,
               ),
             ),
-            const SizedBox(height: 15),
-            Text(
-              _mission!.title,
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
-            ),
-            Text(
-              _mission!.description ?? 'Description non disponible',
-              style: const TextStyle(color: Colors.grey),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Title and description
+          Text(
+            _mission!.title,
+            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 12),
+
+          // Metadata badges
+          Row(
+            children: [
+              if (_mission!.isUrgent)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.red[100],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.priority_high,
+                          size: 12, color: Colors.red[700]),
+                      const SizedBox(width: 4),
+                      Text(
+                        'URGENT',
+                        style: TextStyle(
+                          color: Colors.red[700],
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (_mission!.isConfidential)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.amber[100],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.lock, size: 12, color: Colors.amber[700]),
+                      const SizedBox(width: 4),
+                      Text(
+                        'CONFIDENTIEL',
+                        style: TextStyle(
+                          color: Colors.amber[700],
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              if (_mission!.category != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.blue[100],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _mission!.category!,
+                    style: TextStyle(
+                      color: Colors.blue[700],
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Description
+          Text(
+            _mission!.description ?? 'Description non disponible',
+            style: const TextStyle(color: Colors.grey, fontSize: 14),
+          ),
+
+          // Tags
+          if (_mission!.tags != null && _mission!.tags!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: _mission!.tags!
+                    .map((tag) => Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[200],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '#$tag',
+                            style: TextStyle(
+                              color: Colors.grey[700],
+                              fontSize: 10,
+                            ),
+                          ),
+                        ))
+                    .toList(),
+              ),
             ),
 
-            const SizedBox(height: 30),
+          const SizedBox(height: 30),
 
-            // Mission Details Card
+          // Mission Details Card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Détails de la mission',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 15),
+                _buildDetailRow(
+                    'Prix', '${_mission!.price.toStringAsFixed(0)} FCFA'),
+                _buildDetailRow(
+                    'Date de création', _formatDate(_mission!.createdAt)),
+                if (_mission!.address != null)
+                  _buildDetailRow('Adresse', _mission!.address!),
+                if (_mission!.agentName != null)
+                  _buildDetailRow('Agent assigné', _mission!.agentName!),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // Agent Card
+          if (_mission!.agentName != null)
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  const Text(
-                    'Détails de la mission',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 15),
-                  _buildDetailRow('Prix', '${_mission!.price.toStringAsFixed(0)} FCFA'),
-                  _buildDetailRow('Date de création', _formatDate(_mission!.createdAt)),
-                  if (_mission!.address != null) 
-                    _buildDetailRow('Adresse', _mission!.address!),
-                  if (_mission!.agentName != null)
-                    _buildDetailRow('Agent assigné', _mission!.agentName!),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Agent Card (Détail)
-            if (_mission!.agentName != null)
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 25,
-                      backgroundColor: Colors.blue[100],
-                      backgroundImage: const NetworkImage(
-                        "https://i.pravatar.cc/100?u=1",
-                      ),
-                      child: Text(
-                        _mission!.agentName![0].toUpperCase(),
-                        style: TextStyle(
-                          color: Colors.blue[700],
-                          fontWeight: FontWeight.bold,
-                        ),
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor: Colors.blue[100],
+                    backgroundImage: const NetworkImage(
+                      "https://i.pravatar.cc/100?u=1",
+                    ),
+                    child: Text(
+                      _mission!.agentName![0].toUpperCase(),
+                      style: TextStyle(
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
+                  ),
                   const SizedBox(width: 15),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "Moussa D.",
-                          style: TextStyle(fontWeight: FontWeight.bold),
+                          _mission!.agentName!,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        Text(
+                        const Text(
                           "Agent Certifié Fonaqo",
                           style: TextStyle(color: Colors.grey, fontSize: 12),
                         ),
                       ],
                     ),
                   ),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(Icons.phone, color: Colors.green),
-                  ),
+                  const Icon(Icons.verified, color: Colors.green),
                 ],
               ),
             ),
 
-            const SizedBox(height: 30),
-            const Text(
-              "Résumé du paiement",
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            _buildInfoTile("Montant bloqué", "2 500 CFA"),
-            _buildInfoTile("Heure de début", "14:30"),
+          const SizedBox(height: 30),
 
-            const SizedBox(height: 24),
-
-            // Tracking + actions
+          // Tracking et actions conditionnés
+          if (_hasAgentAccepted()) ...[
             const Text("Suivi", style: TextStyle(fontWeight: FontWeight.w900)),
             const SizedBox(height: 10),
             Step5TrackingView(onBackToMissions: () {}, showBackButton: false),
             const SizedBox(height: 18),
-            const Text(
-              "Actions",
-              style: TextStyle(fontWeight: FontWeight.w900),
-            ),
+            const Text("Actions",
+                style: TextStyle(fontWeight: FontWeight.w900)),
             const SizedBox(height: 10),
             Row(
               children: [
@@ -347,10 +450,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                     ),
                     child: const Text(
                       "LIBÉRER L'ARGENT",
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 12,
-                      ),
+                      style:
+                          TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
                     ),
                   ),
                 ),
@@ -370,10 +471,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                     ),
                     child: const Text(
                       "FINALISER",
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 12,
-                      ),
+                      style:
+                          TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
                     ),
                   ),
                 ),
@@ -393,8 +492,42 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                 style: TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
+          ] else ...[
+            // Message si aucun agent n'a accepté
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.hourglass_empty,
+                    size: 48,
+                    color: Colors.grey[400],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    "En attente d'un agent",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Un agent disponible prendra bientôt votre mission",
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
           ],
-        ),
+        ],
+      ),
     );
   }
 
@@ -411,7 +544,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
             style: TextStyle(fontWeight: FontWeight.w900),
           ),
           content: const Text(
-            "Confirmez que la mission a bien été réalisée. Les fonds seront transférés à l’agent.",
+            "Confirmez que la mission a bien été réalisée. Les fonds seront transférés à l'agent.",
           ),
           actions: [
             TextButton(
@@ -421,41 +554,23 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFD400),
-                foregroundColor: Colors.black,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
               ),
-              child: const Text(
-                'Confirmer',
-                style: TextStyle(fontWeight: FontWeight.w900),
-              ),
+              child: const Text('Confirmer'),
             ),
           ],
         );
       },
     );
 
-    if (confirmed != true) return;
-
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Fonds libérés (simulation).')),
-    );
-  }
-
-  Widget _buildInfoTile(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
+    if (confirmed == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Fonds libérés avec succès'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
   }
 }
