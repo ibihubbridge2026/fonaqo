@@ -19,6 +19,13 @@ class _AgentsScreenState extends State<AgentsScreen> {
   bool _isLoadingAgents = false;
 
   static const Color _accent = Color(0xFFFFD400);
+  String _selectedFilter = 'Tous';
+  final List<String> _filterOptions = [
+    'Tous',
+    'Vérifiés',
+    'À proximité',
+    'Disponibles'
+  ];
 
   final CameraPosition _initialCamera = const CameraPosition(
     target: LatLng(5.3363, -4.0260), // Abidjan (approx.)
@@ -54,6 +61,10 @@ class _AgentsScreenState extends State<AgentsScreen> {
           _agents = agents;
           _isLoadingAgents = false;
         });
+        // Mettre à jour les marqueurs après le chargement
+        if (_currentLatLng != null) {
+          _markers = _buildMarkersAround(_currentLatLng!);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -67,6 +78,23 @@ class _AgentsScreenState extends State<AgentsScreen> {
           ),
         );
       }
+    }
+  }
+
+  List<Map<String, dynamic>> get _filteredAgents {
+    switch (_selectedFilter) {
+      case 'Vérifiés':
+        return _agents.where((agent) => agent['is_verified'] == true).toList();
+      case 'À proximité':
+        return _agents
+            .where((agent) =>
+                agent['distance_km'] != null && agent['distance_km'] < 10)
+            .toList();
+      case 'Disponibles':
+        return _agents.where((agent) => agent['is_available'] == true).toList();
+      case 'Toutes':
+      default:
+        return _agents;
     }
   }
 
@@ -125,10 +153,11 @@ class _AgentsScreenState extends State<AgentsScreen> {
 
   Set<Marker> _buildMarkersAround(LatLng center) {
     final markers = <Marker>[];
+    final agentsToShow = _filteredAgents;
 
     // Créer des marqueurs pour les agents disponibles
-    for (var i = 0; i < _agents.length; i++) {
-      final agent = _agents[i];
+    for (var i = 0; i < agentsToShow.length; i++) {
+      final agent = agentsToShow[i];
 
       // Vérifier si l'agent a des coordonnées
       if (agent['latitude'] != null && agent['longitude'] != null) {
@@ -368,24 +397,55 @@ class _AgentsScreenState extends State<AgentsScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Agents proches',
-                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Agents proches',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w900, fontSize: 16),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: DropdownButton<String>(
+                          value: _selectedFilter,
+                          underline: const SizedBox(),
+                          isDense: true,
+                          items: _filterOptions.map((filter) {
+                            return DropdownMenuItem(
+                              value: filter,
+                              child: Text(
+                                filter,
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                _selectedFilter = value;
+                                _markers = _buildMarkersAround(_currentLatLng!);
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
-                  SizedBox(
-                    height: 180,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _agents.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemBuilder: (context, index) {
-                        return SizedBox(
-                          width: 320,
-                          child: AgentListTile(agent: _agents[index]),
-                        );
-                      },
-                    ),
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _filteredAgents.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      return AgentListTile(agent: _filteredAgents[index]);
+                    },
                   ),
                 ],
               ),

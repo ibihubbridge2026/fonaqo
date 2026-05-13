@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 
 import '../api/base_client.dart';
 import '../models/user_model.dart';
@@ -610,6 +612,52 @@ class AuthProvider extends ChangeNotifier {
       _logger.e('Erreur CHANGE PASSWORD: ${e.toString()}');
       _setError('Erreur lors du changement de mot de passe: ${e.toString()}');
       return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // =========================
+  // UPLOAD PROFILE IMAGE
+  // =========================
+
+  Future<String?> uploadProfileImage(File imageFile) async {
+    _clearError();
+    _setLoading(true);
+
+    try {
+      final formData = FormData.fromMap({
+        'avatar': await MultipartFile.fromFile(
+          imageFile.path,
+          filename: 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        ),
+      });
+
+      final response = await _baseClient.dio.post(
+        'accounts/profile/upload-avatar/',
+        data: formData,
+      );
+
+      _logger.d('UPLOAD AVATAR STATUS CODE: ${response.statusCode}');
+      _logger.i('UPLOAD AVATAR RESPONSE DATA: ${response.data}');
+
+      if (response.statusCode != 200) {
+        final errorMessage = response.data is Map
+            ? response.data['message'] ??
+                'Erreur lors de l\'upload de l\'avatar'
+            : 'Erreur lors de l\'upload de l\'avatar';
+        _setError(errorMessage);
+        return null;
+      }
+
+      final responseData = response.data as Map<String, dynamic>;
+      final avatarUrl = responseData['data']?['avatar_url'] as String?;
+
+      return avatarUrl;
+    } catch (e) {
+      _logger.e('Erreur UPLOAD AVATAR: ${e.toString()}');
+      _setError('Erreur lors de l\'upload de l\'avatar: ${e.toString()}');
+      return null;
     } finally {
       _setLoading(false);
     }

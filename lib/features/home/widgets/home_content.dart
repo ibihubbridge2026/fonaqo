@@ -873,6 +873,23 @@ class OngoingMissionStrip extends StatelessWidget {
         ),
       );
     }
+
+    // Si une seule mission, afficher en pleine largeur
+    if (missions.length == 1) {
+      final mission = missions.first;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: OngoingMissionCard(
+          missionId: mission.id,
+          title: mission.title,
+          agentName: mission.agentName ?? '—',
+          statusLabel: mission.formattedStatus,
+          isFullWidth: true,
+        ),
+      );
+    }
+
+    // Si plusieurs missions, afficher en horizontal
     return SizedBox(
       height: 85,
       child: ListView(
@@ -885,6 +902,7 @@ class OngoingMissionStrip extends StatelessWidget {
               title: m.title,
               agentName: m.agentName ?? '—',
               statusLabel: m.formattedStatus,
+              isFullWidth: false,
             ),
         ],
       ),
@@ -898,6 +916,7 @@ class OngoingMissionCard extends StatelessWidget {
   final String title;
   final String agentName;
   final String statusLabel;
+  final bool isFullWidth;
 
   const OngoingMissionCard({
     super.key,
@@ -905,6 +924,7 @@ class OngoingMissionCard extends StatelessWidget {
     required this.title,
     required this.agentName,
     required this.statusLabel,
+    this.isFullWidth = false,
   });
 
   @override
@@ -919,8 +939,9 @@ class OngoingMissionCard extends StatelessWidget {
       },
       borderRadius: BorderRadius.circular(18),
       child: Container(
-        width: 260,
-        margin: const EdgeInsets.only(right: 15),
+        width: isFullWidth ? double.infinity : 260,
+        margin:
+            isFullWidth ? EdgeInsets.zero : const EdgeInsets.only(right: 15),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -979,7 +1000,7 @@ class OngoingMissionCard extends StatelessWidget {
   }
 }
 
-/// Historique rapide (missions terminées depuis l’API).
+/// Historique rapide (missions terminées depuis l'API).
 class QuickHistoryEntries extends StatelessWidget {
   final List<MissionModel> missions;
 
@@ -991,7 +1012,7 @@ class QuickHistoryEntries extends StatelessWidget {
       return const Padding(
         padding: EdgeInsets.symmetric(horizontal: 24),
         child: Text(
-          'Pas encore d’historique. Les missions terminées apparaîtront ici.',
+          'Pas encore d\'historique. Les missions terminées apparaîtront ici.',
           style: TextStyle(color: Colors.grey, fontSize: 13),
         ),
       );
@@ -999,12 +1020,24 @@ class QuickHistoryEntries extends StatelessWidget {
     return Column(
       children: [
         for (final m in missions)
-          HistoryEntryRow(
-            title: m.title,
-            dateLine: m.createdAt != null
-                ? '${m.createdAt!.day}/${m.createdAt!.month}/${m.createdAt!.year}'
-                : '—',
-            priceLabel: '${m.price.toStringAsFixed(0)} FCFA',
+          InkWell(
+            onTap: () {
+              Navigator.pushNamed(
+                context,
+                AppRoutes.missionDetail,
+                arguments: {'missionId': m.id},
+              );
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: HistoryEntryRow(
+              title: m.title,
+              dateLine: m.createdAt != null
+                  ? '${m.createdAt!.day}/${m.createdAt!.month}/${m.createdAt!.year}'
+                  : '—',
+              priceLabel: '${m.price.toStringAsFixed(0)} FCFA',
+              status: m.formattedStatus,
+              agentName: m.agentName ?? 'Agent assigné',
+            ),
           ),
       ],
     );
@@ -1016,12 +1049,16 @@ class HistoryEntryRow extends StatelessWidget {
   final String title;
   final String dateLine;
   final String priceLabel;
+  final String? status;
+  final String? agentName;
 
   const HistoryEntryRow({
     super.key,
     required this.title,
     required this.dateLine,
     required this.priceLabel,
+    this.status,
+    this.agentName,
   });
 
   @override
@@ -1053,15 +1090,51 @@ class HistoryEntryRow extends StatelessWidget {
                       fontSize: 14,
                     ),
                   ),
-                  Text(
-                    dateLine,
-                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                  if (agentName != null)
+                    Text(
+                      agentName!,
+                      style: const TextStyle(color: Colors.grey, fontSize: 11),
+                    ),
+                  Row(
+                    children: [
+                      Text(
+                        dateLine,
+                        style:
+                            const TextStyle(color: Colors.grey, fontSize: 11),
+                      ),
+                      if (status != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green[100],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            status!,
+                            style: TextStyle(
+                              color: Colors.green[800],
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
             ],
           ),
-          Text(priceLabel, style: const TextStyle(fontWeight: FontWeight.w900)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(priceLabel,
+                  style: const TextStyle(fontWeight: FontWeight.w900)),
+              const Icon(Icons.chevron_right, color: Colors.grey, size: 16),
+            ],
+          ),
         ],
       ),
     );

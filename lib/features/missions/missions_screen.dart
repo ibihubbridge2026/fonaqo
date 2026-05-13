@@ -1,20 +1,97 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:provider/provider.dart';
 
 import '../../core/routes/app_routes.dart';
+import '../../core/models/mission_model.dart';
+import '../../core/providers/auth_provider.dart';
 import '../../widgets/main_wrapper.dart';
+import '../missions/mission_repository.dart';
 import 'screens/create_mission_screen.dart';
 
-class MissionsScreen extends StatelessWidget {
+class MissionsScreen extends StatefulWidget {
   /// Contrôle si on affiche la liste des missions ou le flux de création.
   final ValueListenable<bool> showCreateMissionListenable;
 
   const MissionsScreen({super.key, required this.showCreateMissionListenable});
 
   @override
+  State<MissionsScreen> createState() => _MissionsScreenState();
+}
+
+class _MissionsScreenState extends State<MissionsScreen> {
+  final MissionRepository _missionRepository = MissionRepository();
+  List<MissionModel> _allMissions = [];
+  List<MissionModel> _filteredMissions = [];
+  bool _isLoading = true;
+  String _selectedFilter = "En cours";
+
+  final List<String> _filters = ["En cours", "Terminées", "Annulées", "Toutes"];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMissions();
+  }
+
+  Future<void> _loadMissions() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final missions = await _missionRepository.fetchMissionsList();
+      if (mounted) {
+        setState(() {
+          _allMissions = missions;
+          _applyFilter();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors du chargement des missions: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _applyFilter() {
+    switch (_selectedFilter) {
+      case "En cours":
+        _filteredMissions = _allMissions
+            .where((m) =>
+                m.status == MissionStatus.PENDING ||
+                m.status == MissionStatus.ACCEPTED ||
+                m.status == MissionStatus.ON_THE_WAY ||
+                m.status == MissionStatus.ARRIVED ||
+                m.status == MissionStatus.IN_PROGRESS)
+            .toList();
+        break;
+      case "Terminées":
+        _filteredMissions = _allMissions
+            .where((m) => m.status == MissionStatus.COMPLETED)
+            .toList();
+        break;
+      case "Annulées":
+        _filteredMissions = _allMissions
+            .where((m) => m.status == MissionStatus.CANCELLED)
+            .toList();
+        break;
+      case "Toutes":
+      default:
+        _filteredMissions = List.from(_allMissions);
+        break;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
-      valueListenable: showCreateMissionListenable,
+      valueListenable: widget.showCreateMissionListenable,
       builder: (context, isCreating, _) {
         if (isCreating) {
           return const Padding(
@@ -28,7 +105,8 @@ class MissionsScreen extends StatelessWidget {
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
           children: [
-            const Text("Mes Missions", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+            const Text("Mes Missions",
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
             const SizedBox(height: 16),
             const MissionsPromoQueueCard(),
             const SizedBox(height: 14),
@@ -39,40 +117,65 @@ class MissionsScreen extends StatelessWidget {
               child: Row(
                 children: [
                   ElevatedButton.icon(
-                    onPressed: () => MainShellScope.maybeOf(context)?.openCreateMission(),
+                    onPressed: () =>
+                        MainShellScope.maybeOf(context)?.openCreateMission(),
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text("CRÉER"),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFFD400),
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20)),
                       elevation: 0,
                     ),
                   ),
                   const SizedBox(width: 10),
-                  const _CategoryChip(label: "En cours", isActive: true),
-                  const _CategoryChip(label: "Terminées", isActive: false),
-                  const _CategoryChip(label: "Annulées", isActive: false),
+                  ..._filters.map(
+                    (filter) => _CategoryChip(
+                      label: filter,
+                      isActive: _selectedFilter == filter,
+                      onTap: () {
+                        setState(() {
+                          _selectedFilter = filter;
+                          _applyFilter();
+                        });
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
 
             const SizedBox(height: 18),
 
-            MissionCard(
-              title: "Mairie d'Abidjan",
-              type: "File d'attente",
-              status: "En cours",
-              time: "12 min",
-              onTap: () => Navigator.pushNamed(context, AppRoutes.missionDetail),
-            ),
-            MissionCard(
-              title: "Poste de Cocody",
-              type: "Service libre",
-              status: "En attente",
-              time: "2h",
-              onTap: () => Navigator.pushNamed(context, AppRoutes.missionDetail),
-            ),
+            if (_isLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (_filteredMissions.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: Center(
+                  child: Text(
+                    'Aucune mission $_selectedFilter',
+                    style: const TextStyle(color: Colors.grey, fontSize: 16),
+                  ),
+                ),
+              )
+            else
+              ..._filteredMissions.map(
+                (mission) => MissionCard(
+                  title: mission.title,
+                  type: mission.formattedStatus,
+                  status: mission.formattedStatus,
+                  time: mission.createdAt != null
+                      ? '${DateTime.now().difference(mission.createdAt!).inHours}h'
+                      : 'Recent',
+                  onTap: () => Navigator.pushNamed(
+                    context,
+                    AppRoutes.missionDetail,
+                    arguments: {'missionId': mission.id},
+                  ),
+                ),
+              ),
           ],
         );
       },
@@ -83,25 +186,33 @@ class MissionsScreen extends StatelessWidget {
 class _CategoryChip extends StatelessWidget {
   final String label;
   final bool isActive;
+  final VoidCallback? onTap;
 
-  const _CategoryChip({required this.label, required this.isActive});
+  const _CategoryChip({
+    required this.label,
+    required this.isActive,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-      decoration: BoxDecoration(
-        color: isActive ? Colors.black : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.black.withOpacity(0.06)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isActive ? Colors.white : Colors.black,
-          fontWeight: FontWeight.bold,
-          fontSize: 12,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? Colors.black : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.black.withOpacity(0.06)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: isActive ? Colors.white : Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
         ),
       ),
     );
@@ -135,7 +246,9 @@ class MissionCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(25),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
+          ],
         ),
         child: Row(
           children: [
@@ -145,16 +258,20 @@ class MissionCard extends StatelessWidget {
                 color: const Color(0xFFFFD400).withOpacity(0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.assignment_outlined, color: Color(0xFFFFD400)),
+              child: const Icon(Icons.assignment_outlined,
+                  color: Color(0xFFFFD400)),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  Text(title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w900, fontSize: 16)),
                   const SizedBox(height: 2),
-                  Text("$type • $time", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text("$type • $time",
+                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               ),
             ),
@@ -177,7 +294,8 @@ class _StatusBadge extends StatelessWidget {
     final fg = isPending ? Colors.orange[800] : Colors.green[800];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
       child: Text(
         status,
         style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 10),
@@ -197,26 +315,34 @@ class MissionsPromoQueueCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFFD400),
         borderRadius: BorderRadius.circular(30),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 14, offset: const Offset(0, 6))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 14,
+              offset: const Offset(0, 6))
+        ],
       ),
       child: Row(
         children: [
           const Expanded(
             child: Text(
               "Faites la queue à\nvotre place",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, height: 1.1),
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w900, height: 1.1),
             ),
           ),
           const SizedBox(width: 12),
           Container(
             width: 52,
             height: 52,
-            decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+                color: Colors.black, shape: BoxShape.circle),
             child: ClipOval(
               child: Image.asset(
                 'favicon.png',
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___)=> const Icon(Icons.hourglass_bottom, color: Color(0xFFFFD400)),
+                errorBuilder: (_, __, ___) => const Icon(Icons.hourglass_bottom,
+                    color: Color(0xFFFFD400)),
               ),
             ),
           ),

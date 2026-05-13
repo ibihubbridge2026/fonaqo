@@ -97,8 +97,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
       // Add image if selected
       if (_profileImage != null) {
-        // TODO: Implement image upload to server
-        // For now, we'll just update the text fields
+        final avatarUrl = await authProvider.uploadProfileImage(_profileImage!);
+        if (avatarUrl != null) {
+          profileData['avatar_url'] = avatarUrl;
+        }
       }
 
       final success = await authProvider.updateProfile(profileData);
@@ -302,7 +304,7 @@ class _AvatarEditor extends StatelessWidget {
                             width: 60,
                             height: 60,
                             fit: BoxFit.cover,
-                            errorBuilder:(_, __, ___) =>
+                            errorBuilder: (_, __, ___) =>
                                 const Icon(Icons.person, color: Colors.black54),
                           ),
                         ),

@@ -74,54 +74,149 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     }
   }
 
+  Color _getStatusColor(MissionStatus status) {
+    switch (status) {
+      case MissionStatus.PENDING:
+        return Colors.orange;
+      case MissionStatus.ACCEPTED:
+        return Colors.blue;
+      case MissionStatus.ON_THE_WAY:
+        return Colors.purple;
+      case MissionStatus.ARRIVED:
+        return Colors.indigo;
+      case MissionStatus.IN_PROGRESS:
+        return Colors.green;
+      case MissionStatus.COMPLETED:
+        return Colors.teal;
+      case MissionStatus.CANCELLED:
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontWeight: FontWeight.w500,
+              color: Colors.grey,
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Non spécifiée';
+    return '${date.day}/${date.month}/${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
-      appBar: const CustomAppBar.detailStack(
-        title: 'Détails de la mission',
+      appBar: CustomAppBar.detailStack(
+        title: _mission?.title ?? 'Détails de la mission',
         detailTitleWidget: Text(
-          "Détails de la mission",
-          style: TextStyle(fontWeight: FontWeight.w900),
+          _mission?.title ?? "Détails de la mission",
+          style: const TextStyle(fontWeight: FontWeight.w900),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Image de contexte (avant le lieu)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Image.asset(
-                  'assets/images/hero/img-2.jpg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: Colors.grey[200],
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.image_not_supported_outlined,
-                      color: Colors.grey,
-                      size: 48,
-                    ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
+              const SizedBox(height: 16),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(fontSize: 16, color: Colors.red),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadMissionDetails,
+                child: const Text('Réessayer'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_mission == null) {
+      return const Center(
+        child: Text('Mission non trouvée'),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Image de contexte (avant le lieu)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Image.asset(
+                'assets/images/hero/img-2.jpg',
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: Colors.grey[200],
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.image_not_supported_outlined,
+                    color: Colors.grey,
+                    size: 48,
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 16),
 
-            // Status Badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Text(
-                "AGENT EN ROUTE",
-                style: TextStyle(
+          // Status Badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: _getStatusColor(_mission!.status).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              _mission!.formattedStatus,
+              style: TextStyle(
                   color: Colors.blue,
                   fontWeight: FontWeight.w900,
                   fontSize: 10,
@@ -129,32 +224,68 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
               ),
             ),
             const SizedBox(height: 15),
-            const Text(
-              "Mairie d'Abidjan",
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+            Text(
+              _mission!.title,
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
             ),
-            const Text(
-              "File d'attente pour acte de naissance",
-              style: TextStyle(color: Colors.grey),
+            Text(
+              _mission!.description ?? 'Description non disponible',
+              style: const TextStyle(color: Colors.grey),
             ),
 
             const SizedBox(height: 30),
 
-            // Agent Card (Détail)
+            // Mission Details Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const CircleAvatar(
-                    radius: 25,
-                    backgroundImage: NetworkImage(
-                      "https://i.pravatar.cc/100?u=1",
-                    ),
+                  const Text(
+                    'Détails de la mission',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
+                  const SizedBox(height: 15),
+                  _buildDetailRow('Prix', '${_mission!.price.toStringAsFixed(0)} FCFA'),
+                  _buildDetailRow('Date de création', _formatDate(_mission!.createdAt)),
+                  if (_mission!.address != null) 
+                    _buildDetailRow('Adresse', _mission!.address!),
+                  if (_mission!.agentName != null)
+                    _buildDetailRow('Agent assigné', _mission!.agentName!),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Agent Card (Détail)
+            if (_mission!.agentName != null)
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 25,
+                      backgroundColor: Colors.blue[100],
+                      backgroundImage: const NetworkImage(
+                        "https://i.pravatar.cc/100?u=1",
+                      ),
+                      child: Text(
+                        _mission!.agentName![0].toUpperCase(),
+                        style: TextStyle(
+                          color: Colors.blue[700],
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   const SizedBox(width: 15),
                   const Expanded(
                     child: Column(
@@ -264,7 +395,6 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 
