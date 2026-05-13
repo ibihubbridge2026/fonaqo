@@ -658,7 +658,13 @@ class AuthProvider extends ChangeNotifier {
       return true;
     } catch (e) {
       _logger.e('Erreur UPDATE PROFILE: ${e.toString()}');
-      _setError('Erreur lors de la mise à jour du profil: ${e.toString()}');
+      if (e is ApiException && e.type == ApiErrorType.notFound) {
+        _setError(
+          'Profil introuvable (404). Vérifiez que l’API expose bien PATCH /api/v1/accounts/profile/.',
+        );
+      } else {
+        _setError('Erreur lors de la mise à jour du profil: ${e.toString()}');
+      }
       return false;
     } finally {
       _setLoading(false);

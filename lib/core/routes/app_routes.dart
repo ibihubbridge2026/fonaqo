@@ -27,6 +27,9 @@ abstract final class AppRoutes {
   /// Mission detail (route empilée).
   static const String missionDetail = '/mission-detail';
 
+  /// Suivi GPS live (mission).
+  static const String missionTracking = '/mission-tracking';
+
   /// Détail événement (route empilée).
   static const String eventDetail = '/event-detail';
 

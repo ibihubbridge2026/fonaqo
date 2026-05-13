@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import '../../../core/providers/wallet_provider.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../widgets/main_wrapper.dart';
-import '../../../widgets/step_indicator.dart';
 import '../mission_repository.dart';
-import '../widgets/step_1_type_selector.dart';
-import '../widgets/step_2_logistics_form.dart';
-import '../widgets/step_3_payment_summary.dart';
-import '../widgets/step_4_matching_agents.dart';
-import '../widgets/step_5_tracking_view.dart';
+import '../widgets/create_mission_step_type.dart';
+import '../widgets/create_mission_step_details.dart';
+import '../widgets/create_mission_step_logistics.dart';
+import '../widgets/create_mission_step_recap.dart';
 
+/// Flux de création de mission (4 étapes, conteneur plat, sans FeexPay).
 class CreateMissionScreen extends StatefulWidget {
   const CreateMissionScreen({super.key});
 
@@ -20,243 +16,273 @@ class CreateMissionScreen extends StatefulWidget {
 }
 
 class _CreateMissionScreenState extends State<CreateMissionScreen> {
-  int currentStep = 1;
-  String _mode = '';
-  String _description = '';
-  String _logisticsAddress = '';
-  double _logisticsLat = 5.36;
-  double _logisticsLng = -4.0083;
+  final MissionRepository _repo = MissionRepository();
 
-  final MissionRepository _missionRepository = MissionRepository();
+  int _step = 1;
+  String? _flowType;
+  int? _categoryId;
+  String _categoryName = '';
+  bool _needsProcuration = false;
 
-  void next() => setState(() => currentStep++);
-  void back() => setState(() => currentStep--);
+  final TextEditingController _adminPlace = TextEditingController();
+  final TextEditingController _address = TextEditingController();
+  final TextEditingController _description = TextEditingController();
+  final TextEditingController _targetAgent = TextEditingController();
+  final TextEditingController _price = TextEditingController(text: '15000');
 
-  String _missionTitle() {
-    final prefix = _mode == 'queue' ? 'File' : 'Libre';
-    final short = _description.trim().isEmpty
-        ? 'Sans description'
-        : (_description.trim().length > 120
-            ? '${_description.trim().substring(0, 120)}…'
-            : _description.trim());
-    return 'Mission $prefix — $short';
+  List<Map<String, dynamic>> _categories = [];
+  bool _loadingCats = true;
+  bool _submitting = false;
+
+  static const double _defaultLat = 6.3725;
+  static const double _defaultLng = 2.4318;
+
+  @override
+  void initState() {
+    super.initState();
+    for (final c in [_adminPlace, _address, _description, _price]) {
+      c.addListener(() => setState(() {}));
+    }
+    _loadCategories();
   }
 
-  // Variables pour la logique conditionnelle
-  bool _requiresProcuration = false;
-  String _targetAgentUsername = '';
+  Future<void> _loadCategories() async {
+    final rows = await _repo.fetchServiceCategories();
+    if (!mounted) return;
+    setState(() {
+      _categories = rows;
+      _loadingCats = false;
+    });
+  }
 
-  Future<void> _onPaymentValidated(MissionPaymentTotals totals) async {
-    final wallet = context.read<WalletProvider>();
-    if (!wallet.canAfford(totals.totalCfa)) {
+  @override
+  void dispose() {
+    _adminPlace.dispose();
+    _address.dispose();
+    _description.dispose();
+    _targetAgent.dispose();
+    _price.dispose();
+    super.dispose();
+  }
+
+  void _cancelAndHome() {
+    final shell = MainShellScope.maybeOf(context);
+    setState(() {
+      _step = 1;
+      _flowType = null;
+      _categoryId = null;
+      _categoryName = '';
+      _needsProcuration = false;
+      _adminPlace.clear();
+      _address.clear();
+      _description.clear();
+      _targetAgent.clear();
+      _price.text = '15000';
+    });
+    shell?.closeCreateMission();
+    shell?.setIndex(0);
+  }
+
+  String _missionTitle() {
+    if (_flowType == 'queue') {
+      final p = _adminPlace.text.trim();
+      return "File d'attente — ${p.isEmpty ? 'Lieu' : p}";
+    }
+    final c = _categoryName.isEmpty ? 'Service' : _categoryName;
+    return 'Service — $c';
+  }
+
+  String _missionDescription() {
+    final base = _description.text.trim();
+    if (_flowType == 'queue') {
+      final place = _adminPlace.text.trim();
+      return [
+        if (place.isNotEmpty) 'Lieu administratif : $place.',
+        if (base.isNotEmpty) base,
+      ].join(' ');
+    }
+    return [
+      if (_categoryName.isNotEmpty) 'Catégorie : $_categoryName.',
+      if (_needsProcuration) 'Procuration requise.',
+      if (base.isNotEmpty) base,
+    ].join(' ');
+  }
+
+  String _recapSummaryLines() {
+    final buf = StringBuffer();
+    buf.writeln(_flowType == 'queue'
+        ? "Type : file d'attente"
+        : 'Type : service');
+    if (_flowType == 'service') {
+      buf.writeln('Catégorie : ${_categoryName.isEmpty ? '—' : _categoryName}');
+      buf.writeln('Procuration : ${_needsProcuration ? 'oui' : 'non'}');
+    } else {
+      buf.writeln('Lieu : ${_adminPlace.text.trim()}');
+    }
+    buf.writeln('Adresse : ${_address.text.trim()}');
+    final u = _targetAgent.text.trim();
+    if (u.isNotEmpty) buf.writeln('Agent ciblé : $u');
+    return buf.toString().trim();
+  }
+
+  Future<void> _confirm() async {
+    final raw = _price.text.replaceAll(',', '.').trim();
+    final price = double.tryParse(raw) ?? 0;
+    if (price <= 0) return;
+
+    setState(() => _submitting = true);
+    try {
+      await _repo.createMission(
+        MissionCreatePayload(
+          title: _missionTitle(),
+          description:
+              _missionDescription().trim().isEmpty ? _missionTitle() : _missionDescription(),
+          address: _address.text.trim(),
+          latitude: _defaultLat,
+          longitude: _defaultLng,
+          price: price,
+          serviceFee: price * 0.10,
+          requiresProcuration: _needsProcuration,
+          targetAgentUsername:
+              _targetAgent.text.trim().isEmpty ? null : _targetAgent.text.trim(),
+        ),
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Solde portefeuille insuffisant (simulation).'),
-          backgroundColor: Colors.red,
+          content: Text('Mission créée (sans FeexPay).'),
+          backgroundColor: Colors.green,
         ),
       );
-      return;
-    }
-
-    final priceMission =
-        totals.paySupplierDirectly ? 1.0 : totals.purchaseBudgetCfa;
-
-    try {
-      await _missionRepository.createMission(
-        MissionCreatePayload(
-          title: _missionTitle(),
-          description: _description.trim().isEmpty
-              ? _missionTitle()
-              : _description.trim(),
-          address: _logisticsAddress,
-          latitude: _logisticsLat,
-          longitude: _logisticsLng,
-          price: priceMission,
-          serviceFee: totals.serviceFeeCfa,
-          requiresProcuration: _requiresProcuration,
-          targetAgentUsername:
-              _targetAgentUsername.isNotEmpty ? _targetAgentUsername : null,
-        ),
-      );
-
-      if (!mounted) return;
-
-      final ok = wallet.deduct(totals.totalCfa);
-      if (!ok) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('Erreur lors de la mise à jour du portefeuille local.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Paiement enregistré'),
-          content: const Text(
-            'Votre mission a été créée et le montant a été réservé sur votre portefeuille (simulation).',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Continuer'),
-            ),
-          ],
-        ),
-      );
-
-      if (mounted) next();
+      _cancelAndHome();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Impossible de créer la mission : $e'),
+          content: Text('Échec création : $e'),
           backgroundColor: Colors.red,
         ),
       );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppTheme.backgroundColor,
-            AppTheme.surfaceColor,
-          ],
-        ),
+      width: double.infinity,
+      height: double.infinity,
+      decoration: const BoxDecoration(
+        color: Color(0xFFF4F4F4),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header avec Glassmorphism
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: AppTheme.glassDecoration(
-              color: Colors.white,
-              borderRadius: 0,
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
             child: Row(
               children: [
-                IconButton(
-                  onPressed: () {
-                    if (currentStep > 1) {
-                      back();
-                    } else {
-                      MainShellScope.maybeOf(context)?.closeCreateMission();
-                    }
-                  },
-                  icon: const Icon(Icons.arrow_back),
-                ),
-                Expanded(
-                  child: StepIndicator(
-                    totalSteps: 5,
-                    currentStep: currentStep,
-                    titles: const [
-                      'Type',
-                      'Logistique',
-                      'Paiement',
-                      'Agents',
-                      'Suivi',
-                    ],
+                Text(
+                  'Étape $_step / 4',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
                   ),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Annuler et retour à l’accueil',
+                  onPressed: _cancelAndHome,
+                  icon: const Icon(Icons.close),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Contenu principal avec Glassmorphism
           Expanded(
             child: Container(
-              margin: const EdgeInsets.all(16),
-              decoration: AppTheme.glassDecoration(
-                color: Colors.white,
-                borderRadius: 20,
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFAFAFA),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE3E3E3)),
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: AnimatedSwitcher(
-                  duration: AppTheme.mediumAnimation,
-                  transitionBuilder: (child, animation) {
-                    return SlideTransition(
-                      position: Tween<Offset>(
-                        begin: const Offset(1.0, 0.0),
-                        end: Offset.zero,
-                      ).animate(CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.easeInOut,
-                      )),
-                      child: FadeTransition(
-                        opacity: animation,
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: _buildStep(),
+              clipBehavior: Clip.antiAlias,
+              child: _step == 1
+                  ? CreateMissionStepType(
+                      selected: _flowType,
+                      onSelect: (v) => setState(() => _flowType = v),
+                    )
+                  : _step == 2
+                      ? _loadingCats
+                          ? const Center(child: CircularProgressIndicator())
+                          : CreateMissionStepDetails(
+                              flowType: _flowType ?? 'service',
+                              categories: _categories,
+                              selectedCategoryId: _categoryId,
+                              onCategorySelected: (id) {
+                                String name = '';
+                                for (final row in _categories) {
+                                  final rid = row['id'] is int
+                                      ? row['id'] as int
+                                      : int.tryParse('${row['id']}');
+                                  if (rid == id) {
+                                    name = row['name']?.toString() ?? '';
+                                    break;
+                                  }
+                                }
+                                setState(() {
+                                  _categoryId = id;
+                                  _categoryName = name;
+                                });
+                              },
+                              needsProcuration: _needsProcuration,
+                              onProcurationChanged: (v) =>
+                                  setState(() => _needsProcuration = v),
+                              adminPlaceController: _adminPlace,
+                              onNext: () => setState(() => _step = 3),
+                            )
+                      : _step == 3
+                          ? CreateMissionStepLogistics(
+                              addressController: _address,
+                              descriptionController: _description,
+                              targetAgentController: _targetAgent,
+                              onNext: () => setState(() => _step = 4),
+                            )
+                          : CreateMissionStepRecap(
+                              priceController: _price,
+                              summaryTitle: _missionTitle(),
+                              summaryLines: _recapSummaryLines(),
+                              isSubmitting: _submitting,
+                              onConfirm: _confirm,
+                            ),
+            ),
+          ),
+          if (_step == 1 && _flowType != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () => setState(() => _step = 2),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFD400),
+                    foregroundColor: Colors.black,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Continuer',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
-  }
-
-  Widget _buildStep() {
-    switch (currentStep) {
-      case 1:
-        return Step1TypeSelector(
-          onNext: (mode, desc) {
-            setState(() {
-              _mode = mode;
-              _description = desc;
-            });
-            next();
-          },
-        );
-      case 2:
-        return Step2LogisticsForm(
-          mode: _mode,
-          onNext: (draft) {
-            setState(() {
-              _logisticsAddress = draft.address;
-              _logisticsLat = draft.latitude;
-              _logisticsLng = draft.longitude;
-              _requiresProcuration = draft.requiresProcuration;
-            });
-            next();
-          },
-        );
-      case 3:
-        return Step3PaymentSummary(
-          mode: _mode,
-          onPayAndValidate: (totals) async {
-            setState(() {
-              _targetAgentUsername = totals.targetAgentUsername ?? '';
-            });
-            await _onPaymentValidated(totals);
-          },
-        );
-      case 4:
-        return Step4MatchingAgents(onConfirmed: next);
-      case 5:
-        return Step5TrackingView(
-          onBackToMissions: () =>
-              MainShellScope.maybeOf(context)?.closeCreateMission(),
-        );
-      default:
-        return const SizedBox.shrink();
-    }
   }
 }

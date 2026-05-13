@@ -2,9 +2,77 @@ import 'package:flutter/material.dart';
 import '../../../widgets/custom_app_bar.dart';
 import 'widgets/step_5_tracking_view.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/models/mission_model.dart';
+import '../missions/mission_repository.dart';
 
-class MissionDetailScreen extends StatelessWidget {
+class MissionDetailScreen extends StatefulWidget {
   const MissionDetailScreen({super.key});
+
+  @override
+  State<MissionDetailScreen> createState() => _MissionDetailScreenState();
+}
+
+class _MissionDetailScreenState extends State<MissionDetailScreen> {
+  final MissionRepository _missionRepository = MissionRepository();
+  MissionModel? _mission;
+  bool _isLoading = true;
+  String? _errorMessage;
+  String? _missionId;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadMissionId();
+    });
+  }
+
+  void _loadMissionId() {
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (args is Map<String, dynamic>) {
+      _missionId = args['missionId']?.toString();
+      if (_missionId != null && _missionId!.isNotEmpty) {
+        _loadMissionDetails();
+      } else {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'ID de mission non fourni';
+        });
+      }
+    } else {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Arguments de navigation invalides';
+      });
+    }
+  }
+
+  Future<void> _loadMissionDetails() async {
+    if (_missionId == null || _missionId!.isEmpty) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final missionData =
+          await _missionRepository.fetchMissionDetails(_missionId!);
+      if (mounted) {
+        setState(() {
+          _mission = missionData;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Erreur lors du chargement: ${e.toString()}';
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +98,7 @@ class MissionDetailScreen extends StatelessWidget {
                 child: Image.asset(
                   'assets/images/hero/img-2.jpg',
                   fit: BoxFit.cover,
-                  errorBuilder:(_, __, ___) => Container(
+                  errorBuilder: (_, __, ___) => Container(
                     color: Colors.grey[200],
                     alignment: Alignment.center,
                     child: const Icon(

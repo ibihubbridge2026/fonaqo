@@ -20,6 +20,7 @@ import 'features/chat/screens/chat_detail_screen.dart';
 import 'features/litiges/litige_screen.dart';
 import 'features/events/event_detail_screen.dart';
 import 'features/missions/mission_detail_screen.dart';
+import 'features/missions/screens/mission_tracking_screen.dart';
 import 'features/missions/missions_screen.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'features/profile/screens/personal_info_screen.dart';
@@ -105,6 +106,16 @@ class FonacoApp extends StatelessWidget {
               AppRoutes.onboarding: (context) => const OnboardingScreen(),
               AppRoutes.mainShell: (context) => const MainWrapper(),
               AppRoutes.missionDetail: (context) => const MissionDetailScreen(),
+              AppRoutes.missionTracking: (context) {
+                final args = ModalRoute.of(context)?.settings.arguments;
+                final id = args is Map ? args['missionId']?.toString() : null;
+                if (id == null || id.isEmpty) {
+                  return const Scaffold(
+                    body: Center(child: Text('Mission introuvable')),
+                  );
+                }
+                return MissionTrackingScreen(missionId: id);
+              },
               AppRoutes.eventDetail: (context) => const EventDetailScreen(),
               AppRoutes.litige: (context) => const LitigeScreen(),
               AppRoutes.notifications: (context) => const NotificationsScreen(),

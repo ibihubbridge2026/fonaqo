@@ -11,6 +11,15 @@ class BaseClient {
   static const Duration _connectTimeout = Duration(seconds: 30);
   static const Duration _receiveTimeout = Duration(seconds: 30);
 
+  /// Hôte et port du serveur (ex. `192.168.1.73:8000`) pour WebSockets `ws://…`.
+  static String get apiHostAndPort {
+    final u = Uri.parse(_baseUrl);
+    if (u.hasPort) {
+      return '${u.host}:${u.port}';
+    }
+    return u.host;
+  }
+
   late final Dio _dio;
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
   final Logger _logger = Logger();
@@ -291,63 +300,15 @@ class _AuthInterceptor extends Interceptor {
     if (err.response?.statusCode == 401) {
       final responseData = err.response?.data;
 
-      // Tenter de rafraîchir le token si c'est une erreur 401
-      if (responseData is Map && responseData['code'] != 'token_not_valid') {
-        _logger.w('Tentative de rafraîchissement du token JWT');
-        final refreshed = await _tryRefreshToken();
-
-        if (refreshed) {
-          // Réessayer la requête originale avec le nouveau token
-          final newToken = await _secureStorage.read(key: _tokenKey);
-          if (newToken != null) {
-            err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
-
-            try {
-              final response = await _dio.fetch(err.requestOptions);
-              handler.resolve(response);
-              return;
-            } catch (e) {
-              _logger.e('Échec de la réessai après rafraîchissement: $e');
-            }
-          }
-        }
-      }
-
-      // Si le rafraîchissement échoue ou si le token est invalide
+      // Token expiré ou invalide - nettoyer et rediriger vers login
       _logger.w('JWT expiré ou invalide : suppression du stockage token');
       await _secureStorage.delete(key: _tokenKey);
+      await _secureStorage.delete(key: 'user_data');
+
+      // Notifier l'application pour rediriger vers l'écran de login
+      // TODO: Ajouter un callback pour notifier l'AuthProvider
     }
     handler.next(err);
-  }
-
-  /// Tente de rafraîchir le token JWT
-  Future<bool> _tryRefreshToken() async {
-    try {
-      final refreshToken =
-          await _secureStorage.read(key: '${_tokenKey}_refresh');
-      if (refreshToken == null) return false;
-
-      final dio = Dio(BaseOptions(
-        baseUrl: 'http://192.168.1.73:8000/api/v1/',
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
-      ));
-
-      final response = await dio.post(
-        'accounts/token/refresh/',
-        data: {'refresh': refreshToken},
-      );
-
-      if (response.statusCode == 200) {
-        final newAccessToken = response.data['access'];
-        await _secureStorage.write(key: _tokenKey, value: newAccessToken);
-        _logger.i('Token JWT rafraîchi avec succès');
-        return true;
-      }
-    } catch (e) {
-      _logger.e('Échec du rafraîchissement du token: $e');
-    }
-    return false;
   }
 }
 

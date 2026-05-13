@@ -18,7 +18,7 @@ class MissionsScreen extends StatelessWidget {
       builder: (context, isCreating, _) {
         if (isCreating) {
           return const Padding(
-            padding: EdgeInsets.fromLTRB(20, 12, 20, 100),
+            padding: EdgeInsets.fromLTRB(12, 4, 12, 8),
             child: SizedBox.expand(
               child: CreateMissionScreen(),
             ),

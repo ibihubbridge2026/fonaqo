@@ -41,8 +41,8 @@ class MissionModel {
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      status: _parseMissionStatus(json['status']?.toString()),
+      price: _readDouble(json['price']) ?? 0.0,
+      status: parseMissionStatus(json['status']?.toString()),
       latitude: _readDouble(json['latitude']),
       longitude: _readDouble(json['longitude']),
       createdAt: json['created_at'] != null
@@ -85,19 +85,25 @@ class MissionModel {
     };
   }
 
-  /// Parse le statut de mission depuis une chaîne.
-  static MissionStatus _parseMissionStatus(String? status) {
+  /// Parse le statut depuis l'API Django (TextChoices).
+  static MissionStatus parseMissionStatus(String? status) {
     switch (status?.toLowerCase()) {
       case 'pending':
         return MissionStatus.PENDING;
       case 'accepted':
         return MissionStatus.ACCEPTED;
+      case 'on_the_way':
+        return MissionStatus.ON_THE_WAY;
+      case 'arrived':
+        return MissionStatus.ARRIVED;
       case 'in_progress':
         return MissionStatus.IN_PROGRESS;
       case 'completed':
         return MissionStatus.COMPLETED;
       case 'cancelled':
         return MissionStatus.CANCELLED;
+      case 'disputed':
+        return MissionStatus.DISPUTED;
       default:
         return MissionStatus.PENDING;
     }
@@ -137,20 +143,7 @@ class MissionModel {
   }
 
   /// Retourne le statut formaté pour l'affichage.
-  String get formattedStatus {
-    switch (status) {
-      case MissionStatus.PENDING:
-        return 'En attente';
-      case MissionStatus.ACCEPTED:
-        return 'Acceptée';
-      case MissionStatus.IN_PROGRESS:
-        return 'En cours';
-      case MissionStatus.COMPLETED:
-        return 'Terminée';
-      case MissionStatus.CANCELLED:
-        return 'Annulée';
-    }
-  }
+  String get formattedStatus => status.label;
 
   @override
   String toString() {
@@ -182,9 +175,12 @@ class MissionModel {
 enum MissionStatus {
   PENDING,
   ACCEPTED,
+  ON_THE_WAY,
+  ARRIVED,
   IN_PROGRESS,
   COMPLETED,
-  CANCELLED;
+  CANCELLED,
+  DISPUTED;
 
   /// Retourne le nom formaté du statut.
   String get name {
@@ -193,12 +189,18 @@ enum MissionStatus {
         return 'pending';
       case ACCEPTED:
         return 'accepted';
+      case ON_THE_WAY:
+        return 'on_the_way';
+      case ARRIVED:
+        return 'arrived';
       case IN_PROGRESS:
         return 'in_progress';
       case COMPLETED:
         return 'completed';
       case CANCELLED:
         return 'cancelled';
+      case DISPUTED:
+        return 'disputed';
     }
   }
 
@@ -209,12 +211,18 @@ enum MissionStatus {
         return 'En attente';
       case ACCEPTED:
         return 'Acceptée';
+      case ON_THE_WAY:
+        return 'En route';
+      case ARRIVED:
+        return 'Sur place';
       case IN_PROGRESS:
         return 'En cours';
       case COMPLETED:
         return 'Terminée';
       case CANCELLED:
         return 'Annulée';
+      case DISPUTED:
+        return 'En litige';
     }
   }
 }

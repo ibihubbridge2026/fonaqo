@@ -4,6 +4,8 @@ class UserModel {
   final String id;
   final String email;
   final String? phoneNumber;
+  /// Nom d'utilisateur Django (connexion / chat), distinct du libellé d'affichage.
+  final String? djangoUsername;
   final String? firstName;
   final String? lastName;
   final String role; // 'agent' ou 'client' - avec valeur par défaut 'client'
@@ -18,6 +20,7 @@ class UserModel {
     required this.id,
     required this.email,
     this.phoneNumber,
+    this.djangoUsername,
     this.firstName,
     this.lastName,
     required this.role,
@@ -35,6 +38,7 @@ class UserModel {
       id: json['id']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       phoneNumber: json['phone_number']?.toString(),
+      djangoUsername: json['username']?.toString(),
       firstName: json['first_name']?.toString(),
       lastName: json['last_name']?.toString(),
       role: json['role']?.toString() ?? 'client',
@@ -71,6 +75,7 @@ class UserModel {
       'id': id,
       'email': email,
       if (phoneNumber != null) 'phone_number': phoneNumber,
+      if (djangoUsername != null) 'username': djangoUsername,
       if (firstName != null) 'first_name': firstName,
       if (lastName != null) 'last_name': lastName,
       'role': role,
@@ -88,6 +93,7 @@ class UserModel {
     String? id,
     String? email,
     String? phoneNumber,
+    String? djangoUsername,
     String? firstName,
     String? lastName,
     String? role,
@@ -102,6 +108,7 @@ class UserModel {
       id: id ?? this.id,
       email: email ?? this.email,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      djangoUsername: djangoUsername ?? this.djangoUsername,
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
       role: role ?? this.role,

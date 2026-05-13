@@ -4,13 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/routes/app_routes.dart';
-import '../../../widgets/main_wrapper.dart';
+import '../../../core/models/mission_model.dart';
 import '../../../core/providers/auth_provider.dart';
+import '../../../widgets/main_wrapper.dart';
+import '../../missions/mission_repository.dart';
 
-/// Bloc corps de page d’accueil (carrousel auto, missions, suggestions, litige).
-/// Contient le [PageController], le métronome pour le slider et la liste des slides.
-///
-/// À placer sous un défilement ou un corps de [Scaffold] parent (voir [HomeScreen]).
+/// Bloc corps de page d'accueil (carrousel, missions API, suggestions agents).
 class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
 
@@ -21,6 +20,12 @@ class HomeContent extends StatefulWidget {
 class _HomeContentState extends State<HomeContent> {
   final PageController _pageController = PageController();
   Timer? _heroTimer;
+  final MissionRepository _missionRepo = MissionRepository();
+
+  List<MissionModel> _missions = [];
+  List<Map<String, dynamic>> _suggestedAgents = [];
+  bool _dashLoading = true;
+  String? _dashError;
 
   /// Chemins relatifs aux visuels du carrousel héros (boucle automatique sans fin logique index).
   final List<String> _heroAssets = const [
@@ -35,6 +40,41 @@ class _HomeContentState extends State<HomeContent> {
   void initState() {
     super.initState();
     _heroTimer = Timer.periodic(const Duration(seconds: 4), _onHeroTick);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadDashboard());
+  }
+
+  Future<void> _loadDashboard() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (!auth.isAuthenticated) {
+      if (mounted) {
+        setState(() {
+          _dashLoading = false;
+          _missions = [];
+          _suggestedAgents = [];
+        });
+      }
+      return;
+    }
+    setState(() {
+      _dashLoading = true;
+      _dashError = null;
+    });
+    try {
+      final missions = await _missionRepo.fetchMissionsList();
+      final agents = await _missionRepo.fetchAgentSuggestions();
+      if (!mounted) return;
+      setState(() {
+        _missions = missions;
+        _suggestedAgents = agents;
+        _dashLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _dashError = e.toString();
+        _dashLoading = false;
+      });
+    }
   }
 
   void _onHeroTick(Timer timer) {
@@ -45,6 +85,27 @@ class _HomeContentState extends State<HomeContent> {
       duration: const Duration(milliseconds: 800),
       curve: Curves.easeInOut,
     );
+  }
+
+  List<MissionModel> _ongoingMissions() {
+    return _missions
+        .where(
+          (m) =>
+              m.status == MissionStatus.PENDING ||
+              m.status == MissionStatus.ACCEPTED ||
+              m.status == MissionStatus.ON_THE_WAY ||
+              m.status == MissionStatus.ARRIVED ||
+              m.status == MissionStatus.IN_PROGRESS,
+        )
+        .take(8)
+        .toList();
+  }
+
+  List<MissionModel> _historyMissions() {
+    return _missions
+        .where((m) => m.status == MissionStatus.COMPLETED)
+        .take(5)
+        .toList();
   }
 
   @override
@@ -86,7 +147,22 @@ class _HomeContentState extends State<HomeContent> {
           onSeeAllPressed: shell == null ? null : () => shell.setIndex(1),
         ),
         const SizedBox(height: 12),
-        const OngoingMissionStrip(),
+        if (_dashLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else ...[
+          if (_dashError != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                _dashError!,
+                style: TextStyle(color: Colors.red[700], fontSize: 13),
+              ),
+            ),
+          OngoingMissionStrip(missions: _ongoingMissions()),
+        ],
         const SizedBox(height: 25),
         SectionTitleStrip(
           title: 'Suggestions d\'agents',
@@ -94,14 +170,20 @@ class _HomeContentState extends State<HomeContent> {
           onSeeAllPressed: shell == null ? null : () => shell.setIndex(2),
         ),
         const SizedBox(height: 12),
-        const AgentSuggestionSlider(),
+        if (_dashLoading)
+          const SizedBox(height: 8)
+        else
+          AgentSuggestionSlider(agents: _suggestedAgents),
         const SizedBox(height: 25),
         SectionTitleStrip(
           title: 'Historique rapide',
           onSeeAllPressed: shell == null ? null : () => shell.setIndex(1),
         ),
         const SizedBox(height: 10),
-        const QuickHistoryEntries(),
+        if (_dashLoading)
+          const SizedBox.shrink()
+        else
+          QuickHistoryEntries(missions: _historyMissions()),
         const SizedBox(height: 25),
 
         // Section spéciale pour les agents - afficher seulement si l'utilisateur est un agent
@@ -135,27 +217,39 @@ class _HomeContentState extends State<HomeContent> {
   }
 }
 
-/// En-tête de salutation : texte utilisateur fictif mais texte métier préservé.
+/// En-tête de salutation dynamique (prénom ou username Django).
 class WelcomeHeader extends StatelessWidget {
   const WelcomeHeader({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Bonjour, Thomas !',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        final first = auth.currentUser?.firstName?.trim();
+        final login = auth.currentUser?.djangoUsername?.trim();
+        final greet = (first != null && first.isNotEmpty)
+            ? first
+            : (login != null && login.isNotEmpty)
+                ? login
+                : 'Invité';
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Bonjour, $greet !',
+                style:
+                    const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+              ),
+              const Text(
+                'Où pouvons-nous vous aider aujourd’hui ?',
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+            ],
           ),
-          Text(
-            'Où pouvons-nous vous aider aujourd’hui ?',
-            style: TextStyle(color: Colors.grey, fontSize: 14),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -517,9 +611,11 @@ class ReportLitigeCardPanel extends StatelessWidget {
   }
 }
 
-/// Liste horizontale des profils d'agents certifiés.
+/// Liste horizontale des profils d'agents certifiés (données API / seeder).
 class AgentSuggestionSlider extends StatefulWidget {
-  const AgentSuggestionSlider({super.key});
+  final List<Map<String, dynamic>> agents;
+
+  const AgentSuggestionSlider({super.key, required this.agents});
 
   @override
   State<AgentSuggestionSlider> createState() => _AgentSuggestionSliderState();
@@ -534,7 +630,6 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
   @override
   void initState() {
     super.initState();
-    // Demande: slider qui défile de droite vers gauche en boucle sans arrêt.
     _autoScrollTimer = Timer.periodic(
       const Duration(milliseconds: 1400),
       _onTick,
@@ -544,6 +639,7 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
   void _onTick(Timer timer) {
     if (!_scrollController.hasClients) return;
     final max = _scrollController.position.maxScrollExtent;
+    if (max <= 0) return;
     final next = _scrollController.offset + _cardStep;
 
     if (next >= max) {
@@ -567,34 +663,46 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
 
   @override
   Widget build(BuildContext context) {
-    // Simulation de données agents (à remplacer plus tard par une API)
-    final List<Map<String, String>> agents = [
-      {
-        'name': 'Marc-Antoine',
-        'role': 'Polyvalent',
-        'image': 'assets/images/avatar/agent1.jpg',
-      },
-      {
-        'name': 'Pauline C.',
-        'role': 'Conciergerie & Courses',
-        'image': 'assets/images/avatar/agent2.avif',
-      },
-      {
-        'name': 'Thomas L.',
-        'role': 'Assistant de maison',
-        'image': 'assets/images/avatar/agent3.png',
-      },
-    ];
+    final rows = widget.agents;
+    if (rows.isEmpty) {
+      return const SizedBox(
+        height: 100,
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              'Aucun agent suggéré pour le moment.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final display = <Map<String, String>>[];
+    for (final raw in rows) {
+      final fn = raw['first_name']?.toString() ?? '';
+      final ln = raw['last_name']?.toString() ?? '';
+      final un = raw['username']?.toString() ?? '';
+      final name =
+          ('$fn $ln').trim().isEmpty ? un : '${fn.trim()} ${ln.trim()}'.trim();
+      display.add({
+        'name': name.isEmpty ? 'Agent' : name,
+        'role': raw['specialty']?.toString() ?? 'Agent terrain',
+        'image': 'assets/images/avatar/user.png',
+      });
+    }
 
     return SizedBox(
-      height: 200, // Hauteur ajustée pour les cartes agents
+      height: 200,
       child: ListView.builder(
         controller: _scrollController,
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: agents.length * 20,
+        itemCount: display.length * 15,
         itemBuilder: (context, index) {
-          final agent = agents[index % agents.length];
+          final agent = display[index % display.length];
           return AgentCard(
             name: agent['name']!,
             role: agent['role']!,
@@ -742,28 +850,42 @@ class AgentSuggestionTile extends StatelessWidget {
   }
 }
 
-/// Liste horizontale de cartes mission en cours.
+/// Liste horizontale de cartes mission en cours (API / seeder).
 class OngoingMissionStrip extends StatelessWidget {
-  const OngoingMissionStrip({super.key});
+  final List<MissionModel> missions;
+
+  const OngoingMissionStrip({super.key, required this.missions});
 
   @override
   Widget build(BuildContext context) {
+    if (missions.isEmpty) {
+      return const SizedBox(
+        height: 72,
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              'Aucune mission en cours. Créez-en une ou exécutez le seeder côté serveur.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey, fontSize: 13),
+            ),
+          ),
+        ),
+      );
+    }
     return SizedBox(
       height: 85,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        children: const [
-          OngoingMissionCard(
-            title: 'Banque Nationale',
-            agentName: 'Marc',
-            statusLabel: 'En route',
-          ),
-          OngoingMissionCard(
-            title: 'Poste Centrale',
-            agentName: 'Julie',
-            statusLabel: 'Sur place',
-          ),
+        children: [
+          for (final m in missions)
+            OngoingMissionCard(
+              missionId: m.id,
+              title: m.title,
+              agentName: m.agentName ?? '—',
+              statusLabel: m.formattedStatus,
+            ),
         ],
       ),
     );
@@ -772,12 +894,14 @@ class OngoingMissionStrip extends StatelessWidget {
 
 /// Carte mission horizontale unique.
 class OngoingMissionCard extends StatelessWidget {
+  final String missionId;
   final String title;
   final String agentName;
   final String statusLabel;
 
   const OngoingMissionCard({
     super.key,
+    required this.missionId,
     required this.title,
     required this.agentName,
     required this.statusLabel,
@@ -785,89 +909,103 @@ class OngoingMissionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 260,
-      margin: const EdgeInsets.only(right: 15),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.black.withOpacity(0.05)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(12),
+    return InkWell(
+      onTap: () {
+        Navigator.pushNamed(
+          context,
+          AppRoutes.missionDetail,
+          arguments: {'missionId': missionId},
+        );
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: 260,
+        margin: const EdgeInsets.only(right: 15),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: Colors.black.withOpacity(0.05)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.account_balance_rounded, size: 20),
             ),
-            child: const Icon(Icons.account_balance_rounded, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
-                ),
-                Text(
-                  'Agent: $agentName',
-                  style: const TextStyle(color: Colors.grey, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFD400).withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              statusLabel,
-              style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-                color: Colors.brown,
+                  Text(
+                    'Agent: $agentName',
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD400).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                statusLabel,
+                style: const TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.brown,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// Historique court : deux entrées factices pour le wireframe.
+/// Historique rapide (missions terminées depuis l’API).
 class QuickHistoryEntries extends StatelessWidget {
-  const QuickHistoryEntries({super.key});
+  final List<MissionModel> missions;
+
+  const QuickHistoryEntries({super.key, required this.missions});
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    if (missions.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 24),
+        child: Text(
+          'Pas encore d’historique. Les missions terminées apparaîtront ici.',
+          style: TextStyle(color: Colors.grey, fontSize: 13),
+        ),
+      );
+    }
+    return Column(
       children: [
-        HistoryEntryRow(
-          title: 'Bureau de Poste',
-          dateLine: 'Hier, 14:30',
-          priceLabel: '12,50€',
-        ),
-        HistoryEntryRow(
-          title: 'Billetterie Concert',
-          dateLine: '12 Oct, 10:15',
-          priceLabel: '25,00€',
-        ),
-        HistoryEntryRow(
-          title: 'Banque Nationale',
-          dateLine: 'Hier, 14:30',
-          priceLabel: '12,50€',
-        ),
+        for (final m in missions)
+          HistoryEntryRow(
+            title: m.title,
+            dateLine: m.createdAt != null
+                ? '${m.createdAt!.day}/${m.createdAt!.month}/${m.createdAt!.year}'
+                : '—',
+            priceLabel: '${m.price.toStringAsFixed(0)} FCFA',
+          ),
       ],
     );
   }

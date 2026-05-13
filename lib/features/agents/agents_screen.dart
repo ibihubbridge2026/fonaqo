@@ -3,7 +3,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:logger/logger.dart';
 
-import '../../core/models/mission_model.dart';
 import '../missions/mission_repository.dart';
 
 class AgentsScreen extends StatefulWidget {
@@ -16,8 +15,8 @@ class AgentsScreen extends StatefulWidget {
 class _AgentsScreenState extends State<AgentsScreen> {
   final Logger _log = Logger();
   final MissionRepository _missionRepository = MissionRepository();
-  List<MissionModel> _missions = [];
-  bool _isLoadingMissions = false;
+  List<Map<String, dynamic>> _agents = [];
+  bool _isLoadingAgents = false;
 
   static const Color _accent = Color(0xFFFFD400);
 
@@ -38,30 +37,31 @@ class _AgentsScreenState extends State<AgentsScreen> {
     // Attendre que l'UI soit prête avant de demander la position
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initLocation();
-      _loadMissions();
+      _loadAgents();
     });
   }
 
-  Future<void> _loadMissions() async {
+  Future<void> _loadAgents() async {
     if (!mounted) return;
 
-    setState(() => _isLoadingMissions = true);
+    setState(() => _isLoadingAgents = true);
 
     try {
-      final missions = await _missionRepository.fetchAvailableMissions();
+      // Récupérer les agents depuis l'API
+      final agents = await _missionRepository.fetchAgentSuggestions();
       if (mounted) {
         setState(() {
-          _missions = missions;
-          _isLoadingMissions = false;
+          _agents = agents;
+          _isLoadingAgents = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoadingMissions = false);
+        setState(() => _isLoadingAgents = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Erreur lors du chargement des missions: ${e.toString()}',
+              'Erreur lors du chargement des agents: ${e.toString()}',
             ),
             backgroundColor: Colors.red,
           ),
@@ -126,30 +126,39 @@ class _AgentsScreenState extends State<AgentsScreen> {
   Set<Marker> _buildMarkersAround(LatLng center) {
     final markers = <Marker>[];
 
-    // Créer des marqueurs pour les missions disponibles
-    for (var i = 0; i < _missions.length; i++) {
-      final mission = _missions[i];
+    // Créer des marqueurs pour les agents disponibles
+    for (var i = 0; i < _agents.length; i++) {
+      final agent = _agents[i];
 
-      // Vérifier si la mission a des coordonnées
-      if (mission.latitude != null && mission.longitude != null) {
-        final missionLatLng = LatLng(mission.latitude!, mission.longitude!);
+      // Vérifier si l'agent a des coordonnées
+      if (agent['latitude'] != null && agent['longitude'] != null) {
+        final agentLat = double.tryParse(agent['latitude'].toString());
+        final agentLng = double.tryParse(agent['longitude'].toString());
 
-        markers.add(
-          Marker(
-            markerId: MarkerId('mission_${mission.id}'),
-            position: missionLatLng,
-            infoWindow: InfoWindow(
-              title: mission.title,
-              snippet:
-                  '${mission.price.toStringAsFixed(0)} XOF • ${mission.formattedStatus}',
+        if (agentLat != null && agentLng != null) {
+          final agentLatLng = LatLng(agentLat, agentLng);
+          final name =
+              '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
+          final specialty = agent['specialty'] ?? 'Agent terrain';
+          final distance = agent['distance_km'];
+
+          markers.add(
+            Marker(
+              markerId: MarkerId('agent_${agent['id']}'),
+              position: agentLatLng,
+              infoWindow: InfoWindow(
+                title: name.isNotEmpty ? name : 'Agent',
+                snippet:
+                    '$specialty${distance != null ? ' • ${distance} km' : ''}',
+              ),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                agent['is_verified'] == true
+                    ? BitmapDescriptor.hueGreen
+                    : BitmapDescriptor.hueOrange,
+              ),
             ),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              mission.status == MissionStatus.PENDING
-                  ? BitmapDescriptor.hueOrange
-                  : BitmapDescriptor.hueBlue,
-            ),
-          ),
-        );
+          );
+        }
       }
     }
 
@@ -368,12 +377,12 @@ class _AgentsScreenState extends State<AgentsScreen> {
                     height: 180,
                     child: ListView.separated(
                       scrollDirection: Axis.horizontal,
-                      itemCount: _missions.length,
+                      itemCount: _agents.length,
                       separatorBuilder: (_, __) => const SizedBox(width: 12),
                       itemBuilder: (context, index) {
                         return SizedBox(
                           width: 320,
-                          child: MissionListTile(mission: _missions[index]),
+                          child: AgentListTile(agent: _agents[index]),
                         );
                       },
                     ),
@@ -388,12 +397,21 @@ class _AgentsScreenState extends State<AgentsScreen> {
   }
 }
 
-class MissionListTile extends StatelessWidget {
-  final MissionModel mission;
-  const MissionListTile({super.key, required this.mission});
+class AgentListTile extends StatelessWidget {
+  final Map<String, dynamic> agent;
+  const AgentListTile({super.key, required this.agent});
 
   @override
   Widget build(BuildContext context) {
+    final name =
+        '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
+    final specialty = agent['specialty'] ?? 'Agent terrain';
+    final city = agent['city'] ?? 'Non spécifié';
+    final distance = agent['distance_km'];
+    final reliability = agent['reliability_score'] ?? 100.0;
+    final isVerified = agent['is_verified'] ?? false;
+    final avatarUrl = agent['avatar_url'];
+
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(12),
@@ -411,20 +429,20 @@ class MissionListTile extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 30,
-                child: ClipOval(
-                  child: mission.avatarUrl != null
-                      ? Image.network(
-                          mission.avatarUrl!,
-                          width: 60,
-                          height: 60,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) =>
-                              const Icon(Icons.person, color: Colors.black54),
-                        )
-                      : const Icon(Icons.person, color: Colors.black54),
-                ),
+                backgroundColor: Colors.blue[100],
+                backgroundImage:
+                    avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                child: avatarUrl == null
+                    ? Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : 'A',
+                        style: TextStyle(
+                          color: Colors.blue[700],
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    : null,
               ),
-              if (mission.isVerified)
+              if (isVerified)
                 const CircleAvatar(
                   radius: 10,
                   backgroundColor: Colors.white,
@@ -438,41 +456,39 @@ class MissionListTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  mission.title,
+                  name.isNotEmpty ? name : 'Agent',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
                   ),
                 ),
                 Text(
-                  mission.description,
+                  specialty,
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
                 const SizedBox(height: 5),
                 Row(
                   children: [
-                    const Icon(
-                      Icons.attach_money,
-                      color: Colors.orange,
+                    Icon(
+                      Icons.star,
+                      color: Colors.orange[700],
                       size: 14,
                     ),
                     Text(
-                      "${mission.price.toStringAsFixed(0)} XOF",
+                      "${reliability.toStringAsFixed(0)}%",
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(width: 10),
-                    const Icon(
-                      Icons.location_searching,
+                    Icon(
+                      Icons.location_on,
                       color: Colors.grey,
                       size: 14,
                     ),
                     Text(
-                      mission.status == MissionStatus.PENDING
-                          ? 'Disponible'
-                          : 'En cours',
+                      distance != null ? '${distance} km' : city,
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                   ],
@@ -481,7 +497,12 @@ class MissionListTile extends StatelessWidget {
             ),
           ),
           ElevatedButton(
-            onPressed: () {},
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Contact agent bientôt disponible')),
+              );
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFFFD400),
               foregroundColor: Colors.black,

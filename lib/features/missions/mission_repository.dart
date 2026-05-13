@@ -183,4 +183,59 @@ class MissionRepository {
       rethrow;
     }
   }
+
+  /// Démarre la mission (agent) → IN_PROGRESS + notification WebSocket.
+  Future<MissionModel> startMission(String missionId) async {
+    final response = await _baseClient.post('missions/$missionId/start_mission/');
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Impossible de démarrer la mission');
+    }
+    return MissionModel.fromJson(_extractObjectFromEnvelope(response.data));
+  }
+
+  /// Termine la mission (agent, flux live) → COMPLETED + notification WebSocket.
+  Future<MissionModel> markMissionCompletedLive(String missionId) async {
+    final response =
+        await _baseClient.post('missions/$missionId/mark_completed_live/');
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Impossible de clôturer la mission');
+    }
+    return MissionModel.fromJson(_extractObjectFromEnvelope(response.data));
+  }
+
+  /// Catégories de services (GET /services/categories/).
+  Future<List<Map<String, dynamic>>> fetchServiceCategories() async {
+    try {
+      final response = await _baseClient.get('services/categories/');
+      if (response.statusCode != 200) return [];
+      final body = response.data;
+      if (body is! Map<String, dynamic>) return [];
+      final data = body['data'];
+      if (data is List<dynamic>) {
+        return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+      return [];
+    } catch (e, st) {
+      _logger.e('fetchServiceCategories', error: e, stackTrace: st);
+      return [];
+    }
+  }
+
+  /// Agents vérifiés pour le dashboard (GET /accounts/agents/suggestions/).
+  Future<List<Map<String, dynamic>>> fetchAgentSuggestions() async {
+    try {
+      final response = await _baseClient.get('accounts/agents/suggestions/');
+      if (response.statusCode != 200) return [];
+      final body = response.data;
+      if (body is! Map<String, dynamic>) return [];
+      final data = body['data'];
+      if (data is List<dynamic>) {
+        return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+      return [];
+    } catch (e, st) {
+      _logger.e('fetchAgentSuggestions', error: e, stackTrace: st);
+      return [];
+    }
+  }
 }
