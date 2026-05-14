@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:fonaco/features/client/missions/mission_repository.dart';
 import '../../core/api/base_client.dart';
 import '../../core/models/mission_model.dart';
 import '../../core/mixins/base_screen_state.dart';
-import '../missions/mission_repository.dart';
 import '../../widgets/custom_app_bar.dart';
 
 /// Écran d'ouverture d'un litige depuis le dashboard.

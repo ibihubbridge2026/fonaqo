@@ -12,6 +12,9 @@ abstract final class AppRoutes {
   /// Conteneur principal avec barre inférieure (post-authentification).
   static const mainShell = '/main';
 
+  /// Conteneur principal pour l'interface Agent (post-authentification).
+  static const agentMainShell = '/agent';
+
   /// Sous-écrans profil (pile détail).
   static const profilePersonalInfo = '/profile/personal-info';
   static const profileNotifications = '/profile/notifications';

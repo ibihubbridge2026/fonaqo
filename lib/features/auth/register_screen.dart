@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:fonaco/features/profile/widgets/country_selector.dart';
+import 'package:fonaco/features/client/profile/widgets/country_selector.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/auth_provider.dart';

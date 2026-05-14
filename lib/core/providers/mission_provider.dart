@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/mission_model.dart';
-import '../../features/missions/mission_repository.dart';
+import '../../features/client/missions/mission_repository.dart';
 
 class MissionProvider extends ChangeNotifier {
   final MissionRepository _repository = MissionRepository();

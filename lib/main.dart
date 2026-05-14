@@ -13,6 +13,7 @@ import 'core/providers/auth_provider.dart';
 import 'core/providers/wallet_provider.dart';
 import 'core/providers/mission_provider.dart';
 import 'core/routes/app_routes.dart';
+import 'features/agent/providers/agent_provider.dart';
 
 import 'features/auth/forgot_password_screen.dart';
 import 'features/auth/login_screen.dart';
@@ -21,9 +22,10 @@ import 'features/auth/register_screen.dart';
 import 'features/onboarding/getting_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 
-import 'features/agents/screens/agent_profile_screen.dart';
+import 'features/client/screens/agent_profile_screen.dart' as agents;
 
 import 'widgets/main_wrapper.dart';
+import 'features/agent/screens/agent_main_shell.dart';
 
 import 'features/chat/chat_screen.dart';
 import 'features/chat/screens/chat_list_screen.dart';
@@ -32,25 +34,24 @@ import 'features/chat/screens/chat_detail_screen.dart';
 import 'features/litiges/litige_screen.dart';
 import 'features/events/event_detail_screen.dart';
 
-import 'features/missions/mission_detail_screen.dart';
-import 'features/missions/missions_screen.dart';
+import 'features/client/missions/mission_detail_screen.dart';
+import 'features/client/missions/missions_screen.dart';
 
 import 'features/map/agents_map_screen.dart';
 
-import 'features/notifications/notifications_screen.dart';
+import 'features/client/notifications/notifications_screen.dart';
 
-import 'features/profile/screens/personal_info_screen.dart';
-import 'features/profile/screens/security_settings_screen.dart';
-import 'features/profile/screens/location_settings_screen.dart';
-import 'features/profile/screens/language_screen.dart';
-import 'features/profile/screens/help_center_screen.dart';
-import 'features/profile/screens/notifications_settings_screen.dart';
+import 'features/client/profile/screens/personal_info_screen.dart';
+import 'features/client/profile/screens/security_settings_screen.dart';
+import 'features/client/profile/screens/location_settings_screen.dart';
+import 'features/client/profile/screens/language_screen.dart';
+import 'features/client/profile/screens/help_center_screen.dart';
+import 'features/client/profile/screens/notifications_settings_screen.dart';
 
 import 'features/rating/rating_screen.dart';
 
 // Global navigator key
-final GlobalKey<NavigatorState> navigatorKey =
-    GlobalKey<NavigatorState>();
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 /// Firebase Messaging Initialization
 Future<void> _initializeFirebaseMessaging(Logger log) async {
@@ -82,13 +83,11 @@ Future<void> _initializeFirebaseMessaging(Logger log) async {
 
     // Foreground
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      final title =
-          message.notification?.title ?? 'Nouvelle notification';
+      final title = message.notification?.title ?? 'Nouvelle notification';
 
       final body = message.notification?.body ?? '';
 
-      final fullMessage =
-          body.isNotEmpty ? '$title\n$body' : title;
+      final fullMessage = body.isNotEmpty ? '$title\n$body' : title;
 
       FeedbackService.showInfoGlobal(fullMessage);
 
@@ -119,8 +118,7 @@ Future<void> _initializeFirebaseMessaging(Logger log) async {
 }
 
 void main() async {
-  final widgetsBinding =
-      WidgetsFlutterBinding.ensureInitialized();
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
 
   final log = Logger();
 
@@ -140,16 +138,14 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
 
-  final isFirstTime =
-      prefs.getBool('isFirstTime') ?? true;
+  final isFirstTime = prefs.getBool('isFirstTime') ?? true;
 
   // Vérification session
   final authProvider = AuthProvider();
 
   await authProvider.checkAuth();
 
-  final isLoggedIn =
-      authProvider.isAuthenticated;
+  final isLoggedIn = authProvider.isAuthenticated;
 
   log.d(
     '🚀 FONACO | FirstTime: $isFirstTime '
@@ -184,13 +180,14 @@ class FonacoApp extends StatelessWidget {
         ChangeNotifierProvider.value(
           value: authProvider,
         ),
-
         ChangeNotifierProvider(
           create: (_) => WalletProvider(),
         ),
-
         ChangeNotifierProvider(
           create: (_) => MissionProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => AgentProvider(),
         ),
       ],
       child: Consumer<AuthProvider>(
@@ -208,8 +205,7 @@ class FonacoApp extends StatelessWidget {
                     onAuthChecked: () async {
                       await SplashConfig.removeSplash();
 
-                      final prefs =
-                          await SharedPreferences.getInstance();
+                      final prefs = await SharedPreferences.getInstance();
 
                       await prefs.setBool(
                         'isFirstTime',
@@ -233,99 +229,50 @@ class FonacoApp extends StatelessWidget {
                       }
                     },
                   ),
-
-              AppRoutes.login: (context) =>
-                  const LoginScreen(),
-
-              AppRoutes.register: (context) =>
-                  const RegisterScreen(),
-
+              AppRoutes.login: (context) => const LoginScreen(),
+              AppRoutes.register: (context) => const RegisterScreen(),
               AppRoutes.forgotPassword: (context) =>
                   const ForgotPasswordScreen(),
-
-              AppRoutes.onboarding: (context) =>
-                  const OnboardingScreen(),
-
-              AppRoutes.mainShell: (context) =>
-                  const MainWrapper(),
-
-              AppRoutes.missionDetail: (context) =>
-                  const MissionDetailScreen(),
-
-              AppRoutes.eventDetail: (context) =>
-                  const EventDetailScreen(),
-
-              AppRoutes.litige: (context) =>
-                  const LitigeScreen(),
-
-              AppRoutes.notifications: (context) =>
-                  const NotificationsScreen(),
-
-              AppRoutes.helpCenter: (context) =>
-                  const HelpCenterScreen(),
-
+              AppRoutes.onboarding: (context) => const OnboardingScreen(),
+              AppRoutes.mainShell: (context) => const MainWrapper(),
+              AppRoutes.agentMainShell: (context) => const AgentMainShell(),
+              AppRoutes.missionDetail: (context) => const MissionDetailScreen(),
+              AppRoutes.eventDetail: (context) => const EventDetailScreen(),
+              AppRoutes.litige: (context) => const LitigeScreen(),
+              AppRoutes.notifications: (context) => const NotificationsScreen(),
+              AppRoutes.helpCenter: (context) => const HelpCenterScreen(),
               AppRoutes.profileNotifications: (context) =>
                   const NotificationsSettingsScreen(),
-
-              AppRoutes.profileLanguage: (context) =>
-                  const LanguageScreen(),
-
-              AppRoutes.personalInfo: (context) =>
-                  const PersonalInfoScreen(),
-
+              AppRoutes.profileLanguage: (context) => const LanguageScreen(),
+              AppRoutes.personalInfo: (context) => const PersonalInfoScreen(),
               AppRoutes.securitySettings: (context) =>
                   const SecuritySettingsScreen(),
-
               AppRoutes.profileLocation: (context) =>
                   const LocationSettingsScreen(),
-
-              AppRoutes.rating: (context) =>
-                  const RatingScreen(),
-
-              AppRoutes.chat: (context) =>
-                  const ChatScreen(),
-
-              AppRoutes.chatList: (context) =>
-                  const ChatListScreen(),
-
+              AppRoutes.rating: (context) => const RatingScreen(),
+              AppRoutes.chat: (context) => const ChatScreen(),
+              AppRoutes.chatList: (context) => const ChatListScreen(),
               AppRoutes.chatDetail: (context) {
-                final args =
-                    ModalRoute.of(context)
-                        ?.settings
-                        .arguments;
+                final args = ModalRoute.of(context)?.settings.arguments;
 
                 final mapArgs =
-                    args is Map<String, dynamic>
-                        ? args
-                        : <String, dynamic>{};
+                    args is Map<String, dynamic> ? args : <String, dynamic>{};
 
                 return ChatDetailScreen(
-                  chatId:
-                      mapArgs['chatId']?.toString() ?? '',
-                  userName:
-                      mapArgs['userName']?.toString() ??
-                          'Utilisateur',
+                  chatId: mapArgs['chatId']?.toString() ?? '',
+                  userName: mapArgs['userName']?.toString() ?? 'Utilisateur',
                 );
               },
-
-              AppRoutes.missionsAvailable: (context) =>
-                  MissionsScreen(
-                    showCreateMissionListenable:
-                        ValueNotifier(false),
+              AppRoutes.missionsAvailable: (context) => MissionsScreen(
+                    showCreateMissionListenable: ValueNotifier(false),
                   ),
-
-              AppRoutes.agentsMap: (context) =>
-                  const AgentsMapScreen(),
-
+              AppRoutes.agentsMap: (context) => const AgentsMapScreen(),
               '/agent-profile': (context) {
-                final args =
-                    ModalRoute.of(context)
-                        ?.settings
-                        .arguments as Map<String, dynamic>?;
+                final args = ModalRoute.of(context)?.settings?.arguments
+                    as Map<String, dynamic>?;
 
-                return AgentProfileScreen(
-                  agentId:
-                      args?['agentId']?.toString() ?? '',
+                return agents.AgentProfileScreen(
+                  agentId: args?['agentId']?.toString() ?? '',
                   agent: args?['agent'],
                 );
               },
