@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../widgets/main_wrapper.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/mission_provider.dart';
+import '../../../core/services/feedback_service.dart';
 import '../mission_repository.dart';
 import '../widgets/create_mission_step_type.dart';
 import '../widgets/create_mission_step_details.dart';
@@ -152,12 +153,7 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
         ),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Mission créée (sans FeexPay).'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      FeedbackService.showSuccess(context, 'Mission créée avec succès.');
 
       // Rafraîchir explicitement les missions avant de retourner à l'accueil
       if (mounted) {
@@ -174,12 +170,7 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Échec création : $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      FeedbackService.showError(context, e);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }

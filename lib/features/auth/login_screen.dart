@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 
-import '../../core/routes/app_routes.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/routes/app_routes.dart';
+import '../../core/services/feedback_service.dart';
 import '../../core/models/country_model.dart' as country_model;
 import 'widgets/input_card.dart';
 import 'widgets/phone_input_card.dart';
@@ -22,8 +23,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isPasswordVisible = false;
 
   country_model.Country _country = country_model
-      .Country
-      .defaultCountry; // Bénin par défaut pour l'Afrique de l'Ouest
+      .Country.defaultCountry; // Bénin par défaut pour l'Afrique de l'Ouest
   final bool _usePhone = true; // Téléphone par défaut pour l'Afrique
 
   Future<void> _handleLogin() async {
@@ -33,12 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _password.text;
 
     if (identifier.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez remplir tous les champs'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      FeedbackService.showError(context, 'Veuillez remplir tous les champs');
       return;
     }
 
@@ -55,9 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showErrorSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
+    FeedbackService.showError(context, message);
   }
 
   @override
@@ -319,10 +312,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             height: 56,
                             child: OutlinedButton.icon(
                               onPressed: () async {
-                                final authProvider = context
-                                    .read<AuthProvider>();
-                                final success = await authProvider
-                                    .signInWithGoogle();
+                                final authProvider =
+                                    context.read<AuthProvider>();
+                                final success =
+                                    await authProvider.signInWithGoogle();
                                 if (success && mounted) {
                                   Navigator.pushReplacementNamed(
                                     context,

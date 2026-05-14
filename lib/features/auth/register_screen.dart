@@ -35,18 +35,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  // Fonction pour rendre l'erreur "humaine"
+  // Fonction pour rendre l'erreur "humaine" (utilise le ErrorMapper du provider)
   String _cleanError(String error) {
-    if (error.contains('duplicate key') || error.contains('already exists')) {
-      return "Ce numéro ou cet email est déjà utilisé.";
-    }
-    if (error.contains('500') || error.contains('Internal Server Error')) {
-      return "Service momentanément indisponible (500).";
-    }
-    if (error.contains('network_error')) {
-      return "Vérifiez votre connexion internet.";
-    }
-    return "Une erreur est survenue lors de l'inscription.";
+    // Utiliser le formatage standard du AuthProvider
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    return authProvider.formatErrorMessage(error);
   }
 
   Future<void> _register() async {

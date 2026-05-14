@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+import 'core/services/feedback_service.dart';
+
 import 'core/providers/auth_provider.dart';
 import 'core/providers/wallet_provider.dart';
 import 'core/providers/mission_provider.dart';
@@ -33,6 +35,9 @@ import 'features/profile/screens/location_settings_screen.dart';
 import 'features/profile/screens/language_screen.dart';
 import 'features/profile/screens/help_center_screen.dart';
 import 'features/rating/rating_screen.dart';
+
+// GlobalKey pour accéder au contexte depuis n'importe où
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 /// Initialise Firebase Cloud Messaging et configure les listeners
 Future<void> _initializeFirebaseMessaging(Logger log) async {
@@ -68,9 +73,15 @@ Future<void> _initializeFirebaseMessaging(Logger log) async {
       log.i(
           '📨 Notification reçue en premier plan: ${message.notification?.title}');
 
-      // Afficher uneSnackBar pour confirmer la réception
-      // Note: Ceci est juste pour le debug, en production on utilisera une notification locale
-      _showNotificationDebug(message, log);
+      // Afficher un toast élégant avec FeedbackService global
+      final title = message.notification?.title ?? 'Nouvelle notification';
+      final body = message.notification?.body ?? '';
+      final fullMessage = body.isNotEmpty ? '$title\n$body' : title;
+
+      FeedbackService.showInfoGlobal(fullMessage);
+
+      // Log pour debug
+      print('🔔 Notification foreground: $title');
     });
 
     // Listener pour les messages quand l'app est en arrière-plan mais ouverte
@@ -110,6 +121,9 @@ void main() async {
 
     // 2. Initialisation de Firebase Cloud Messaging
     await _initializeFirebaseMessaging(log);
+
+    // 3. Initialiser le navigatorKey dans FeedbackService
+    FeedbackService.navigatorKey = navigatorKey;
   } catch (e) {
     log.e('❌ Échec initialisation Firebase : $e');
     // On continue quand même, mais les notifications ne marcheront pas
@@ -162,6 +176,8 @@ class FonacoApp extends StatelessWidget {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'FONACO',
+            navigatorKey:
+                navigatorKey, // GlobalKey pour accès global au contexte
             theme: ThemeData(useMaterial3: true),
             initialRoute: _getInitialRoute(),
             routes: {

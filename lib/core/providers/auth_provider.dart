@@ -9,6 +9,7 @@ import 'package:dio/dio.dart';
 import '../api/base_client.dart';
 import '../models/user_model.dart';
 import '../services/notification_service.dart';
+import '../services/feedback_service.dart';
 
 /// Provider pour gérer l'état d'authentification
 class AuthProvider extends ChangeNotifier {
@@ -69,68 +70,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Affiche une SnackBar moderne avec le message d'erreur
+  /// Affiche une erreur avec le nouveau système de feedback
   void showErrorSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.red.shade50,
-        elevation: 0,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        content: Row(
-          children: [
-            Icon(Icons.error_outline, color: Colors.red.shade600, size: 20),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: Colors.red.shade800,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        duration: const Duration(seconds: 4),
-      ),
-    );
+    FeedbackService.showError(context, message);
   }
 
-  /// Affiche une SnackBar de succès moderne
+  /// Affiche un succès avec le nouveau système de feedback
   void showSuccessSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.green.shade50,
-        elevation: 0,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        content: Row(
-          children: [
-            Icon(
-              Icons.check_circle_outline,
-              color: Colors.green.shade600,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: Colors.green.shade800,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-        duration: const Duration(seconds: 3),
-      ),
-    );
+    FeedbackService.showSuccess(context, message);
   }
 
   void _clearError() {
@@ -298,15 +245,50 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      // Connexion automatique après inscription
-      final loginData = {
-        'phone_number': userData['phone_number'],
-        'password': userData['password'],
-      };
+      final responseData = response.data as Map<String, dynamic>;
 
-      final loginSuccess = await login(loginData);
+      final data = responseData['data'] as Map<String, dynamic>?;
 
-      return loginSuccess;
+      final accessToken = data?['access_token'] as String?;
+
+      final refreshToken = data?['refresh_token'] as String?;
+
+      final userDataResponse = data?['user'] as Map<String, dynamic>?;
+
+      if (accessToken == null ||
+          refreshToken == null ||
+          userDataResponse == null) {
+        _setError('Données manquantes dans la réponse d\'inscription');
+
+        return false;
+      }
+
+      // Forcer le nettoyage des anciens tokens
+      await _secureStorage.deleteAll();
+
+      _logger.d('Inscription réussie à ${DateTime.now().toIso8601String()}');
+
+      // Sauvegarder les tokens
+      await _secureStorage.write(key: _tokenKey, value: accessToken);
+      await _secureStorage.write(key: 'refresh_token', value: refreshToken);
+
+      // Sauvegarder les données utilisateur
+      await _secureStorage.write(
+          key: _userKey, value: jsonEncode(userDataResponse));
+
+      // Créer le user model
+      final user = UserModel.fromJson(userDataResponse);
+
+      _currentUser = user;
+
+      _isAuthenticated = true;
+
+      // Envoyer le FCM token au backend après inscription réussie
+      await NotificationService().sendTokenToBackend(accessToken);
+
+      notifyListeners();
+
+      return true;
     } catch (e) {
       _logger.e('Erreur REGISTER: ${e.toString()}');
 
@@ -557,12 +539,38 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> refreshToken() async {
     try {
-      await Future.delayed(const Duration(seconds: 2));
+      // Récupérer le refresh token depuis le secure storage
+      final refreshToken = await _secureStorage.read(key: 'refresh_token');
 
-      return true;
+      if (refreshToken == null || refreshToken.isEmpty) {
+        _logger.w('Refresh token manquant');
+        return false;
+      }
+
+      final response = await _baseClient.post(
+        'accounts/token/refresh/',
+        data: {'refresh': refreshToken},
+      );
+
+      _logger.d('REFRESH TOKEN STATUS CODE: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final responseData = response.data as Map<String, dynamic>;
+        final newAccessToken = responseData['access'] as String?;
+
+        if (newAccessToken != null) {
+          // Sauvegarder le nouveau access token
+          await _secureStorage.write(key: _tokenKey, value: newAccessToken);
+          _logger.i('✅ Access token rafraîchi avec succès');
+          return true;
+        }
+      }
+
+      _logger.w('Échec du rafraîchissement du token');
+      return false;
     } catch (e) {
+      _logger.e('Erreur refreshToken: ${e.toString()}');
       _setError('Erreur rafraîchissement token');
-
       return false;
     }
   }
@@ -573,6 +581,20 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> checkAuth() async {
     await _loadUserData();
+
+    // Si on a un token, vérifions sa validité
+    if (_isAuthenticated) {
+      final token = await _secureStorage.read(key: _tokenKey);
+      if (token != null && token.isNotEmpty) {
+        // Tenter de rafraîchir le token pour vérifier sa validité
+        final refreshSuccess = await refreshToken();
+        if (!refreshSuccess) {
+          // Le refresh a échoué, le token est invalide
+          _logger.w('Token invalide, déconnexion');
+          await logout();
+        }
+      }
+    }
   }
 
   // =========================

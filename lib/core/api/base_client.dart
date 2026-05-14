@@ -278,6 +278,8 @@ class _AuthInterceptor extends Interceptor {
   final Dio _dio; // Ajout de l'instance Dio
   final Function()? onTokenExpired;
   static const String _tokenKey = 'jwt_token';
+  static const String _refreshTokenKey = 'refresh_token';
+  bool _isRefreshing = false;
 
   _AuthInterceptor(this._secureStorage, this._logger, this._dio,
       {this.onTokenExpired});
@@ -286,7 +288,8 @@ class _AuthInterceptor extends Interceptor {
     return path.contains('accounts/login/') ||
         path.contains('accounts/register/') ||
         path.contains('accounts/forgot-password/') ||
-        path.contains('accounts/google-auth/');
+        path.contains('accounts/google-auth/') ||
+        path.contains('accounts/token/refresh/');
   }
 
   @override
@@ -307,19 +310,81 @@ class _AuthInterceptor extends Interceptor {
   }
 
   @override
-  void onError(DioException err, ErrorInterceptorHandler handler) {
-    if (err.response?.statusCode == 401) {
+  void onError(DioException err, ErrorInterceptorHandler handler) async {
+    if (err.response?.statusCode == 401 &&
+        !_isPublicPath(err.requestOptions.path)) {
       final responseData = err.response?.data;
 
-      // Token expiré ou invalide - nettoyer et rediriger vers login
-      _logger.w('JWT expiré ou invalide : suppression du stockage token');
-      _secureStorage.delete(key: _tokenKey);
-      _secureStorage.delete(key: 'user_data');
+      // Éviter les boucles infinies de refresh
+      if (_isRefreshing) {
+        _logger.w('Refresh déjà en cours, suppression des tokens');
+        await _clearTokens();
+        onTokenExpired?.call();
+        handler.next(err);
+        return;
+      }
 
-      // Notifier l'application pour rediriger vers l'écran de login
-      onTokenExpired?.call();
+      _isRefreshing = true;
+
+      try {
+        // Tenter de rafraîchir le token
+        final refreshToken = await _secureStorage.read(key: _refreshTokenKey);
+
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          final refreshResponse = await _dio.post(
+            'accounts/token/refresh/',
+            data: {'refresh': refreshToken},
+            options: Options(
+              headers: {'Content-Type': 'application/json'},
+            ),
+          );
+
+          if (refreshResponse.statusCode == 200) {
+            final newAccessToken = refreshResponse.data['access'] as String?;
+
+            if (newAccessToken != null) {
+              // Sauvegarder le nouveau token
+              await _secureStorage.write(key: _tokenKey, value: newAccessToken);
+              _logger.i('✅ Token rafraîchi avec succès');
+
+              // Retenter la requête originale avec le nouveau token
+              final originalOptions = err.requestOptions;
+              originalOptions.headers['Authorization'] =
+                  'Bearer $newAccessToken';
+
+              try {
+                final retryResponse = await _dio.fetch(originalOptions);
+                _isRefreshing = false;
+                handler.resolve(retryResponse);
+                return;
+              } catch (retryError) {
+                _logger.e('Échec de la retry: ${retryError.toString()}');
+              }
+            }
+          }
+        }
+
+        // Si le refresh a échoué, nettoyer les tokens
+        _logger
+            .w('JWT expiré et refresh échoué : suppression du stockage token');
+        await _clearTokens();
+        onTokenExpired?.call();
+      } catch (refreshError) {
+        _logger.e('Erreur lors du refresh: ${refreshError.toString()}');
+        await _clearTokens();
+        onTokenExpired?.call();
+      } finally {
+        _isRefreshing = false;
+      }
     }
+
     handler.next(err);
+  }
+
+  Future<void> _clearTokens() async {
+    await _secureStorage.delete(key: _tokenKey);
+    await _secureStorage.delete(key: _refreshTokenKey);
+    await _secureStorage.delete(key: 'user_data');
   }
 }
 
