@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
@@ -90,17 +91,29 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      Map<String, dynamic> profileData = {
-        'first_name': _firstName.text.trim(),
-        'last_name': _lastName.text.trim(),
-      };
+      dynamic profileData;
 
-      // Add image if selected
       if (_profileImage != null) {
+<<<<<<< HEAD
         final avatarUrl = await authProvider.uploadProfileImage(_profileImage!);
         if (avatarUrl != null) {
           profileData['avatar_url'] = avatarUrl;
         }
+=======
+        profileData = FormData.fromMap({
+          'first_name': _firstName.text.trim(),
+          'last_name': _lastName.text.trim(),
+          'profile_picture': await MultipartFile.fromFile(
+            _profileImage!.path,
+            filename: 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
+          ),
+        });
+      } else {
+        profileData = {
+          'first_name': _firstName.text.trim(),
+          'last_name': _lastName.text.trim(),
+        };
+>>>>>>> baf250f (mmisse a jour ddu gradle)
       }
 
       final success = await authProvider.updateProfile(profileData);

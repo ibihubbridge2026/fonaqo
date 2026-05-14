@@ -48,6 +48,9 @@ abstract final class AppRoutes {
   /// Centre d'aide
   static const String helpCenter = '/profile/help';
 
+  /// Carte des agents
+  static const String agentsMap = '/agents-map';
+
   /// Paramètres de notifications
   static const String notificationsSettings = '/notifications-settings';
 

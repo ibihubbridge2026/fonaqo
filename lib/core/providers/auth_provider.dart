@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
@@ -16,6 +18,7 @@ class AuthProvider extends ChangeNotifier {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
   static const String _tokenKey = 'jwt_token';
+  static const String _refreshTokenKey = 'jwt_refresh_token';
   static const String _userKey = 'user_data';
 
   final Logger _logger = Logger();
@@ -179,13 +182,18 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
+      final refreshToken = data?['refresh_token'] as String?;
+
       // Forcer le nettoyage des anciens tokens
       await _secureStorage.deleteAll();
 
       _logger.d('Connexion réussie à ${DateTime.now().toIso8601String()}');
 
-      // Sauvegarder le token
+      // Sauvegarder les tokens
       await _secureStorage.write(key: _tokenKey, value: accessToken);
+      if (refreshToken != null) {
+        await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
+      }
 
       // Sauvegarder les données utilisateur
       await _secureStorage.write(key: _userKey, value: jsonEncode(userData));
@@ -351,28 +359,24 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
 
     try {
-      // TODO: Implémenter l'authentification Google avec Firebase Auth
-      // Pour l'instant, nous allons simuler le processus
+      // Étape 1: Authentifier avec Google Sign-In
+      final GoogleSignIn googleSignIn =
+          GoogleSignIn(scopes: ['email', 'profile']);
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
 
-      // Étape 1: Authentifier avec Firebase (à implémenter)
-      // final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      // final GoogleSignInAuthentication? googleAuth = await googleUser?.authentication;
-      // final credential = GoogleAuthProvider.credential(
-      //   accessToken: googleAuth?.accessToken,
-      //   idToken: googleAuth?.idToken,
-      // );
-      // final userCredential = await _firebaseAuth.signInWithCredential(credential);
-
-      // Simulation pour le développement
-      await Future.delayed(const Duration(seconds: 2));
+      if (googleUser == null) {
+        // L'utilisateur a annulé
+        _setLoading(false);
+        return false;
+      }
 
       // Étape 2: Envoyer les informations à notre backend Django
       final response = await _baseClient.post(
         'accounts/google-auth/',
         data: {
-          'email': 'test@example.com', // TODO: Remplacer par l'email Google
-          'name': 'Test User', // TODO: Remplacer par le nom Google
-          'google_id': 'google_id_123', // TODO: Remplacer par l'ID Google
+          'email': googleUser.email,
+          'name': googleUser.displayName ?? '',
+          'google_id': googleUser.id,
         },
       );
 
@@ -395,9 +399,14 @@ class AuthProvider extends ChangeNotifier {
       if (responseData['status'] == 'success') {
         final userData = responseData['data']['user'];
         final accessToken = responseData['data']['access_token'];
+        final refreshToken = responseData['data']['refresh_token'];
 
-        // Sauvegarder le token et les données utilisateur
+        // Sauvegarder les tokens et les données utilisateur
         await _secureStorage.write(key: _tokenKey, value: accessToken);
+        if (refreshToken != null) {
+          await _secureStorage.write(
+              key: _refreshTokenKey, value: refreshToken);
+        }
         final userMap = Map<String, dynamic>.from(userData as Map);
         await _secureStorage.write(key: _userKey, value: jsonEncode(userMap));
 
@@ -440,7 +449,7 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       await _secureStorage.delete(key: _tokenKey);
-
+      await _secureStorage.delete(key: _refreshTokenKey);
       await _secureStorage.delete(key: _userKey);
 
       _currentUser = null;
@@ -539,6 +548,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> refreshToken() async {
     try {
+<<<<<<< HEAD
       // Récupérer le refresh token depuis le secure storage
       final refreshToken = await _secureStorage.read(key: 'refresh_token');
 
@@ -570,6 +580,32 @@ class AuthProvider extends ChangeNotifier {
       return false;
     } catch (e) {
       _logger.e('Erreur refreshToken: ${e.toString()}');
+=======
+      final storedRefreshToken =
+          await _secureStorage.read(key: _refreshTokenKey);
+      if (storedRefreshToken == null) {
+        _logger.w('Pas de refresh token stocké');
+        return false;
+      }
+
+      final response = await _baseClient.post(
+        'accounts/token/refresh/',
+        data: {'refresh': storedRefreshToken},
+      );
+
+      if (response.statusCode == 200) {
+        final responseData = response.data as Map<String, dynamic>;
+        final newAccessToken = responseData['access'] as String?;
+        if (newAccessToken != null) {
+          await _secureStorage.write(key: _tokenKey, value: newAccessToken);
+          _logger.i('Token rafraîchi avec succès');
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      _logger.e('Erreur rafraîchissement token: $e');
+>>>>>>> baf250f (mmisse a jour ddu gradle)
       _setError('Erreur rafraîchissement token');
       return false;
     }
@@ -691,7 +727,7 @@ class AuthProvider extends ChangeNotifier {
   // UPDATE PROFILE
   // =========================
 
-  Future<bool> updateProfile(Map<String, dynamic> profileData) async {
+  Future<bool> updateProfile(dynamic profileData) async {
     _clearError();
     _setLoading(true);
 
@@ -699,6 +735,9 @@ class AuthProvider extends ChangeNotifier {
       final response = await _baseClient.patch(
         'accounts/profile/',
         data: profileData,
+        options: profileData is FormData
+            ? Options(contentType: 'multipart/form-data')
+            : null,
       );
 
       _logger.d('UPDATE PROFILE STATUS CODE: ${response.statusCode}');

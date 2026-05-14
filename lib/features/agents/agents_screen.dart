@@ -54,8 +54,16 @@ class _AgentsScreenState extends State<AgentsScreen> {
     setState(() => _isLoadingAgents = true);
 
     try {
+<<<<<<< HEAD
       // Récupérer les agents depuis l'API
       final agents = await _missionRepository.fetchAgentSuggestions();
+=======
+      // Récupérer les coordonnées utilisateur pour le filtrage par distance
+      final agents = await _missionRepository.fetchAgentSuggestions(
+        latitude: _currentLatLng?.latitude,
+        longitude: _currentLatLng?.longitude,
+      );
+>>>>>>> baf250f (mmisse a jour ddu gradle)
       if (mounted) {
         setState(() {
           _agents = agents;
@@ -175,6 +183,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
     final markers = <Marker>[];
     final agentsToShow = _filteredAgents;
 
+<<<<<<< HEAD
     // Ajouter le marqueur bleu pour la position de l'utilisateur
     markers.add(
       Marker(
@@ -205,6 +214,18 @@ class _AgentsScreenState extends State<AgentsScreen> {
             agentLat.abs() <= 90 &&
             agentLng.abs() <= 180) {
           // Validation des coordonnées
+=======
+    // Créer des marqueurs pour les agents disponibles
+    for (var i = 0; i < _agents.length; i++) {
+      final agent = _agents[i];
+
+      // Vérifier si l'agent a des coordonnées
+      if (agent['latitude'] != null && agent['longitude'] != null) {
+        final agentLat = double.tryParse(agent['latitude'].toString());
+        final agentLng = double.tryParse(agent['longitude'].toString());
+
+        if (agentLat != null && agentLng != null) {
+>>>>>>> baf250f (mmisse a jour ddu gradle)
           final agentLatLng = LatLng(agentLat, agentLng);
           final name =
               '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
@@ -222,6 +243,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
               ),
               icon: BitmapDescriptor.defaultMarkerWithHue(
                 agent['is_verified'] == true
+<<<<<<< HEAD
                     ? BitmapDescriptor.hueYellow
                     : BitmapDescriptor.hueOrange,
               ),
@@ -229,6 +251,11 @@ class _AgentsScreenState extends State<AgentsScreen> {
                 // Mettre à jour la liste pour sélectionner l'agent correspondant
                 _onAgentMarkerTapped(agent);
               },
+=======
+                    ? BitmapDescriptor.hueGreen
+                    : BitmapDescriptor.hueOrange,
+              ),
+>>>>>>> baf250f (mmisse a jour ddu gradle)
             ),
           );
         }
@@ -411,6 +438,30 @@ class _AgentsScreenState extends State<AgentsScreen> {
                         ),
                       ),
                     ),
+<<<<<<< HEAD
+=======
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Agents proches',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 180,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _agents.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        return SizedBox(
+                          width: 320,
+                          child: AgentListTile(agent: _agents[index]),
+                        );
+                      },
+                    ),
+                  ),
+>>>>>>> baf250f (mmisse a jour ddu gradle)
                 ],
               ),
             ),
@@ -628,6 +679,7 @@ class AgentListTile extends StatelessWidget {
                       color: Colors.orange[700],
                       size: 14,
                     ),
+<<<<<<< HEAD
                     Flexible(
                       child: Text(
                         "${reliability.toStringAsFixed(0)}%",
@@ -636,6 +688,13 @@ class AgentListTile extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                         overflow: TextOverflow.ellipsis,
+=======
+                    Text(
+                      "${reliability.toStringAsFixed(0)}%",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+>>>>>>> baf250f (mmisse a jour ddu gradle)
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -644,6 +703,7 @@ class AgentListTile extends StatelessWidget {
                       color: Colors.grey,
                       size: 14,
                     ),
+<<<<<<< HEAD
                     Flexible(
                       child: Text(
                         distance != null ? '${distance} km' : city,
@@ -651,12 +711,18 @@ class AgentListTile extends StatelessWidget {
                             const TextStyle(fontSize: 12, color: Colors.grey),
                         overflow: TextOverflow.ellipsis,
                       ),
+=======
+                    Text(
+                      distance != null ? '${distance} km' : city,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+>>>>>>> baf250f (mmisse a jour ddu gradle)
                     ),
                   ],
                 ),
               ],
             ),
           ),
+<<<<<<< HEAD
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -685,6 +751,21 @@ class AgentListTile extends StatelessWidget {
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
                   ),
                 ),
+=======
+          ElevatedButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                    content: Text('Contact agent bientôt disponible')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFD400),
+              foregroundColor: Colors.black,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+>>>>>>> baf250f (mmisse a jour ddu gradle)
               ),
               const SizedBox(height: 6),
               // Bouton Contacter

@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/models/mission_model.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/models/mission_model.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../widgets/main_wrapper.dart';
+<<<<<<< HEAD
 import '../missions/mission_repository.dart';
+=======
+import 'mission_repository.dart';
+>>>>>>> baf250f (mmisse a jour ddu gradle)
 import 'screens/create_mission_screen.dart';
 
 class MissionsScreen extends StatefulWidget {
@@ -20,6 +25,7 @@ class MissionsScreen extends StatefulWidget {
 }
 
 class _MissionsScreenState extends State<MissionsScreen> {
+<<<<<<< HEAD
   final MissionRepository _missionRepository = MissionRepository();
   List<MissionModel> _allMissions = [];
   List<MissionModel> _filteredMissions = [];
@@ -27,11 +33,19 @@ class _MissionsScreenState extends State<MissionsScreen> {
   String _selectedFilter = "Toutes";
 
   final List<String> _filters = ["Toutes", "En cours", "Terminées", "Annulées"];
+=======
+  final MissionRepository _repo = MissionRepository();
+  List<MissionModel> _missions = [];
+  bool _loading = true;
+  String? _error;
+  String _filter = 'all'; // all, ongoing, completed, cancelled
+>>>>>>> baf250f (mmisse a jour ddu gradle)
 
   @override
   void initState() {
     super.initState();
     _loadMissions();
+<<<<<<< HEAD
   }
 
   @override
@@ -70,6 +84,51 @@ class _MissionsScreenState extends State<MissionsScreen> {
     switch (_selectedFilter) {
       case "En cours":
         _filteredMissions = _allMissions
+=======
+    // Listen to create mode changes to refresh when coming back
+    widget.showCreateMissionListenable.addListener(_onCreateModeChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.showCreateMissionListenable.removeListener(_onCreateModeChanged);
+    super.dispose();
+  }
+
+  void _onCreateModeChanged() {
+    // When switching back from create mode, refresh
+    if (!widget.showCreateMissionListenable.value) {
+      _loadMissions();
+    }
+  }
+
+  Future<void> _loadMissions() async {
+    if (!mounted) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final missions = await _repo.fetchMissionsList();
+      if (!mounted) return;
+      setState(() {
+        _missions = missions;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  List<MissionModel> get _filteredMissions {
+    switch (_filter) {
+      case 'ongoing':
+        return _missions
+>>>>>>> baf250f (mmisse a jour ddu gradle)
             .where((m) =>
                 m.status == MissionStatus.PENDING ||
                 m.status == MissionStatus.ACCEPTED ||
@@ -77,6 +136,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
                 m.status == MissionStatus.ARRIVED ||
                 m.status == MissionStatus.IN_PROGRESS)
             .toList();
+<<<<<<< HEAD
         break;
       case "Terminées":
         _filteredMissions = _allMissions
@@ -92,6 +152,20 @@ class _MissionsScreenState extends State<MissionsScreen> {
       default:
         _filteredMissions = List.from(_allMissions);
         break;
+=======
+      case 'completed':
+        return _missions
+            .where((m) => m.status == MissionStatus.COMPLETED)
+            .toList();
+      case 'cancelled':
+        return _missions
+            .where((m) =>
+                m.status == MissionStatus.CANCELLED ||
+                m.status == MissionStatus.DISPUTED)
+            .toList();
+      default:
+        return _missions;
+>>>>>>> baf250f (mmisse a jour ddu gradle)
     }
   }
 
@@ -109,6 +183,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
           );
         }
 
+<<<<<<< HEAD
         return ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
           children: [
@@ -184,6 +259,104 @@ class _MissionsScreenState extends State<MissionsScreen> {
                 ),
               ),
           ],
+=======
+        final filtered = _filteredMissions;
+
+        return RefreshIndicator(
+          onRefresh: _loadMissions,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+            children: [
+              const Text("Mes Missions",
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 16),
+              const MissionsPromoQueueCard(),
+              const SizedBox(height: 14),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: () =>
+                          MainShellScope.maybeOf(context)?.openCreateMission(),
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text("CRÉER"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFFD400),
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20)),
+                        elevation: 0,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _CategoryChip(
+                      label: "Toutes",
+                      isActive: _filter == 'all',
+                      onTap: () => setState(() => _filter = 'all'),
+                    ),
+                    _CategoryChip(
+                      label: "En cours",
+                      isActive: _filter == 'ongoing',
+                      onTap: () => setState(() => _filter = 'ongoing'),
+                    ),
+                    _CategoryChip(
+                      label: "Terminées",
+                      isActive: _filter == 'completed',
+                      onTap: () => setState(() => _filter = 'completed'),
+                    ),
+                    _CategoryChip(
+                      label: "Annulées",
+                      isActive: _filter == 'cancelled',
+                      onTap: () => setState(() => _filter = 'cancelled'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
+                    children: [
+                      Text(_error!,
+                          style:
+                              TextStyle(color: Colors.red[700], fontSize: 13)),
+                      const SizedBox(height: 8),
+                      TextButton(
+                          onPressed: _loadMissions,
+                          child: const Text('Réessayer')),
+                    ],
+                  ),
+                )
+              else if (filtered.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(
+                    child: Text('Aucune mission',
+                        style: TextStyle(color: Colors.grey, fontSize: 15)),
+                  ),
+                )
+              else
+                ...filtered.map((m) => MissionCard(
+                      title: m.title,
+                      type: m.description,
+                      status: m.statusDisplay,
+                      time: m.timeAgo,
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.missionDetail,
+                        arguments: {'missionId': m.id},
+                      ),
+                    )),
+            ],
+          ),
+>>>>>>> baf250f (mmisse a jour ddu gradle)
         );
       },
     );
@@ -195,11 +368,16 @@ class _CategoryChip extends StatelessWidget {
   final bool isActive;
   final VoidCallback? onTap;
 
+<<<<<<< HEAD
   const _CategoryChip({
     required this.label,
     required this.isActive,
     this.onTap,
   });
+=======
+  const _CategoryChip(
+      {required this.label, required this.isActive, this.onTap});
+>>>>>>> baf250f (mmisse a jour ddu gradle)
 
   @override
   Widget build(BuildContext context) {

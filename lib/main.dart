@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:fonaco/core/config/splash_config.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
+<<<<<<< HEAD
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import 'core/services/feedback_service.dart';
+=======
+>>>>>>> baf250f (mmisse a jour ddu gradle)
 
 import 'core/providers/auth_provider.dart';
 import 'core/providers/wallet_provider.dart';
@@ -26,14 +30,15 @@ import 'features/chat/screens/chat_detail_screen.dart';
 import 'features/litiges/litige_screen.dart';
 import 'features/events/event_detail_screen.dart';
 import 'features/missions/mission_detail_screen.dart';
-import 'features/missions/screens/mission_tracking_screen.dart';
 import 'features/missions/missions_screen.dart';
+import 'features/map/agents_map_screen.dart';
 import 'features/notifications/notifications_screen.dart';
 import 'features/profile/screens/personal_info_screen.dart';
 import 'features/profile/screens/security_settings_screen.dart';
 import 'features/profile/screens/location_settings_screen.dart';
 import 'features/profile/screens/language_screen.dart';
 import 'features/profile/screens/help_center_screen.dart';
+import 'features/profile/screens/notifications_settings_screen.dart';
 import 'features/rating/rating_screen.dart';
 
 // GlobalKey pour accéder au contexte depuis n'importe où
@@ -133,6 +138,12 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
   final isFirstTime = prefs.getBool('isFirstTime') ?? true;
+<<<<<<< HEAD
+=======
+  const secureStorage = FlutterSecureStorage();
+  final token = await secureStorage.read(key: 'jwt_token');
+  final isLoggedIn = token != null;
+>>>>>>> baf250f (mmisse a jour ddu gradle)
 
   log.d('🚀 Démarrage FONACO | FirstTime: $isFirstTime');
 
@@ -207,20 +218,12 @@ class FonacoApp extends StatelessWidget {
               AppRoutes.onboarding: (context) => const OnboardingScreen(),
               AppRoutes.mainShell: (context) => const MainWrapper(),
               AppRoutes.missionDetail: (context) => const MissionDetailScreen(),
-              AppRoutes.missionTracking: (context) {
-                final args = ModalRoute.of(context)?.settings.arguments;
-                final id = args is Map ? args['missionId']?.toString() : null;
-                if (id == null || id.isEmpty) {
-                  return const Scaffold(
-                    body: Center(child: Text('Mission introuvable')),
-                  );
-                }
-                return MissionTrackingScreen(missionId: id);
-              },
               AppRoutes.eventDetail: (context) => const EventDetailScreen(),
               AppRoutes.litige: (context) => const LitigeScreen(),
               AppRoutes.notifications: (context) => const NotificationsScreen(),
               AppRoutes.helpCenter: (context) => const HelpCenterScreen(),
+              AppRoutes.profileNotifications: (context) =>
+                  const NotificationsSettingsScreen(),
               AppRoutes.profileLanguage: (context) => const LanguageScreen(),
               AppRoutes.personalInfo: (context) => const PersonalInfoScreen(),
               AppRoutes.securitySettings: (context) =>
@@ -230,13 +233,21 @@ class FonacoApp extends StatelessWidget {
               AppRoutes.rating: (context) => const RatingScreen(),
               AppRoutes.chat: (context) => const ChatScreen(),
               AppRoutes.chatList: (context) => const ChatListScreen(),
-              AppRoutes.chatDetail: (context) => const ChatDetailScreen(
-                    chatId: '',
-                    userName: '',
-                  ),
+              AppRoutes.chatDetail: (context) {
+                final args = ModalRoute.of(context)?.settings.arguments;
+                final chatId =
+                    args is Map ? args['chatId']?.toString() ?? '' : '';
+                final userName =
+                    args is Map ? args['userName']?.toString() ?? '' : '';
+                return ChatDetailScreen(
+                  chatId: chatId,
+                  userName: userName,
+                );
+              },
               AppRoutes.missionsAvailable: (context) => MissionsScreen(
                     showCreateMissionListenable: ValueNotifier(false),
                   ),
+<<<<<<< HEAD
               '/agent-profile': (context) {
                 final args = ModalRoute.of(context)?.settings.arguments
                     as Map<String, dynamic>?;
@@ -245,6 +256,9 @@ class FonacoApp extends StatelessWidget {
                   agent: args?['agent'],
                 );
               },
+=======
+              AppRoutes.agentsMap: (context) => const AgentsMapScreen(),
+>>>>>>> baf250f (mmisse a jour ddu gradle)
             },
           );
         },

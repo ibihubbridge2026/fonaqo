@@ -2,23 +2,18 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logger/logger.dart';
 
+import '../config/api_config.dart';
+
 /// Client HTTP centralisé pour toutes les appels API
 /// Utilise Dio avec intercepteurs pour authentification et logging
 class BaseClient {
   /// Base API (suffixe /api/v1/). Les chemins passés à Dio sont relatifs, ex. `accounts/login/`.
-  /// Émulateur Android : http://10.0.2.2:8000/api/v1/
-  static const String _baseUrl = 'http://192.168.1.73:8000/api/v1/';
+  static String get _baseUrl => ApiConfig.baseUrl;
   static const Duration _connectTimeout = Duration(seconds: 30);
   static const Duration _receiveTimeout = Duration(seconds: 30);
 
   /// Hôte et port du serveur (ex. `192.168.1.73:8000`) pour WebSockets `ws://…`.
-  static String get apiHostAndPort {
-    final u = Uri.parse(_baseUrl);
-    if (u.hasPort) {
-      return '${u.host}:${u.port}';
-    }
-    return u.host;
-  }
+  static String get apiHostAndPort => ApiConfig.wsHost;
 
   late final Dio _dio;
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
@@ -313,6 +308,7 @@ class _AuthInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401 &&
         !_isPublicPath(err.requestOptions.path)) {
+<<<<<<< HEAD
       final responseData = err.response?.data;
 
       // Éviter les boucles infinies de refresh
@@ -361,9 +357,28 @@ class _AuthInterceptor extends Interceptor {
                 _logger.e('Échec de la retry: ${retryError.toString()}');
               }
             }
+=======
+      // Tenter de rafraîchir le token pour toute erreur 401
+      _logger.w('401 reçu — tentative de rafraîchissement du token JWT');
+      final refreshed = await _tryRefreshToken();
+
+      if (refreshed) {
+        // Réessayer la requête originale avec le nouveau token
+        final newToken = await _secureStorage.read(key: _tokenKey);
+        if (newToken != null) {
+          err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+
+          try {
+            final response = await _dio.fetch(err.requestOptions);
+            handler.resolve(response);
+            return;
+          } catch (e) {
+            _logger.e('Échec de la réessai après rafraîchissement: $e');
+>>>>>>> baf250f (mmisse a jour ddu gradle)
           }
         }
 
+<<<<<<< HEAD
         // Si le refresh a échoué, nettoyer les tokens
         _logger
             .w('JWT expiré et refresh échoué : suppression du stockage token');
@@ -376,15 +391,50 @@ class _AuthInterceptor extends Interceptor {
       } finally {
         _isRefreshing = false;
       }
+=======
+      // Si le rafraîchissement échoue
+      _logger.w('JWT expiré ou invalide : suppression du stockage token');
+      await _secureStorage.delete(key: _tokenKey);
+>>>>>>> baf250f (mmisse a jour ddu gradle)
     }
 
     handler.next(err);
   }
 
+<<<<<<< HEAD
   Future<void> _clearTokens() async {
     await _secureStorage.delete(key: _tokenKey);
     await _secureStorage.delete(key: _refreshTokenKey);
     await _secureStorage.delete(key: 'user_data');
+=======
+  /// Tente de rafraîchir le token JWT
+  Future<bool> _tryRefreshToken() async {
+    try {
+      final refreshToken = await _secureStorage.read(key: 'jwt_refresh_token');
+      if (refreshToken == null) return false;
+
+      final dio = Dio(BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+      ));
+
+      final response = await dio.post(
+        'accounts/token/refresh/',
+        data: {'refresh': refreshToken},
+      );
+
+      if (response.statusCode == 200) {
+        final newAccessToken = response.data['access'];
+        await _secureStorage.write(key: _tokenKey, value: newAccessToken);
+        _logger.i('Token JWT rafraîchi avec succès');
+        return true;
+      }
+    } catch (e) {
+      _logger.e('Échec du rafraîchissement du token: $e');
+    }
+    return false;
+>>>>>>> baf250f (mmisse a jour ddu gradle)
   }
 }
 

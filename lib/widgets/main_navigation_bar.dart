@@ -30,40 +30,59 @@ class MainNavigationBar extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _NavItem(
-            index: 0,
-            currentIndex: currentIndex,
-            icon: Icons.home_filled,
-            label: 'Home',
-            onTap: onTap,
+          Expanded(
+            child: _NavItem(
+              index: 0,
+              currentIndex: currentIndex,
+              icon: Icons.home_filled,
+              label: 'Home',
+              onTap: onTap,
+            ),
           ),
-          _NavItem(
-            index: 1,
-            currentIndex: currentIndex,
-            icon: Icons.assignment_rounded,
-            label: 'Missions',
-            onTap: onTap,
+          Expanded(
+            child: _NavItem(
+              index: 1,
+              currentIndex: currentIndex,
+              icon: Icons.assignment_rounded,
+              label: 'Missions',
+              onTap: onTap,
+            ),
           ),
-          _NavItem(
-            index: 2,
-            currentIndex: currentIndex,
-            icon: Icons.group_work,
-            label: 'Agents',
-            onTap: onTap,
+          Expanded(
+            child: _NavItem(
+              index: 2,
+              currentIndex: currentIndex,
+              icon: Icons.group_work,
+              label: 'Agents',
+              onTap: onTap,
+            ),
           ),
+<<<<<<< HEAD
           _NavItem(
             index: 3,
             currentIndex: currentIndex,
             icon: Icons.lightbulb_rounded,
             label: 'Opportunités',
             onTap: onTap,
+=======
+          Expanded(
+            child: _NavItem(
+              index: 3,
+              currentIndex: currentIndex,
+              icon: Icons.event_rounded,
+              label: 'Événements',
+              onTap: onTap,
+            ),
+>>>>>>> baf250f (mmisse a jour ddu gradle)
           ),
-          _NavItem(
-            index: 4,
-            currentIndex: currentIndex,
-            icon: Icons.person_rounded,
-            label: 'Profil',
-            onTap: onTap,
+          Expanded(
+            child: _NavItem(
+              index: 4,
+              currentIndex: currentIndex,
+              icon: Icons.person_rounded,
+              label: 'Profil',
+              onTap: onTap,
+            ),
           ),
         ],
       ),

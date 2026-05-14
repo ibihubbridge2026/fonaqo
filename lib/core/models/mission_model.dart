@@ -156,6 +156,20 @@ class MissionModel {
   /// Retourne le statut formaté pour l'affichage.
   String get formattedStatus => status.label;
 
+  /// Alias pour l'affichage du statut dans les cartes.
+  String get statusDisplay => status.label;
+
+  /// Retourne un texte relatif approximatif depuis createdAt.
+  String get timeAgo {
+    if (createdAt == null) return '';
+    final diff = DateTime.now().difference(createdAt!);
+    if (diff.inMinutes < 1) return 'maintenant';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min';
+    if (diff.inHours < 24) return '${diff.inHours}h';
+    if (diff.inDays < 7) return '${diff.inDays}j';
+    return '${createdAt!.day}/${createdAt!.month}/${createdAt!.year}';
+  }
+
   @override
   String toString() {
     return 'MissionModel(id: $id, title: $title, status: $status, price: $price)';

@@ -68,7 +68,11 @@ class _HomeContentState extends State<HomeContent> {
     });
     try {
       final missions = await _missionRepo.fetchMissionsList();
+
+      // Pour l'instant, nous n'utilisons pas la localisation
+      // TODO: Ajouter la localisation à UserModel et utiliser les coordonnées utilisateur
       final agents = await _missionRepo.fetchAgentSuggestions();
+
       if (!mounted) return;
       setState(() {
         _missions = missions;

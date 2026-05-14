@@ -4,6 +4,7 @@ class UserModel {
   final String id;
   final String email;
   final String? phoneNumber;
+
   /// Nom d'utilisateur Django (connexion / chat), distinct du libellé d'affichage.
   final String? djangoUsername;
   final String? firstName;
@@ -49,10 +50,12 @@ class UserModel {
           ? AgentProfile.fromJson(json['agent_profile'] as Map<String, dynamic>)
           : null,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
-          : null,
+          ? DateTime.tryParse(json['created_at'].toString())
+          : json['date_joined'] != null
+              ? DateTime.tryParse(json['date_joined'].toString())
+              : null,
       updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
+          ? DateTime.tryParse(json['updated_at'].toString())
           : null,
     );
   }
@@ -200,8 +203,7 @@ class AgentProfile {
   factory AgentProfile.fromJson(Map<String, dynamic> json) {
     return AgentProfile(
       bio: json['bio']?.toString(),
-      skills:
-          (json['skills'] as List<dynamic>?)
+      skills: (json['skills'] as List<dynamic>?)
               ?.map((skill) => skill.toString())
               .toList() ??
           [],
@@ -209,8 +211,7 @@ class AgentProfile {
       totalMissions: json['total_missions'] as int? ?? 0,
       isAvailable: json['is_available'] as bool? ?? false,
       location: json['location']?.toString(),
-      certifications:
-          (json['certifications'] as List<dynamic>?)
+      certifications: (json['certifications'] as List<dynamic>?)
               ?.map((cert) => cert.toString())
               .toList() ??
           [],

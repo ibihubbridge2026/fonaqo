@@ -14,8 +14,7 @@ class NotificationService {
   // SINGLETON
   // =========================
 
-  static final NotificationService _instance =
-      NotificationService._internal();
+  static final NotificationService _instance = NotificationService._internal();
 
   factory NotificationService() => _instance;
 
@@ -25,11 +24,9 @@ class NotificationService {
   // VARIABLES
   // =========================
 
-  final FirebaseMessaging _firebaseMessaging =
-      FirebaseMessaging.instance;
+  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
 
-  final FlutterLocalNotificationsPlugin
-      _localNotifications =
+  final FlutterLocalNotificationsPlugin _localNotifications =
       FlutterLocalNotificationsPlugin();
 
   final Logger _logger = Logger();
@@ -39,6 +36,8 @@ class NotificationService {
   String? _fcmToken;
 
   bool _isInitialized = false;
+
+  int _notificationIdCounter = 0;
 
   // =========================
   // GETTER
@@ -63,16 +62,14 @@ class NotificationService {
       // =========================
 
       NotificationSettings settings =
-          await _firebaseMessaging
-              .requestPermission(
+          await _firebaseMessaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
         provisional: false,
       );
 
-      if (settings.authorizationStatus ==
-          AuthorizationStatus.authorized) {
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         _logger.i(
           'Permission notifications accordée',
         );
@@ -86,22 +83,19 @@ class NotificationService {
       // INITIALISATION NOTIFICATIONS LOCALES
       // =========================
 
-      const AndroidInitializationSettings
-          androidSettings =
+      const AndroidInitializationSettings androidSettings =
           AndroidInitializationSettings(
         '@mipmap/ic_launcher',
       );
 
-      const DarwinInitializationSettings
-          iosSettings =
+      const DarwinInitializationSettings iosSettings =
           DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
         requestSoundPermission: true,
       );
 
-      const InitializationSettings
-          initializationSettings =
+      const InitializationSettings initializationSettings =
           InitializationSettings(
         android: androidSettings,
         iOS: iosSettings,
@@ -151,8 +145,7 @@ class NotificationService {
 
   Future<void> _getFCMToken() async {
     try {
-      final token =
-          await _firebaseMessaging.getToken();
+      final token = await _firebaseMessaging.getToken();
 
       if (token != null) {
         _fcmToken = token;
@@ -180,12 +173,8 @@ class NotificationService {
     );
 
     await _showLocalNotification(
-      title:
-          message.notification?.title ??
-          'Nouvelle notification',
-      body:
-          message.notification?.body ??
-          'Vous avez un nouveau message',
+      title: message.notification?.title ?? 'Nouvelle notification',
+      body: message.notification?.body ?? 'Vous avez un nouveau message',
       data: message.data,
     );
   }
@@ -202,12 +191,8 @@ class NotificationService {
     );
 
     await _showLocalNotification(
-      title:
-          message.notification?.title ??
-          'Nouvelle notification',
-      body:
-          message.notification?.body ??
-          'Vous avez un nouveau message',
+      title: message.notification?.title ?? 'Nouvelle notification',
+      body: message.notification?.body ?? 'Vous avez un nouveau message',
       data: message.data,
     );
   }
@@ -235,36 +220,30 @@ class NotificationService {
     required String body,
     Map<String, dynamic>? data,
   }) async {
-    const AndroidNotificationDetails
-        androidDetails =
+    const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
       'fonaco_channel',
       'FONACO Notifications',
-      channelDescription:
-          'Notifications de l\'application FONACO',
+      channelDescription: 'Notifications de l\'application FONACO',
       importance: Importance.high,
       priority: Priority.high,
       color: Color(0xFFFFD400),
       playSound: true,
     );
 
-    const DarwinNotificationDetails
-        iosDetails =
-        DarwinNotificationDetails(
+    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
     );
 
-    const NotificationDetails
-        notificationDetails =
-        NotificationDetails(
+    const NotificationDetails notificationDetails = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );
 
     await _localNotifications.show(
-      0,
+      _notificationIdCounter++,
       title,
       body,
       notificationDetails,
@@ -309,20 +288,17 @@ class NotificationService {
   // REQUEST PERMISSION ANDROID 13+
   // =========================
 
-  Future<bool>
-      requestNotificationPermission() async {
+  Future<bool> requestNotificationPermission() async {
     if (Platform.isIOS) {
       return true;
     }
 
     final androidImplementation =
-        _localNotifications
-            .resolvePlatformSpecificImplementation<
-                AndroidFlutterLocalNotificationsPlugin>();
+        _localNotifications.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
 
     final granted =
-        await androidImplementation
-            ?.requestNotificationsPermission();
+        await androidImplementation?.requestNotificationsPermission();
 
     return granted ?? false;
   }

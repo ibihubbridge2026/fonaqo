@@ -235,10 +235,24 @@ class MissionRepository {
     }
   }
 
-  /// Agents vérifiés pour le dashboard (GET /accounts/agents/suggestions/).
-  Future<List<Map<String, dynamic>>> fetchAgentSuggestions() async {
+  /// Agents vérifiés pour le dashboard (GET /accounts/agent-suggestions/).
+  /// Accepte des coordonnées optionnelles pour le filtrage par distance.
+  Future<List<Map<String, dynamic>>> fetchAgentSuggestions({
+    double? latitude,
+    double? longitude,
+    int limit = 12,
+  }) async {
     try {
-      final response = await _baseClient.get('accounts/agents/suggestions/');
+      // Construire les paramètres de requête
+      final queryParams = <String, String>{};
+      if (latitude != null) queryParams['latitude'] = latitude.toString();
+      if (longitude != null) queryParams['longitude'] = longitude.toString();
+      if (limit != 12) queryParams['limit'] = limit.toString();
+
+      final response = await _baseClient.get(
+        'accounts/agent-suggestions/',
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
       if (response.statusCode != 200) return [];
       final body = response.data;
       if (body is! Map<String, dynamic>) return [];

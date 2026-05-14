@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../widgets/custom_app_bar.dart';
+<<<<<<< HEAD
 import 'widgets/step_5_tracking_view.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/models/mission_model.dart';
@@ -7,6 +8,61 @@ import '../missions/mission_repository.dart';
 
 class MissionDetailScreen extends StatefulWidget {
   const MissionDetailScreen({super.key});
+=======
+import '../missions/mission_repository.dart';
+import '../../core/models/mission_model.dart';
+
+class MissionDetailScreen extends StatefulWidget {
+  final String? missionId;
+
+  const MissionDetailScreen({super.key, this.missionId});
+
+  @override
+  State<MissionDetailScreen> createState() => _MissionDetailScreenState();
+}
+
+class _MissionDetailScreenState extends State<MissionDetailScreen> {
+  final MissionRepository _missionRepo = MissionRepository();
+  MissionModel? _mission;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMission();
+  }
+
+  Future<void> _loadMission() async {
+    if (widget.missionId == null) {
+      setState(() {
+        _loading = false;
+        _error = 'ID de mission non fourni';
+      });
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final mission = await _missionRepo.fetchMissionDetails(widget.missionId!);
+      if (!mounted) return;
+      setState(() {
+        _mission = mission;
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+>>>>>>> baf250f (mmisse a jour ddu gradle)
 
   @override
   State<MissionDetailScreen> createState() => _MissionDetailScreenState();
@@ -147,22 +203,34 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
   }
 
   Widget _buildBody() {
+<<<<<<< HEAD
     if (_isLoading) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(20),
+=======
+    if (_loading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40),
+>>>>>>> baf250f (mmisse a jour ddu gradle)
           child: CircularProgressIndicator(),
         ),
       );
     }
 
+<<<<<<< HEAD
     if (_errorMessage != null) {
+=======
+    if (_error != null) {
+>>>>>>> baf250f (mmisse a jour ddu gradle)
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+<<<<<<< HEAD
               Icon(Icons.error_outline, size: 64, color: Colors.red[400]),
               const SizedBox(height: 16),
               Text(
@@ -173,6 +241,12 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: _loadMissionDetails,
+=======
+              Text(_error!, style: TextStyle(color: Colors.red[700])),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: _loadMission,
+>>>>>>> baf250f (mmisse a jour ddu gradle)
                 child: const Text('Réessayer'),
               ),
             ],
@@ -192,7 +266,11 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+<<<<<<< HEAD
           // Image de contexte
+=======
+          // Image
+>>>>>>> baf250f (mmisse a jour ddu gradle)
           ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: AspectRatio(
@@ -222,7 +300,11 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
+<<<<<<< HEAD
               _mission!.formattedStatus,
+=======
+              _mission!.statusDisplay.toUpperCase(),
+>>>>>>> baf250f (mmisse a jour ddu gradle)
               style: TextStyle(
                 color: _getStatusColor(_mission!.status),
                 fontWeight: FontWeight.w900,
@@ -230,6 +312,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
               ),
             ),
           ),
+<<<<<<< HEAD
 
           const SizedBox(height: 16),
 
@@ -350,10 +433,34 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
           const SizedBox(height: 30),
 
           // Mission Details Card
+=======
+          const SizedBox(height: 16),
+
+          // Title and Description
+          Text(
+            _mission!.title,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _mission!.description ?? 'Aucune description',
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Mission Details
+>>>>>>> baf250f (mmisse a jour ddu gradle)
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: Colors.white,
+<<<<<<< HEAD
               borderRadius: BorderRadius.circular(24),
             ),
             child: Column(
@@ -475,23 +582,87 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                           TextStyle(fontWeight: FontWeight.w900, fontSize: 12),
                     ),
                   ),
+=======
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 14,
+>>>>>>> baf250f (mmisse a jour ddu gradle)
                 ),
               ],
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Détails de la mission',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _buildInfoTile('Lieu', _mission!.address ?? 'Non spécifié'),
+                _buildInfoTile(
+                    'Catégorie', _mission!.category ?? 'Non spécifiée'),
+                _buildInfoTile(
+                    'Prix', '${_mission!.price.toStringAsFixed(0)} XOF'),
+                _buildInfoTile(
+                    'Date', _mission!.createdAt.toString().split(' ')[0]),
+                _buildInfoTile('Statut', _mission!.statusDisplay),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Action Buttons
+          if (_mission!.status == MissionStatus.PENDING) ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Fonctionnalité bientôt disponible')),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'ACCEPTER LA MISSION',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+            ),
             const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: () => Navigator.pushNamed(context, AppRoutes.chat),
+          ],
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Chat bientôt disponible')),
+                );
+              },
               style: OutlinedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 54),
+                side: const BorderSide(color: Colors.black),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
               child: const Text(
-                "OUVRIR LE CHAT",
+                'OUVRIR LE CHAT',
                 style: TextStyle(fontWeight: FontWeight.w900),
               ),
             ),
+<<<<<<< HEAD
           ] else ...[
             // Message si aucun agent n'a accepté
             Container(
@@ -526,11 +697,15 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
               ),
             ),
           ],
+=======
+          ),
+>>>>>>> baf250f (mmisse a jour ddu gradle)
         ],
       ),
     );
   }
 
+<<<<<<< HEAD
   static Future<void> _confirmReleaseFunds(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -572,5 +747,38 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
         ),
       );
     }
+=======
+  Color _getStatusColor(MissionStatus status) {
+    switch (status) {
+      case MissionStatus.PENDING:
+        return Colors.orange;
+      case MissionStatus.ACCEPTED:
+        return Colors.blue;
+      case MissionStatus.ON_THE_WAY:
+      case MissionStatus.ARRIVED:
+      case MissionStatus.IN_PROGRESS:
+        return Colors.green;
+      case MissionStatus.COMPLETED:
+        return Colors.purple;
+      case MissionStatus.CANCELLED:
+      case MissionStatus.DISPUTED:
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Widget _buildInfoTile(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.grey)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+>>>>>>> baf250f (mmisse a jour ddu gradle)
   }
 }
