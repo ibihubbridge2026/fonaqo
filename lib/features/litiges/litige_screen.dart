@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/api/base_client.dart';
 import '../../core/models/mission_model.dart';
+import '../../core/mixins/base_screen_state.dart';
 import '../missions/mission_repository.dart';
 import '../../widgets/custom_app_bar.dart';
 
@@ -12,13 +13,11 @@ class LitigeScreen extends StatefulWidget {
   State<LitigeScreen> createState() => _LitigeScreenState();
 }
 
-class _LitigeScreenState extends State<LitigeScreen> {
+class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
   final MissionRepository _missionRepo = MissionRepository();
   final BaseClient _api = BaseClient();
 
   List<MissionModel> _missions = [];
-  bool _loading = true;
-  String? _error;
   String? _selectedMissionId;
   String _reason = '';
   bool _submitting = false;
@@ -30,44 +29,34 @@ class _LitigeScreenState extends State<LitigeScreen> {
   }
 
   Future<void> _loadMissions() async {
-    if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final missions = await _missionRepo.fetchMissionsList();
-      
-      // Filtrage des missions éligibles au litige (on exclut les terminées/déjà en litige)
-      final disputableMissions = missions.where((m) {
-        return m.status != MissionStatus.DISPUTED &&
-               m.status != MissionStatus.COMPLETED &&
-               (m.status == MissionStatus.ACCEPTED ||
-                m.status == MissionStatus.ON_THE_WAY ||
-                m.status == MissionStatus.ARRIVED ||
-                m.status == MissionStatus.IN_PROGRESS ||
-                m.status == MissionStatus.CANCELLED);
-      }).toList();
+    await executeWithLoading(
+      () async {
+        final missions = await _missionRepo.fetchMissionsList();
 
-      if (!mounted) return;
-      setState(() {
+        // Filtrage des missions éligibles au litige (on exclut les terminées/déjà en litige)
+        final disputableMissions = missions.where((m) {
+          return m.status != MissionStatus.DISPUTED &&
+              m.status != MissionStatus.COMPLETED &&
+              (m.status == MissionStatus.ACCEPTED ||
+                  m.status == MissionStatus.ON_THE_WAY ||
+                  m.status == MissionStatus.ARRIVED ||
+                  m.status == MissionStatus.IN_PROGRESS ||
+                  m.status == MissionStatus.CANCELLED);
+        }).toList();
+
         _missions = disputableMissions;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
+        return null;
+      },
+      errorMessage: 'Erreur lors du chargement des missions',
+    );
   }
 
   Future<void> _submitDispute() async {
     if (_selectedMissionId == null || _reason.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text('Veuillez sélectionner une mission et décrire le problème')),
+            content: Text(
+                'Veuillez sélectionner une mission et décrire le problème')),
       );
       return;
     }
@@ -75,7 +64,7 @@ class _LitigeScreenState extends State<LitigeScreen> {
     setState(() {
       _submitting = true;
     });
-    
+
     try {
       // Appel API vers ton backend Django
       final response = await _api.dio.post(
@@ -128,26 +117,13 @@ class _LitigeScreenState extends State<LitigeScreen> {
   }
 
   Widget _buildBody() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+    if (isLoading) {
+      return buildLoadingIndicator();
     }
 
-    if (_error != null) {
-      return Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(_error!, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadMissions,
-              child: const Text('Réessayer'),
-            ),
-          ],
-        ),
+    if (error != null) {
+      return buildErrorWidget(
+        onRetry: _loadMissions,
       );
     }
 
@@ -257,7 +233,8 @@ class _LitigeScreenState extends State<LitigeScreen> {
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
                   )
                 : const Text(
                     'SOUMETTRE',

@@ -17,6 +17,196 @@ class AppTheme {
     end: Alignment.bottomRight,
   );
 
+  // =========================
+  // STYLES DE BOUTONS CENTRALISÉS
+  // =========================
+
+  // Bouton principal (jaune FONACO)
+  static ButtonStyle primaryButton = ElevatedButton.styleFrom(
+    backgroundColor: primaryColor,
+    foregroundColor: Colors.black,
+    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    elevation: 2,
+    textStyle: const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+    ),
+  );
+
+  // Bouton secondaire (bleu foncé)
+  static ButtonStyle secondaryButton = ElevatedButton.styleFrom(
+    backgroundColor: secondaryColor,
+    foregroundColor: Colors.white,
+    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    elevation: 2,
+    textStyle: const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+    ),
+  );
+
+  // Bouton danger (rouge)
+  static ButtonStyle dangerButton = ElevatedButton.styleFrom(
+    backgroundColor: errorColor,
+    foregroundColor: Colors.white,
+    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    elevation: 2,
+    textStyle: const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+    ),
+  );
+
+  // Bouton succès (vert)
+  static ButtonStyle successButton = ElevatedButton.styleFrom(
+    backgroundColor: successColor,
+    foregroundColor: Colors.white,
+    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    elevation: 2,
+    textStyle: const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+    ),
+  );
+
+  // Bouton outlined (bordure seulement)
+  static ButtonStyle outlinedButton = OutlinedButton.styleFrom(
+    foregroundColor: primaryColor,
+    side: const BorderSide(color: primaryColor, width: 2),
+    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    textStyle: const TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+    ),
+  );
+
+  // Bouton text (sans fond)
+  static ButtonStyle textButton = TextButton.styleFrom(
+    foregroundColor: primaryColor,
+    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(8),
+    ),
+    textStyle: const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+    ),
+  );
+
+  // Bouton compact (petit)
+  static ButtonStyle compactButton = ElevatedButton.styleFrom(
+    backgroundColor: primaryColor,
+    foregroundColor: Colors.black,
+    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(8),
+    ),
+    elevation: 1,
+    textStyle: const TextStyle(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+    ),
+  );
+
+  // Bouton avec loading state
+  static Widget primaryButtonWithLoading({
+    required String text,
+    required VoidCallback onPressed,
+    bool isLoading = false,
+    bool enabled = true,
+    double? width,
+  }) {
+    return SizedBox(
+      width: width,
+      height: 50,
+      child: ElevatedButton(
+        onPressed: (enabled && !isLoading) ? onPressed : null,
+        style: primaryButton,
+        child: isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.black,
+                ),
+              )
+            : Text(text),
+      ),
+    );
+  }
+
+  // Bouton secondaire avec loading state
+  static Widget secondaryButtonWithLoading({
+    required String text,
+    required VoidCallback onPressed,
+    bool isLoading = false,
+    bool enabled = true,
+    double? width,
+  }) {
+    return SizedBox(
+      width: width,
+      height: 50,
+      child: ElevatedButton(
+        onPressed: (enabled && !isLoading) ? onPressed : null,
+        style: secondaryButton,
+        child: isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : Text(text),
+      ),
+    );
+  }
+
+  // Helper pour créer des boutons personnalisés rapidement
+  static ButtonStyle customButton({
+    Color? backgroundColor,
+    Color? foregroundColor,
+    Color? borderColor,
+    double borderRadius = 12,
+    EdgeInsetsGeometry? padding,
+    double elevation = 2,
+    TextStyle? textStyle,
+  }) {
+    return ElevatedButton.styleFrom(
+      backgroundColor: backgroundColor,
+      foregroundColor: foregroundColor,
+      side: borderColor != null ? BorderSide(color: borderColor) : null,
+      padding:
+          padding ?? const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(borderRadius),
+      ),
+      elevation: elevation,
+      textStyle: textStyle ??
+          const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+    );
+  }
+
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,

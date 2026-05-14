@@ -1,22 +1,21 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:fonaco/core/services/feedback_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
 
 import '../api/base_client.dart';
 import '../models/user_model.dart';
 import '../services/notification_service.dart';
-import '../services/feedback_service.dart';
 
 /// Provider pour gérer l'état d'authentification
 class AuthProvider extends ChangeNotifier {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
 
-  static const String _tokenKey = 'jwt_token';
+  static const String _tokenKey = 'jwt_access_token';
   static const String _refreshTokenKey = 'jwt_refresh_token';
   static const String _userKey = 'user_data';
 

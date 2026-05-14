@@ -121,20 +121,22 @@ class _MissionsScreenState extends State<MissionsScreen> {
               const SizedBox(height: 16),
               const MissionsPromoQueueCard(),
               const SizedBox(height: 14),
-              
+
               // Filtres et Bouton Créer
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
                     ElevatedButton.icon(
-                      onPressed: () => MainShellScope.maybeOf(context)?.openCreateMission(),
+                      onPressed: () =>
+                          MainShellScope.maybeOf(context)?.openCreateMission(),
                       icon: const Icon(Icons.add, size: 18),
                       label: const Text("CRÉER"),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFFD400),
                         foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20)),
                         elevation: 0,
                       ),
                     ),
@@ -227,7 +229,8 @@ class _CategoryChip extends StatelessWidget {
   final bool isActive;
   final VoidCallback onTap;
 
-  const _CategoryChip({required this.label, required this.isActive, required this.onTap});
+  const _CategoryChip(
+      {required this.label, required this.isActive, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -261,7 +264,13 @@ class MissionCard extends StatelessWidget {
   final String time;
   final VoidCallback? onTap;
 
-  const MissionCard({super.key, required this.title, required this.type, required this.status, required this.time, this.onTap});
+  const MissionCard(
+      {super.key,
+      required this.title,
+      required this.type,
+      required this.status,
+      required this.time,
+      this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -274,7 +283,9 @@ class MissionCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(25),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
+          ],
         ),
         child: Row(
           children: [
@@ -284,16 +295,20 @@ class MissionCard extends StatelessWidget {
                 color: const Color(0xFFFFD400).withOpacity(0.12),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.assignment_outlined, color: Color(0xFFFFD400)),
+              child: const Icon(Icons.assignment_outlined,
+                  color: Color(0xFFFFD400)),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  Text(title,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w900, fontSize: 16)),
                   const SizedBox(height: 2),
-                  Text("$type • $time", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  Text("$type • $time",
+                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
                 ],
               ),
             ),
@@ -314,7 +329,7 @@ class _StatusBadge extends StatelessWidget {
     final s = status.toLowerCase();
     final isPending = s.contains('attente') || s.contains('pending');
     final isCancelled = s.contains('annulée') || s.contains('cancelled');
-    
+
     Color bg = Colors.green[50]!;
     Color fg = Colors.green[800]!;
 
@@ -328,7 +343,8 @@ class _StatusBadge extends StatelessWidget {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+      decoration:
+          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
       child: Text(
         status.toUpperCase(),
         style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 10),
@@ -353,14 +369,16 @@ class MissionsPromoQueueCard extends StatelessWidget {
           const Expanded(
             child: Text(
               "Faites la queue à\nvotre place",
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, height: 1.1),
+              style: TextStyle(
+                  fontSize: 16, fontWeight: FontWeight.w900, height: 1.1),
             ),
           ),
           const SizedBox(width: 12),
           Container(
             width: 52,
             height: 52,
-            decoration: const BoxDecoration(color: Colors.black, shape: BoxShape.circle),
+            decoration: const BoxDecoration(
+                color: Colors.black, shape: BoxShape.circle),
             child: const Icon(Icons.hourglass_bottom, color: Color(0xFFFFD400)),
           ),
         ],
