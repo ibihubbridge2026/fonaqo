@@ -235,7 +235,7 @@ class MissionRepository {
     }
   }
 
-  /// Agents vérifiés pour le dashboard (GET /accounts/agent-suggestions/).
+  /// Agents vérifiés pour le dashboard (GET /accounts/agents/suggestions/).
   /// Accepte des coordonnées optionnelles pour le filtrage par distance.
   Future<List<Map<String, dynamic>>> fetchAgentSuggestions({
     double? latitude,
@@ -250,7 +250,7 @@ class MissionRepository {
       if (limit != 12) queryParams['limit'] = limit.toString();
 
       final response = await _baseClient.get(
-        'accounts/agent-suggestions/',
+        'accounts/agents/suggestions/',
         queryParameters: queryParams.isNotEmpty ? queryParams : null,
       );
       if (response.statusCode != 200) return [];

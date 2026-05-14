@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
+import '../../../core/config/api_config.dart';
 
 class ServiceType {
   final String id;
@@ -114,7 +115,7 @@ class _Step1TypeSelectorState extends State<Step1TypeSelector> {
     setState(() => _isLoadingCategories = true);
     try {
       final dio = Dio(BaseOptions(
-        baseUrl: 'http://192.168.1.73:8000/api/v1/',
+        baseUrl: ApiConfig.baseUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 10),
       ));

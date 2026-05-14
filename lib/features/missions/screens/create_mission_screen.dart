@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/routes/app_routes.dart';
 import '../../../widgets/main_wrapper.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/mission_provider.dart';
 import '../../../core/services/feedback_service.dart';
+import '../../../core/services/location_service.dart';
 import '../mission_repository.dart';
 import '../widgets/create_mission_step_type.dart';
 import '../widgets/create_mission_step_details.dart';
@@ -21,6 +24,7 @@ class CreateMissionScreen extends StatefulWidget {
 
 class _CreateMissionScreenState extends State<CreateMissionScreen> {
   final MissionRepository _repo = MissionRepository();
+  final Logger _logger = Logger();
 
   int _step = 1;
   String? _flowType;
@@ -128,10 +132,121 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
     return buf.toString().trim();
   }
 
+  /// Vérifie que l'utilisateur a un numéro de téléphone
+  Future<bool> _checkPhoneNumber() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentUser = authProvider.currentUser;
+
+    if (currentUser == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Utilisateur non connecté'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    }
+
+    if (currentUser.phoneNumber == null || currentUser.phoneNumber!.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Un numéro de téléphone est requis pour créer une mission. Veuillez compléter votre profil.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  /// Vérifie la localisation avant la soumission de la mission
+  Future<bool> _checkLocationBeforeSubmission() async {
+    try {
+      final locationService = LocationService();
+      final permissionStatus = await locationService.checkAndRequestLocation();
+
+      if (permissionStatus == LocationPermissionStatus.granted) {
+        // La permission est accordée, obtenir la position actuelle
+        await locationService.getCurrentLocation();
+
+        // Vérifier si nous avons une position valide
+        if (locationService.currentPosition != null) {
+          return true;
+        } else {
+          // La permission est accordée mais pas de position disponible
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'Impossible d\'obtenir votre position. Veuillez réessayer.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+          return false;
+        }
+      } else {
+        // La permission est refusée
+        String message =
+            'La localisation est nécessaire pour créer une mission. Veuillez l\'activer pour continuer.';
+
+        if (permissionStatus == LocationPermissionStatus.deniedForever) {
+          message +=
+              ' Vous pouvez l\'activer dans les paramètres de votre appareil.';
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 6),
+              action: permissionStatus == LocationPermissionStatus.deniedForever
+                  ? SnackBarAction(
+                      label: 'Paramètres',
+                      textColor: Colors.white,
+                      onPressed: () => locationService.openAppSettings(),
+                    )
+                  : null,
+            ),
+          );
+        }
+        return false;
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Erreur lors de la vérification de la localisation: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
   Future<void> _confirm() async {
     final raw = _price.text.replaceAll(',', '.').trim();
     final price = double.tryParse(raw) ?? 0;
     if (price <= 0) return;
+
+    // Vérifier que l'utilisateur a un numéro de téléphone
+    final phoneCheck = await _checkPhoneNumber();
+    if (!phoneCheck) return;
+
+    // Vérifier la localisation avant de soumettre la mission
+    final locationCheck = await _checkLocationBeforeSubmission();
+    if (!locationCheck) return;
 
     setState(() => _submitting = true);
     try {
@@ -153,22 +268,39 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
         ),
       );
       if (!mounted) return;
-      FeedbackService.showSuccess(context, 'Mission créée avec succès.');
 
-      // Rafraîchir explicitement les missions avant de retourner à l'accueil
-      if (mounted) {
-        try {
-          await Provider.of<MissionProvider>(context, listen: false)
-              .refreshMissions();
-        } catch (e) {
-          // Le refresh a échoué mais on continue quand même
-          print('Refresh missions failed: $e');
-        }
+      // NAVIGATION PROPRE : nettoyer la pile et revenir au Dashboard.
+      // 1. Si on est dans le shell principal (cas normal),
+      //    on ferme le mode création et on revient à l'onglet Home.
+      // 2. Sinon, on rebascule sur la route racine via pushAndRemoveUntil
+      //    pour garantir une pile propre et un rafraîchissement complet.
+      final shell = MainShellScope.maybeOf(context);
+      if (shell != null) {
+        shell.closeCreateMission();
+        shell.setIndex(0);
+      } else {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.mainShell,
+          (route) => false,
+        );
       }
 
-      // Rafraîchir la liste des missions en naviguant vers l'accueil avec indicateur de rafraîchissement
-      Navigator.pop(context, true);
-    } catch (e) {
+      // Feedback APRÈS la navigation pour éviter tout blocage UI.
+      if (mounted) {
+        FeedbackService.showSuccess(context, 'Mission créée avec succès.');
+      }
+
+      // Rafraîchissement des missions en arrière-plan (best-effort).
+      try {
+        if (mounted) {
+          await Provider.of<MissionProvider>(context, listen: false)
+              .refreshMissions();
+        }
+      } catch (e, st) {
+        _logger.e('Refresh missions failed', error: e, stackTrace: st);
+      }
+    } catch (e, st) {
+      _logger.e('createMission failed', error: e, stackTrace: st);
       if (!mounted) return;
       FeedbackService.showError(context, e);
     } finally {

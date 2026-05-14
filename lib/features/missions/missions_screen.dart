@@ -23,6 +23,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
   final MissionRepository _repo = MissionRepository();
   List<MissionModel> _missions = [];
   bool _loading = true;
+  bool _isFetching = false; // garde-fou réel (concurrence)
   String? _error;
   String _filter = 'all'; // 'all', 'ongoing', 'completed', 'cancelled'
 
@@ -47,7 +48,30 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Future<void> _loadMissions() async {
-    if (!mounted) return;
+    // SÉCURITÉ : Éviter les fetchs concurrents (et non pas l'état UI initial)
+    if (_isFetching) {
+      return;
+    }
+    _isFetching = true;
+
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (!auth.isAuthenticated) {
+      print('🔒 Utilisateur non authentifié, skip missions load');
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _missions = [];
+          _error = auth.errorMessage ?? 'Veuillez vous connecter';
+        });
+      }
+      _isFetching = false;
+      return;
+    }
+
+    if (!mounted) {
+      _isFetching = false;
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -65,6 +89,8 @@ class _MissionsScreenState extends State<MissionsScreen> {
         _error = "Erreur de connexion aux missions";
         _loading = false;
       });
+    } finally {
+      _isFetching = false;
     }
   }
 
@@ -113,80 +139,124 @@ class _MissionsScreenState extends State<MissionsScreen> {
           onRefresh: _loadMissions,
           color: Colors.black,
           backgroundColor: const Color(0xFFFFD400),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
-            children: [
-              const Text("Mes Missions",
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
-              const SizedBox(height: 16),
-              const MissionsPromoQueueCard(),
-              const SizedBox(height: 14),
+          child: CustomScrollView(
+            physics:
+                const AlwaysScrollableScrollPhysics(), // Permet le refresh même si le contenu est petit
+            slivers: [
+              // Sliver pour l'en-tête et les filtres
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("Mes Missions",
+                          style: TextStyle(
+                              fontSize: 24, fontWeight: FontWeight.w900)),
+                      const SizedBox(height: 16),
+                      const MissionsPromoQueueCard(),
+                      const SizedBox(height: 14),
 
-              // Filtres et Bouton Créer
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: () =>
-                          MainShellScope.maybeOf(context)?.openCreateMission(),
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text("CRÉER"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFFD400),
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20)),
-                        elevation: 0,
+                      // Filtres et Bouton Créer
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () => MainShellScope.maybeOf(context)
+                                  ?.openCreateMission(),
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text("CRÉER"),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFFD400),
+                                foregroundColor: Colors.black,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20)),
+                                elevation: 0,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            _CategoryChip(
+                              label: "Toutes",
+                              isActive: _filter == 'all',
+                              onTap: () => setState(() => _filter = 'all'),
+                            ),
+                            _CategoryChip(
+                              label: "En cours",
+                              isActive: _filter == 'ongoing',
+                              onTap: () => setState(() => _filter = 'ongoing'),
+                            ),
+                            _CategoryChip(
+                              label: "Terminées",
+                              isActive: _filter == 'completed',
+                              onTap: () =>
+                                  setState(() => _filter = 'completed'),
+                            ),
+                            _CategoryChip(
+                              label: "Annulées",
+                              isActive: _filter == 'cancelled',
+                              onTap: () =>
+                                  setState(() => _filter = 'cancelled'),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    _CategoryChip(
-                      label: "Toutes",
-                      isActive: _filter == 'all',
-                      onTap: () => setState(() => _filter = 'all'),
-                    ),
-                    _CategoryChip(
-                      label: "En cours",
-                      isActive: _filter == 'ongoing',
-                      onTap: () => setState(() => _filter = 'ongoing'),
-                    ),
-                    _CategoryChip(
-                      label: "Terminées",
-                      isActive: _filter == 'completed',
-                      onTap: () => setState(() => _filter = 'completed'),
-                    ),
-                    _CategoryChip(
-                      label: "Annulées",
-                      isActive: _filter == 'cancelled',
-                      onTap: () => setState(() => _filter = 'cancelled'),
-                    ),
-                  ],
+                      const SizedBox(height: 18),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 18),
 
+              // Sliver pour le contenu des missions
               if (_loading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 40),
-                  child: Center(child: CircularProgressIndicator()),
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
                 )
               else if (_error != null)
-                _buildErrorState()
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                    child: _buildErrorState(),
+                  ),
+                )
               else if (filtered.isEmpty)
-                _buildEmptyState()
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                    child: _buildEmptyState(),
+                  ),
+                )
               else
-                ...filtered.map((m) => MissionCard(
-                      title: m.title,
-                      type: m.category ?? 'Mission',
-                      status: m.statusDisplay,
-                      time: m.timeAgo,
-                      onTap: () => Navigator.pushNamed(
-                        context,
-                        AppRoutes.missionDetail,
-                        arguments: {'missionId': m.id},
-                      ),
-                    )),
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final mission = filtered[index];
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 15),
+                        child: MissionCard(
+                          title: mission.title,
+                          type: mission.category ?? 'Mission',
+                          status: mission.statusDisplay,
+                          time: mission.timeAgo,
+                          onTap: () => Navigator.pushNamed(
+                            context,
+                            AppRoutes.missionDetail,
+                            arguments: {'missionId': mission.id},
+                          ),
+                        ),
+                      );
+                    },
+                    childCount: filtered.length,
+                  ),
+                ),
+
+              // Padding pour le bas
+              const SliverToBoxAdapter(
+                child: SizedBox(height: 100),
+              ),
             ],
           ),
         );

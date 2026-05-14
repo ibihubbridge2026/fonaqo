@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../utils/error_mapper.dart';
-import '../../widgets/feedback/custom_toast.dart';
 
-/// Service centralisé pour afficher des feedbacks utilisateur
+enum FeedbackType { success, error, info, warning }
+
+/// Service centralisé pour afficher des feedbacks utilisateur avec SnackBar
 class FeedbackService {
   static GlobalKey<NavigatorState>? _navigatorKey;
-  static OverlayEntry? _currentOverlay;
-  static int _activeToasts = 0;
-  static const int _maxActiveToasts = 3;
 
   // Setter pour initialiser la navigatorKey
   static set navigatorKey(GlobalKey<NavigatorState>? key) {
@@ -22,36 +20,77 @@ class FeedbackService {
     required FeedbackType type,
     Duration? duration,
   }) {
-    // Limiter le nombre de toasts simultanés
-    if (_activeToasts >= _maxActiveToasts) {
-      return;
-    }
-
-    final overlay = Overlay.of(context);
-    late OverlayEntry entry;
-
-    entry = OverlayEntry(
-      builder: (context) => CustomToast(
-        message: message,
-        type: type,
-        duration: duration ?? const Duration(seconds: 4),
-      ),
+    final snackBar = _createSnackBar(
+      message: message,
+      type: type,
+      duration: duration ?? const Duration(seconds: 4),
     );
 
-    _activeToasts++;
-    overlay.insert(entry);
-    _currentOverlay = entry;
+    ScaffoldMessenger.of(context).showSnackBar(snackBar);
+  }
 
-    // Nettoyer quand le toast est terminé
-    Future.delayed(duration ?? const Duration(seconds: 4), () {
-      if (entry.mounted) {
-        entry.remove();
-        _activeToasts--;
-        if (_currentOverlay == entry) {
-          _currentOverlay = null;
-        }
-      }
-    });
+  static SnackBar _createSnackBar({
+    required String message,
+    required FeedbackType type,
+    required Duration duration,
+  }) {
+    Color backgroundColor;
+    Color textColor;
+    IconData icon;
+    Color iconColor;
+
+    switch (type) {
+      case FeedbackType.success:
+        backgroundColor = const Color(0xFFFFD400); // Jaune FONACO
+        textColor = Colors.black;
+        icon = Icons.check_circle;
+        iconColor = Colors.black;
+        break;
+      case FeedbackType.error:
+        backgroundColor = const Color(0xFFE74C3C); // Rouge erreur
+        textColor = Colors.white;
+        icon = Icons.error_outline;
+        iconColor = Colors.white;
+        break;
+      case FeedbackType.warning:
+        backgroundColor = const Color(0xFFF39C12); // Orange
+        textColor = Colors.white;
+        icon = Icons.warning_amber;
+        iconColor = Colors.white;
+        break;
+      case FeedbackType.info:
+        backgroundColor = const Color(0xFF2196F3); // Bleu
+        textColor = Colors.white;
+        icon = Icons.info_outline;
+        iconColor = Colors.white;
+        break;
+    }
+
+    return SnackBar(
+      content: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+      backgroundColor: backgroundColor,
+      duration: duration,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      margin: const EdgeInsets.all(16),
+    );
   }
 
   static void showSuccess(BuildContext context, String message) {
@@ -71,10 +110,8 @@ class FeedbackService {
     show(context, message: message, type: FeedbackType.warning);
   }
 
-  static void dismissAll() {
-    _currentOverlay?.remove();
-    _currentOverlay = null;
-    _activeToasts = 0;
+  static void dismissCurrent(BuildContext context) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
   }
 
   // Méthodes globales utilisant navigatorKey

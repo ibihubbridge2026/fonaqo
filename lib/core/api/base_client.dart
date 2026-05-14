@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logger/logger.dart';
 
 import '../config/api_config.dart';
+import '../utils/retry_utils.dart';
 
 /// Client HTTP centralisé pour toutes les appels API
 /// Utilise Dio avec intercepteurs pour authentification et logging
@@ -51,6 +52,7 @@ class BaseClient {
     // Ajout des intercepteurs
     _dio.interceptors.add(_AuthInterceptor(_secureStorage, _logger, _dio));
     _dio.interceptors.add(_LoggingInterceptor(_logger));
+    _dio.interceptors.add(RetryUtils.createRetryInterceptor(logger: _logger));
   }
 
   /// Méthode GET
@@ -330,10 +332,25 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
-    if (err.response?.statusCode == 401 &&
-        !_isPublicPath(err.requestOptions.path)) {
+    // FILTRAGE STRICT : Seules les vraies erreurs 401 déclenchent la déconnexion
+    final isExact401 = err.response?.statusCode == 401;
+    final isNotPublicPath = !_isPublicPath(err.requestOptions.path);
+    final hasResponse = err.response != null;
+
+    _logger.d(
+        '🔍 Analyse erreur: statusCode=${err.response?.statusCode}, isPublicPath=${_isPublicPath(err.requestOptions.path)}');
+
+    if (isExact401 && isNotPublicPath && hasResponse) {
+      // Log détaillé pour debug des erreurs 401
+      _logger.e('🔴 VRAIE ERREUR 401 DÉTECTÉE:');
+      _logger.e('📍 URL: ${err.requestOptions.uri}');
+      _logger.e('📍 Méthode: ${err.requestOptions.method}');
+      _logger.e('📍 Headers: ${err.requestOptions.headers}');
+      _logger.e('📍 Corps de l\'erreur: ${err.response?.data}');
+      _logger.e('📍 Message: ${err.message}');
+
       // Tenter de rafraîchir le token pour toute erreur 401
-      _logger.w('401 reçu — tentative de rafraîchissement du token JWT');
+      _logger.w('🔄 401 reçu — tentative de rafraîchissement du token JWT');
       final refreshed = await _tryRefreshToken();
 
       if (refreshed) {
@@ -352,12 +369,22 @@ class _AuthInterceptor extends Interceptor {
         }
       }
 
-      // Si le rafraîchissement échoue
-      _logger.w('JWT expiré ou invalide : suppression du stockage token');
+      // Si le rafraîchissement échoue, SEULEMENT là on déconnecte
+      _logger.w('🚨 JWT expiré ou invalide : DÉCONNEXION confirmée');
+      _logger.w('📍 Suppression du stockage token et appel de onTokenExpired');
       await _secureStorage.delete(key: _tokenKey);
       await _secureStorage.delete(key: _refreshTokenKey);
       await _secureStorage.delete(key: 'user_data');
       onTokenExpired?.call();
+      return; // Important : ne pas appeler handler.next(err) après déconnexion
+    }
+
+    // Pour toutes les autres erreurs (404, 500, réseau, etc.), on ne fait rien de spécial
+    if (err.response?.statusCode != null) {
+      _logger.d(
+          'ℹ️ Erreur ${err.response?.statusCode} gérée normalement: ${err.requestOptions.uri}');
+    } else {
+      _logger.d('ℹ️ Erreur réseau/générale: ${err.type} - ${err.message}');
     }
 
     handler.next(err);
@@ -373,6 +400,9 @@ class _AuthInterceptor extends Interceptor {
         baseUrl: ApiConfig.baseUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 10),
+        headers: {
+          'No-Auth': 'True'
+        }, // Évite l'interception par l'auth interceptor
       ));
 
       final response = await dio.post(
@@ -420,9 +450,37 @@ class _LoggingInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    _logger.e('❌ [${err.response?.statusCode}] ${err.requestOptions.uri}');
-    _logger.e('📥 Error Data: ${err.response?.data}');
-    _logger.e('📥 Error Message: ${err.message}');
+    // Catégoriser et logger les erreurs de manière plus intelligente
+    switch (err.type) {
+      case DioExceptionType.connectionError:
+        _logger.w('🔌 Connexion refusée: ${err.requestOptions.uri.host}');
+        break;
+      case DioExceptionType.connectionTimeout:
+        _logger.w('⏱️ Timeout de connexion: ${err.requestOptions.uri}');
+        break;
+      case DioExceptionType.receiveTimeout:
+        _logger.w('⏱️ Timeout de réception: ${err.requestOptions.uri}');
+        break;
+      case DioExceptionType.sendTimeout:
+        _logger.w('⏱️ Timeout d\'envoi: ${err.requestOptions.uri}');
+        break;
+      case DioExceptionType.badResponse:
+        _logger.e('❌ [${err.response?.statusCode}] ${err.requestOptions.uri}');
+        if (err.response?.data != null) {
+          _logger.d('📥 Response Data: ${err.response?.data}');
+        }
+        break;
+      case DioExceptionType.cancel:
+        _logger.d('🚫 Requête annulée: ${err.requestOptions.uri}');
+        break;
+      case DioExceptionType.badCertificate:
+        _logger.e('� Erreur SSL: ${err.requestOptions.uri}');
+        break;
+      case DioExceptionType.unknown:
+        _logger.e('❌ Erreur inconnue: ${err.message}');
+        break;
+    }
+
     handler.next(err);
   }
 }

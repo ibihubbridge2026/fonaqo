@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 
 import '../../core/api/base_client.dart';
 import '../../widgets/custom_app_bar.dart';
@@ -13,6 +14,7 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
   final BaseClient _api = BaseClient();
+  final Logger _logger = Logger();
   List<Map<String, dynamic>> _notifications = [];
   bool _loading = true;
   String? _error;
@@ -21,6 +23,53 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     _loadNotifications();
+  }
+
+  /// Extrait une liste de notifications quel que soit le format de réponse :
+  /// - liste pure : `[ {...}, {...} ]`
+  /// - enveloppe `{data: [...]}` ou `{data: {results: [...]}}`
+  /// - enveloppe `{results: [...]}` (pagination DRF)
+  List<Map<String, dynamic>> _extractNotifications(dynamic body) {
+    try {
+      List<dynamic>? raw;
+      if (body is List) {
+        raw = body;
+      } else if (body is Map) {
+        final data = body['data'];
+        if (data is List) {
+          raw = data;
+        } else if (data is Map && data['results'] is List) {
+          raw = data['results'] as List;
+        } else if (body['results'] is List) {
+          raw = body['results'] as List;
+        }
+      }
+      if (raw == null) {
+        _logger.e(
+            'Format de réponse notifications inattendu : ${body.runtimeType}');
+        return const [];
+      }
+      // Mapping élément par élément, avec log + skip en cas d'élément invalide.
+      final out = <Map<String, dynamic>>[];
+      for (final item in raw) {
+        try {
+          if (item is Map<String, dynamic>) {
+            out.add(item);
+          } else if (item is Map) {
+            out.add(Map<String, dynamic>.from(item));
+          } else {
+            _logger.e('Notification ignorée (type ${item.runtimeType}): $item');
+          }
+        } catch (e, st) {
+          _logger.e('Notification fromJson échoué — payload: $item',
+              error: e, stackTrace: st);
+        }
+      }
+      return out;
+    } catch (e, st) {
+      _logger.e('Extraction notifications échouée', error: e, stackTrace: st);
+      return const [];
+    }
   }
 
   Future<void> _loadNotifications() async {
@@ -32,15 +81,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       final response = await _api.get('notifications/');
       if (response.statusCode == 200) {
-        final data = response.data as List<dynamic>;
+        final items = _extractNotifications(response.data);
+        if (!mounted) return;
         setState(() {
-          _notifications = data.cast<Map<String, dynamic>>();
+          _notifications = items;
           _loading = false;
         });
       } else {
         throw Exception('Erreur ${response.statusCode}');
       }
-    } catch (e) {
+    } catch (e, st) {
+      _logger.e('loadNotifications', error: e, stackTrace: st);
       if (!mounted) return;
       setState(() {
         _error = e.toString();
@@ -118,18 +169,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      children: _notifications
-          .map((notif) => _NotifTile(
-                title: notif['title'] ?? '',
-                subtitle: notif['body'] ?? '',
-                time: notif['time_ago'] ?? '',
-                icon: _iconForTitle(notif['title'] ?? ''),
-                isRead: notif['is_read'] ?? false,
-                onTap: () {
-                  // TODO: Marquer comme lue via API
-                },
-              ))
-          .toList(),
+      children: _notifications.map((notif) {
+        try {
+          final title = notif['title']?.toString() ?? '';
+          final body = notif['body']?.toString() ?? '';
+          final timeAgo = notif['time_ago']?.toString() ?? '';
+          final isRead = notif['is_read'] == true;
+          return _NotifTile(
+            title: title,
+            subtitle: body,
+            time: timeAgo,
+            icon: _iconForTitle(title),
+            isRead: isRead,
+            onTap: () {
+              // TODO: Marquer comme lue via API
+            },
+          );
+        } catch (e, st) {
+          _logger.e('Rendu d\'une notification a échoué — payload: $notif',
+              error: e, stackTrace: st);
+          return const SizedBox.shrink();
+        }
+      }).toList(),
     );
   }
 }

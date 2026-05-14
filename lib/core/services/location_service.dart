@@ -1,7 +1,27 @@
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:app_settings/app_settings.dart';
 import 'package:logger/logger.dart';
 import 'dart:async';
+
+/// Énumération pour les différents états de permission de localisation
+enum LocationPermissionStatus {
+  /// La permission est accordée
+  granted,
+
+  /// La permission est refusée
+  denied,
+
+  /// La permission est refusée définitivement (nécessite intervention manuelle)
+  deniedForever,
+
+  /// Les services de localisation sont désactivés
+  serviceDisabled,
+
+  /// Une erreur s'est produite
+  error,
+}
 
 class LocationService {
   final Logger _logger = Logger();
@@ -38,6 +58,61 @@ class LocationService {
 
     return permission == LocationPermission.whileInUse ||
         permission == LocationPermission.always;
+  }
+
+  /// Vérifie si les services de localisation sont activés et demande les permissions si nécessaire
+  /// Retourne true si la localisation est disponible, false sinon
+  Future<LocationPermissionStatus> checkAndRequestLocation() async {
+    try {
+      // 1. Vérifier si les services de localisation sont activés
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _logger.w('Services de localisation désactivés');
+        return LocationPermissionStatus.serviceDisabled;
+      }
+
+      // 2. Vérifier les permissions actuelles
+      LocationPermission permission = await Geolocator.checkPermission();
+
+      // 3. Demander la permission si elle n'est pas accordée
+      if (permission == LocationPermission.denied) {
+        _logger.d('Permission de localisation refusée, demande en cours...');
+        permission = await Geolocator.requestPermission();
+
+        if (permission == LocationPermission.denied) {
+          _logger.w('Permission de localisation refusée par l\'utilisateur');
+          return LocationPermissionStatus.denied;
+        }
+      }
+
+      // 4. Gérer le cas où la permission est refusée définitivement
+      if (permission == LocationPermission.deniedForever) {
+        _logger.w('Permission de localisation refusée définitivement');
+        return LocationPermissionStatus.deniedForever;
+      }
+
+      // 5. Vérifier si nous avons les permissions nécessaires
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
+        _logger.d('Permission de localisation accordée: $permission');
+        return LocationPermissionStatus.granted;
+      }
+
+      return LocationPermissionStatus.denied;
+    } catch (e, st) {
+      _logger.e('Erreur lors de la vérification de la localisation',
+          error: e, stackTrace: st);
+      return LocationPermissionStatus.error;
+    }
+  }
+
+  /// Ouvre les paramètres de l'application pour que l'utilisateur puisse activer la localisation
+  Future<void> openAppSettings() async {
+    try {
+      await AppSettings.openAppSettings(type: AppSettingsType.settings);
+    } catch (e) {
+      _logger.e('Erreur lors de l\'ouverture des paramètres: $e');
+    }
   }
 
   Future<void> getCurrentLocation() async {

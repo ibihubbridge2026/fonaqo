@@ -216,12 +216,93 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
             ),
             child: Column(
               children: [
-                _buildDetailRow('Lieu', _mission!.address ?? 'Non spécifié'),
+                _buildDetailRow(
+                    'Lieu', _mission!.address ?? 'Adresse non spécifiée'),
                 _buildDetailRow(
                     'Prix', '${_mission!.price.toStringAsFixed(0)} FCFA'),
-                _buildDetailRow('Catégorie', _mission!.category ?? 'Général'),
                 _buildDetailRow(
-                    'Date', _mission!.createdAt.toString().split(' ')[0]),
+                    'Catégorie', _mission!.category ?? 'Non catégorisée'),
+                _buildDetailRow(
+                    'Date',
+                    _mission!.createdAt != null
+                        ? _mission!.createdAt.toString().split(' ')[0]
+                        : 'Date non disponible'),
+                _buildDetailRow(
+                    'Client', _mission!.clientName ?? 'Client non spécifié'),
+                if (_mission!.agentName != null)
+                  _buildDetailRow('Agent', _mission!.agentName!),
+                if (_mission!.isUrgent) _buildDetailRow('Urgence', 'Oui'),
+                if (_mission!.isConfidential)
+                  _buildDetailRow('Confidentiel', 'Oui'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Bouton "Ouvrir un litige"
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1C1C),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFD400),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.gpp_maybe_rounded,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Signaler un problème',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            'Un souci ? Nous intervenons.',
+                            style:
+                                TextStyle(color: Colors.white60, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () =>
+                      Navigator.pushNamed(context, AppRoutes.litige),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFD400),
+                    foregroundColor: Colors.black,
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'OUVRIR UN LITIGE',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
               ],
             ),
           ),

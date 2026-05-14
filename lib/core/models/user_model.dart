@@ -1,3 +1,5 @@
+import '../config/api_config.dart';
+
 /// Modèle utilisateur pour l'application FONACO
 /// Reflète la structure du backend Django
 class UserModel {
@@ -35,6 +37,13 @@ class UserModel {
 
   /// Crée un UserModel à partir d'un JSON (réponse API)
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    // Gestion des URLs d'avatar relatives
+    String? avatarUrl = json['avatar_url']?.toString();
+    if (avatarUrl != null && !avatarUrl.startsWith('http')) {
+      // Ajouter l'URL de base du serveur pour les URLs relatives
+      avatarUrl = '${ApiConfig.serverUrl}$avatarUrl';
+    }
+
     return UserModel(
       id: json['id']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
@@ -44,7 +53,7 @@ class UserModel {
       lastName: json['last_name']?.toString(),
       role: json['role']?.toString() ?? 'client',
       isVerified: json['is_verified'] as bool? ?? false,
-      avatarUrl: json['avatar_url']?.toString(),
+      avatarUrl: avatarUrl,
       walletBalance: (json['wallet_balance'] as num?)?.toDouble(),
       agentProfile: json['agent_profile'] != null
           ? AgentProfile.fromJson(json['agent_profile'] as Map<String, dynamic>)

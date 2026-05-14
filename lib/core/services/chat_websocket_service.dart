@@ -6,6 +6,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logger/logger.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
+import '../config/api_config.dart';
+
 /// Exception personnalisée pour les erreurs de chat
 class ChatConnectionException implements Exception {
   final String message;
@@ -39,15 +41,11 @@ class ChatWebSocketMessage {
     final senderName = json['sender']?.toString() ?? '';
 
     return ChatWebSocketMessage(
-      id:
-          json['id']?.toString() ??
+      id: json['id']?.toString() ??
           DateTime.now().millisecondsSinceEpoch.toString(),
-      content: json['content']?.toString() ??
-          json['message']?.toString() ??
-          '',
+      content: json['content']?.toString() ?? json['message']?.toString() ?? '',
       sender: senderName,
-      timestamp:
-          DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
+      timestamp: DateTime.tryParse(json['timestamp']?.toString() ?? '') ??
           DateTime.now(),
       isMe: senderName == currentUsername,
     );
@@ -78,8 +76,7 @@ class ChatWebSocketService extends ChangeNotifier {
   String? _lastError;
 
   /// Getters
-  List<ChatWebSocketMessage> get messages =>
-      List.unmodifiable(_messages);
+  List<ChatWebSocketMessage> get messages => List.unmodifiable(_messages);
 
   bool get isConnected => _isConnected;
 
@@ -96,8 +93,7 @@ class ChatWebSocketService extends ChangeNotifier {
   final StreamController<bool> _typingController =
       StreamController<bool>.broadcast();
 
-  Stream<ChatWebSocketMessage> get messageStream =>
-      _messageController.stream;
+  Stream<ChatWebSocketMessage> get messageStream => _messageController.stream;
 
   Stream<bool> get typingStream => _typingController.stream;
 
@@ -145,7 +141,7 @@ class ChatWebSocketService extends ChangeNotifier {
         );
       }
 
-      const baseUrl = 'http://192.168.1.73:8000';
+      final baseUrl = ApiConfig.serverUrl;
 
       final wsUrl = Uri.parse(
         '${baseUrl.replaceFirst('http', 'ws')}/ws/chat/$missionId/',
@@ -194,8 +190,7 @@ class ChatWebSocketService extends ChangeNotifier {
   /// Réception message
   void _handleMessage(dynamic rawMessage) {
     try {
-      final data = jsonDecode(rawMessage as String)
-          as Map<String, dynamic>;
+      final data = jsonDecode(rawMessage as String) as Map<String, dynamic>;
 
       if (data['type'] == 'typing') {
         _isTyping = data['is_typing'] ?? false;
@@ -329,8 +324,7 @@ class ChatWebSocketService extends ChangeNotifier {
 
   /// Username courant
   String _getCurrentUsername() {
-    if (_currentUsername != null &&
-        _currentUsername!.isNotEmpty) {
+    if (_currentUsername != null && _currentUsername!.isNotEmpty) {
       return _currentUsername!;
     }
 

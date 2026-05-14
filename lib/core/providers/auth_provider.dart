@@ -77,8 +77,54 @@ class AuthProvider extends ChangeNotifier {
 
   void handleTokenExpired() {
     _logger.w('Déconnexion automatique : token expiré');
-    logout();
+    _clearUserDataAndNotify();
     _setError('Votre session a expiré. Veuillez vous reconnecter.');
+  }
+
+  /// Nettoie les données utilisateur et notifie les listeners
+  void _clearUserDataAndNotify() {
+    _currentUser = null;
+    _isAuthenticated = false;
+    notifyListeners();
+  }
+
+  /// Vérifie si un token JWT est expiré en parsant le payload
+  bool _isTokenExpired(String token) {
+    try {
+      // Format JWT: header.payload.signature
+      final parts = token.split('.');
+      if (parts.length != 3) return true; // Format invalide = expiré
+
+      final payload = parts[1];
+      // Padding pour base64 si nécessaire
+      final paddedPayload =
+          payload.padRight((payload.length + 3) ~/ 4 * 4, '=');
+
+      final decoded = String.fromCharCodes(base64
+          .decode(paddedPayload.replaceAll('-', '+').replaceAll('_', '/')));
+
+      final payloadMap = jsonDecode(decoded) as Map<String, dynamic>;
+      final exp = payloadMap['exp'] as int?;
+
+      if (exp == null)
+        return true; // Pas de date d'expiration = expiré par sécurité
+
+      final expirationTime = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+      final now = DateTime.now();
+
+      // Ajouter une marge de 30 secondes pour éviter les courses aux conditions
+      final isExpired =
+          now.isAfter(expirationTime.subtract(const Duration(seconds: 30)));
+
+      if (isExpired) {
+        _logger.d('Token expiré: expiration=$expirationTime, now=$now');
+      }
+
+      return isExpired;
+    } catch (e) {
+      _logger.e('Erreur parsing token JWT: $e');
+      return true; // En cas d'erreur, considérer comme expiré
+    }
   }
 
   // =========================
@@ -90,20 +136,80 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
 
     try {
+      // Nettoyer les champs de connexion pour éviter les espaces invisibles
+      final cleanedCredentials = Map<String, dynamic>.from(credentials);
+      if (cleanedCredentials.containsKey('email')) {
+        cleanedCredentials['email'] =
+            cleanedCredentials['email']?.toString().trim();
+      }
+      if (cleanedCredentials.containsKey('phone_number')) {
+        cleanedCredentials['phone_number'] =
+            cleanedCredentials['phone_number']?.toString().trim();
+      }
+      if (cleanedCredentials.containsKey('password')) {
+        cleanedCredentials['password'] =
+            cleanedCredentials['password']?.toString().trim();
+      }
+
       final response =
-          await _baseClient.post('accounts/login/', data: credentials);
+          await _baseClient.post('accounts/login/', data: cleanedCredentials);
 
       if (response.statusCode != 200) {
-        _setError(response.data['message'] ?? 'Erreur de connexion');
+        // Gestion spécifique des erreurs 400 (identifiants incorrects)
+        String errorMessage = 'Erreur de connexion';
+        if (response.statusCode == 400) {
+          // Erreur 400 : afficher le message exact du backend
+          errorMessage = response.data['message'] ??
+              response.data['error'] ??
+              response.data['detail'] ??
+              'Identifiants incorrects';
+          _logger.e('🔴 Erreur 400 login: $errorMessage');
+        } else if (response.statusCode == 401) {
+          errorMessage = 'Identifiants incorrects';
+          _logger.e('🔴 Erreur 401 login: $errorMessage');
+        } else {
+          errorMessage = response.data['message'] ??
+              response.data['error'] ??
+              'Erreur de connexion (code: ${response.statusCode})';
+          _logger.e('🔴 Erreur login ${response.statusCode}: $errorMessage');
+        }
+
+        _setError(errorMessage);
         return false;
       }
 
       final data = response.data['data'];
       await _saveAuthData(data);
       return true;
+    } on DioException catch (e) {
+      _logger.e(
+          '🔴 Erreur Dio LOGIN: ${e.response?.statusCode} - ${e.response?.data}');
+
+      // Gestion spécifique des erreurs Dio
+      String errorMessage = 'Erreur de connexion';
+      if (e.response?.statusCode == 400) {
+        errorMessage = e.response?.data['message'] ??
+            e.response?.data['error'] ??
+            e.response?.data['detail'] ??
+            'Identifiants incorrects';
+      } else if (e.response?.statusCode == 401) {
+        errorMessage = 'Identifiants incorrects';
+      } else if (e.type == DioExceptionType.connectionError) {
+        errorMessage =
+            'Serveur indisponible. Vérifiez votre connexion internet.';
+      } else if (e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.connectionTimeout) {
+        errorMessage = 'Délai d\'attente dépassé. Réessayez dans un instant.';
+      } else {
+        errorMessage = 'Erreur réseau: ${e.message}';
+      }
+
+      _setError(errorMessage);
+      return false;
     } catch (e) {
-      _logger.e('Erreur LOGIN: $e');
-      _setError('Erreur réseau: ${e.toString()}');
+      _logger.e('🔴 Erreur inattendue LOGIN: $e');
+      _setError('Erreur inattendue: ${e.toString()}');
       return false;
     } finally {
       _setLoading(false);
@@ -161,11 +267,51 @@ class AuthProvider extends ChangeNotifier {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = response.data['data'];
         await _saveAuthData(data);
+
+        // Charger immédiatement les données utilisateur pour mettre à jour l'UI
+        await _loadUserData();
+
         return true;
       }
       return false;
     } catch (e) {
       _logger.e('Erreur Google Auth: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<bool> updatePhoneNumber(String phoneNumber) async {
+    _clearError();
+    _setLoading(true);
+
+    try {
+      final response = await _baseClient.patch(
+        'accounts/update-phone/',
+        data: {
+          'phone_number': phoneNumber,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final userData = response.data['data']['user'];
+
+        // Mettre à jour les données utilisateur localement
+        await _secureStorage.write(key: _userKey, value: jsonEncode(userData));
+
+        // Recharger les données utilisateur pour mettre à jour l'état
+        await _loadUserData();
+
+        _logger.i('📱 Numéro de téléphone mis à jour avec succès');
+        return true;
+      } else {
+        _setError('Erreur lors de la mise à jour du numéro de téléphone');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Erreur updatePhoneNumber: $e');
+      _setError('Une erreur est survenue: ${e.toString()}');
       return false;
     } finally {
       _setLoading(false);
@@ -181,16 +327,35 @@ class AuthProvider extends ChangeNotifier {
     final refreshTokenValue = data['refresh_token'];
     final userData = data['user'];
 
+    _logger.i('💾 Sauvegarde des données d\'authentification...');
+
     await _secureStorage.deleteAll();
+    _logger.d('🗑️ Stockage nettoyé');
+
     await _secureStorage.write(key: _tokenKey, value: accessToken);
+    _logger.d('🔑 Access token sauvegardé: ${_tokenKey}');
+
     if (refreshTokenValue != null) {
       await _secureStorage.write(
           key: _refreshTokenKey, value: refreshTokenValue);
+      _logger.d('🔄 Refresh token sauvegardé: ${_refreshTokenKey}');
     }
-    await _secureStorage.write(key: _userKey, value: jsonEncode(userData));
 
-    _currentUser = UserModel.fromJson(userData);
-    _isAuthenticated = true;
+    await _secureStorage.write(key: _userKey, value: jsonEncode(userData));
+    _logger.d('👤 Données utilisateur sauvegardées: ${_userKey}');
+
+    // Vérification que tout est bien sauvegardé
+    final savedToken = await _secureStorage.read(key: _tokenKey);
+    final savedUser = await _secureStorage.read(key: _userKey);
+
+    if (savedToken != null && savedUser != null) {
+      _logger.i('✅ Données d\'authentification sauvegardées avec succès');
+      _currentUser = UserModel.fromJson(userData);
+      _isAuthenticated = true;
+    } else {
+      _logger.e('❌ Erreur lors de la sauvegarde des données');
+      throw Exception('Échec de la sauvegarde des données d\'authentification');
+    }
 
     await NotificationService().sendTokenToBackend(accessToken);
     notifyListeners();
@@ -233,23 +398,73 @@ class AuthProvider extends ChangeNotifier {
   Future<void> logout() async {
     _setLoading(true);
     await _secureStorage.deleteAll();
-    _currentUser = null;
-    _isAuthenticated = false;
+    _clearUserDataAndNotify();
     _setLoading(false);
   }
 
   Future<void> _loadUserData() async {
     try {
+      // LOGS DÉTAILLÉS DU SECURE STORAGE AU DÉMARRAGE
+      _logger.i('🔍 Vérification du SecureStorage au démarrage...');
+
       final token = await _secureStorage.read(key: _tokenKey);
+      final refreshToken = await _secureStorage.read(key: _refreshTokenKey);
       final userDataString = await _secureStorage.read(key: _userKey);
 
+      _logger.i('📋 Contenu SecureStorage:');
+      _logger.i(
+          '  🎫 Token: ${token != null ? "Présent (${token.length} chars)" : "ABSENT"}');
+      _logger.i(
+          '  🔄 Refresh Token: ${refreshToken != null ? "Présent (${refreshToken.length} chars)" : "ABSENT"}');
+      _logger.i(
+          '  👤 User Data: ${userDataString != null ? "Présent (${userDataString.length} chars)" : "ABSENT"}');
+
+      // Vérification basique de l'expiration du token (format JWT)
+      if (token != null && _isTokenExpired(token)) {
+        _logger.w(
+            '🚨 Token JWT expiré détecté au démarrage, nettoyage automatique');
+        await _secureStorage.deleteAll();
+        _clearUserDataAndNotify();
+        _setError('Votre session a expiré. Veuillez vous reconnecter.');
+        return;
+      }
+
       if (token != null && userDataString != null) {
-        _currentUser = UserModel.fromJson(jsonDecode(userDataString));
-        _isAuthenticated = true;
+        // Charger l'utilisateur depuis le cache SANS tenter de refresh
+        try {
+          _currentUser = UserModel.fromJson(jsonDecode(userDataString));
+          _isAuthenticated = true;
+          _logger.i(
+              '✅ Utilisateur chargé depuis le cache: ${_currentUser?.email}');
+          _logger.i('📍 Session restaurée (refresh automatique désactivé)');
+          _logger
+              .i('🛡️ handleTokenExpired ne sera JAMAIS appelé au démarrage');
+          _logger.i(
+              '📍 Seule une vraie erreur 401 API déclenchera la déconnexion');
+        } catch (e) {
+          _logger.e('❌ Erreur parsing utilisateur depuis cache: $e');
+          await _secureStorage.deleteAll();
+          _currentUser = null;
+          _isAuthenticated = false;
+          notifyListeners();
+          return;
+        }
+
+        // REFRESH AUTOMATIQUE DÉSACTIVÉ - Laisser l'intercepteur gérer les 401 réelles
+        _logger.i(
+            '📍 Refresh automatique désactivé - l\'intercepteur gérera les 401 si nécessaire');
+      } else {
+        _logger.w('⚠️ Session incomplète - certains tokens manquent');
+        _logger.w('📍 Aucune action de déconnexion automatique au démarrage');
       }
       notifyListeners();
     } catch (e) {
-      _logger.e('Erreur chargement utilisateur: $e');
+      _logger.e('❌ Erreur critique chargement utilisateur: $e');
+      // Seulement en cas d'erreur critique, on nettoie tout
+      await _secureStorage.deleteAll();
+      _currentUser = null;
+      _isAuthenticated = false;
+      notifyListeners();
     }
   }
 

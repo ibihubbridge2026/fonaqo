@@ -1,3 +1,29 @@
+import 'package:logger/logger.dart';
+
+/// Logger dédié au mapping JSON des missions.
+final Logger _missionLogger = Logger();
+
+/// Énumération des statuts de mission (Dart enhanced enum).
+enum MissionStatus {
+  PENDING('pending', 'En attente'),
+  ACCEPTED('accepted', 'Acceptée'),
+  ON_THE_WAY('on_the_way', 'En route'),
+  ARRIVED('arrived', 'Sur place'),
+  IN_PROGRESS('in_progress', 'En cours'),
+  COMPLETED('completed', 'Terminée'),
+  CANCELLED('cancelled', 'Annulée'),
+  DISPUTED('disputed', 'En litige'),
+  UNKNOWN('unknown', 'Inconnu');
+
+  final String apiName;
+  final String label;
+
+  const MissionStatus(this.apiName, this.label);
+
+  /// Conserve la compatibilité avec les appels existants `status.name`.
+  String get name => apiName;
+}
+
 /// Modèle de mission pour l'application FONACO
 /// Reflète la structure du backend Django (UUID + coordonnées plates).
 class MissionModel {
@@ -42,39 +68,70 @@ class MissionModel {
   });
 
   /// Crée un MissionModel à partir d'un JSON (réponse API).
+  /// Tous les champs disposent de valeurs par défaut pour résister aux
+  /// payloads partiels. Les erreurs sont loguées pour diagnostic.
   factory MissionModel.fromJson(Map<String, dynamic> json) {
-    return MissionModel(
-      id: json['id']?.toString() ?? '',
-      title: json['title']?.toString() ?? '',
-      description: json['description']?.toString() ?? '',
-      price: _readDouble(json['price']) ?? 0.0,
-      status: parseMissionStatus(json['status']?.toString()),
-      latitude: _readDouble(json['latitude']),
-      longitude: _readDouble(json['longitude']),
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'].toString())
-          : null,
-      updatedAt: json['updated_at'] != null
-          ? DateTime.tryParse(json['updated_at'].toString())
-          : null,
-      clientName: json['client_name']?.toString(),
-      agentName: json['agent_name']?.toString(),
-      address: json['address']?.toString(),
-      category: json['category']?.toString(),
-      avatarUrl: json['avatar_url']?.toString(),
-      isVerified: json['is_verified'] as bool? ?? false,
-      isConfidential: json['is_confidential'] as bool? ?? false,
-      isUrgent: json['is_urgent'] as bool? ?? false,
-      tags: json['tags'] != null
-          ? (json['tags'] as List<dynamic>).map((e) => e.toString()).toList()
-          : null,
-    );
+    try {
+      return MissionModel(
+        id: json['id']?.toString() ?? '',
+        title: json['title']?.toString() ?? '',
+        description: json['description']?.toString() ?? '',
+        price: _readDouble(json['price']) ?? 0.0,
+        status: parseMissionStatus(json['status']?.toString()),
+        latitude: _readDouble(json['latitude']),
+        longitude: _readDouble(json['longitude']),
+        createdAt: _readDate(json['created_at']),
+        updatedAt: _readDate(json['updated_at']),
+        clientName: json['client_name']?.toString(),
+        agentName: json['agent_name']?.toString(),
+        address: json['address']?.toString(),
+        category: json['category']?.toString(),
+        avatarUrl: json['avatar_url']?.toString(),
+        isVerified: _readBool(json['is_verified']),
+        isConfidential: _readBool(json['is_confidential']),
+        isUrgent: _readBool(json['is_urgent']),
+        tags: _readStringList(json['tags']),
+      );
+    } catch (e, st) {
+      _missionLogger.e(
+        'MissionModel.fromJson a échoué — payload: $json',
+        error: e,
+        stackTrace: st,
+      );
+      // Retourne une mission « squelette » plutôt que de propager
+      // une exception qui ferait crasher la liste entière.
+      return MissionModel(
+        id: json['id']?.toString() ?? '',
+        title: json['title']?.toString() ?? 'Mission',
+        description: '',
+        price: 0,
+        status: MissionStatus.UNKNOWN,
+      );
+    }
   }
 
   static double? _readDouble(dynamic v) {
     if (v == null) return null;
     if (v is num) return v.toDouble();
     return double.tryParse(v.toString());
+  }
+
+  static DateTime? _readDate(dynamic v) {
+    if (v == null) return null;
+    return DateTime.tryParse(v.toString());
+  }
+
+  static bool _readBool(dynamic v) {
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    if (v is String) return v.toLowerCase() == 'true' || v == '1';
+    return false;
+  }
+
+  static List<String>? _readStringList(dynamic v) {
+    if (v == null) return null;
+    if (v is List) return v.map((e) => e.toString()).toList();
+    return null;
   }
 
   /// Convertit le MissionModel en JSON (requête API).
@@ -84,7 +141,7 @@ class MissionModel {
       'title': title,
       'description': description,
       'price': price,
-      'status': status.name,
+      'status': status.apiName,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
       if (createdAt != null) 'created_at': createdAt!.toIso8601String(),
@@ -193,61 +250,5 @@ class MissionModel {
         description.hashCode ^
         price.hashCode ^
         status.hashCode;
-  }
-}
-
-/// Énumération des statuts de mission.
-enum MissionStatus {
-  PENDING,
-  ACCEPTED,
-  ON_THE_WAY,
-  ARRIVED,
-  IN_PROGRESS,
-  COMPLETED,
-  CANCELLED,
-  DISPUTED;
-
-  /// Retourne le nom formaté du statut.
-  String get name {
-    switch (this) {
-      case PENDING:
-        return 'pending';
-      case ACCEPTED:
-        return 'accepted';
-      case ON_THE_WAY:
-        return 'on_the_way';
-      case ARRIVED:
-        return 'arrived';
-      case IN_PROGRESS:
-        return 'in_progress';
-      case COMPLETED:
-        return 'completed';
-      case CANCELLED:
-        return 'cancelled';
-      case DISPUTED:
-        return 'disputed';
-    }
-  }
-
-  /// Retourne le libellé du statut en français.
-  String get label {
-    switch (this) {
-      case PENDING:
-        return 'En attente';
-      case ACCEPTED:
-        return 'Acceptée';
-      case ON_THE_WAY:
-        return 'En route';
-      case ARRIVED:
-        return 'Sur place';
-      case IN_PROGRESS:
-        return 'En cours';
-      case COMPLETED:
-        return 'Terminée';
-      case CANCELLED:
-        return 'Annulée';
-      case DISPUTED:
-        return 'En litige';
-    }
   }
 }

@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/models/country_model.dart';
+import '../../core/services/location_service.dart';
+import '../../core/services/feedback_service.dart';
+import '../auth/widgets/phone_input_card.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -75,6 +78,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         final success = await authProvider.register(registerData);
 
         if (success && mounted) {
+          // Demander la localisation après une inscription réussie
+          await _requestLocationAfterRegistration();
           Navigator.pushReplacementNamed(context, AppRoutes.mainShell);
         }
       } catch (e) {
@@ -173,31 +178,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 25),
 
                     // CHAMPS DE SAISIE
-                    _buildField(
-                      controller: _nameController,
-                      hint: "Nom complet",
-                      icon: Icons.person_outline,
-                    ),
-                    const SizedBox(height: 15),
+                    // _buildField(
+                    //   controller: _nameController,
+                    //   hint: "Nom complet",
+                    //   icon: Icons.person_outline,
+                    // ),
+                    // const SizedBox(height: 15),
 
-                    // SÉLECTEUR DE PAYS
-                    CountrySelector(
-                      selectedCountry: _selectedCountry,
-                      onCountrySelected: (Country country) {
-                        setState(() {
-                          _selectedCountry = country;
-                        });
+                    PhoneInputCard(
+                      country: _selectedCountry,
+                      onCountryPressed: () async {
+                        final picked = await pickCountry(
+                          context,
+                          _selectedCountry,
+                        );
+
+                        if (picked != null) {
+                          setState(() {
+                            _selectedCountry = picked;
+                          });
+                        }
                       },
-                    ),
-
-                    const SizedBox(height: 15),
-                    _buildField(
                       controller: _phoneController,
-                      hint: "Numéro de téléphone",
-                      icon: Icons.phone_android_outlined,
-                      type: TextInputType.phone,
                     ),
                     const SizedBox(height: 15),
+
                     _buildField(
                       controller: _emailController,
                       hint: "Email (Optionnel)",
@@ -260,57 +265,96 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
 
-                    // DÉJÀ MEMBRE
-                    Center(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text("Déjà membre ?"),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text(
-                              "Connexion",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFFD4AF37),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // GOOGLE
-                    Center(
-                      child: Column(
-                        children: [
-                          Text(
-                            "OU",
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          "Déjà membre ?",
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: const Text(
+                            "Connexion",
                             style: TextStyle(
-                              color: Colors.grey[400],
-                              fontSize: 12,
+                              color: Color(0xFFD4AF37),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          TextButton.icon(
-                            onPressed: () {},
-                            icon: const FaIcon(
-                              FontAwesomeIcons.google,
-                              size: 16,
-                              color: Color(0xFFEA4335),
-                            ),
-                            label: const Text(
-                              "Continuer avec Google",
-                              style: TextStyle(color: Colors.black87),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Divider(color: Colors.grey[300]),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                          ),
+                          child: Text(
+                            "OU",
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ],
+                        ),
+                        Expanded(
+                          child: Divider(color: Colors.grey[300]),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 22),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final authProvider = context.read<AuthProvider>();
+
+                          final success = await authProvider.signInWithGoogle();
+
+                          if (success && mounted) {
+                            Navigator.pushReplacementNamed(
+                              context,
+                              AppRoutes.mainShell,
+                            );
+                          }
+                        },
+                        icon: const FaIcon(
+                          FontAwesomeIcons.google,
+                          color: Color(0xFFEA4335),
+                          size: 18,
+                        ),
+                        label: const Text(
+                          "Continuer avec Google",
+                          style: TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: Colors.grey.shade300,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
                       ),
                     ),
+
+                    const SizedBox(height: 35),
                   ],
                 ),
               ),
@@ -319,6 +363,65 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       ),
     );
+  }
+
+  /// Demande la localisation après une inscription réussie
+  Future<void> _requestLocationAfterRegistration() async {
+    try {
+      final locationService = LocationService();
+      final permissionStatus = await locationService.checkAndRequestLocation();
+
+      if (permissionStatus == LocationPermissionStatus.granted) {
+        // La permission est accordée, obtenir la position actuelle
+        await locationService.getCurrentLocation();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Localisation activée avec succès !'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        // La permission est refusée, afficher un message explicatif
+        String message =
+            'La localisation est nécessaire pour vous proposer des missions proches de vous.';
+
+        if (permissionStatus == LocationPermissionStatus.deniedForever) {
+          message +=
+              ' Veuillez l\'activer dans les paramètres de votre appareil.';
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: Colors.orange,
+              duration: const Duration(seconds: 5),
+              action: permissionStatus == LocationPermissionStatus.deniedForever
+                  ? SnackBarAction(
+                      label: 'Paramètres',
+                      textColor: Colors.white,
+                      onPressed: () => locationService.openAppSettings(),
+                    )
+                  : null,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+                'Erreur lors de l\'activation de la localisation: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   // Widget pour les boutons de rôle
