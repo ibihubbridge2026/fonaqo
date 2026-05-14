@@ -90,16 +90,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
       dynamic profileData;
 
+      // Logique corrigée : Si image présente, on utilise FormData pour le multipart/form-data
       if (_profileImage != null) {
-<<<<<<< HEAD
-        final avatarUrl = await authProvider.uploadProfileImage(_profileImage!);
-        if (avatarUrl != null) {
-          profileData['avatar_url'] = avatarUrl;
-        }
-=======
         profileData = FormData.fromMap({
           'first_name': _firstName.text.trim(),
           'last_name': _lastName.text.trim(),
@@ -109,27 +103,29 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           ),
         });
       } else {
+        // Sinon un simple Map JSON suffit
         profileData = {
           'first_name': _firstName.text.trim(),
           'last_name': _lastName.text.trim(),
         };
->>>>>>> baf250f (mmisse a jour ddu gradle)
       }
 
       final success = await authProvider.updateProfile(profileData);
 
       if (mounted) {
         if (success) {
-          authProvider.showSuccessSnackBar(
-            context,
-            'Profil mis à jour avec succès',
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profil mis à jour avec succès'),
+              backgroundColor: Colors.green,
+            ),
           );
-          // Optionally navigate back
-          // Navigator.of(context).pop();
         } else {
-          authProvider.showErrorSnackBar(
-            context,
-            authProvider.errorMessage ?? 'Erreur lors de la mise à jour',
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(authProvider.errorMessage ?? 'Erreur lors de la mise à jour'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       }

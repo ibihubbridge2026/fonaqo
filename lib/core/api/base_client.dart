@@ -58,12 +58,14 @@ class BaseClient {
     String path, {
     Map<String, dynamic>? queryParameters,
     Options? options,
+    ProgressCallback? onReceiveProgress,
   }) async {
     try {
       return await _dio.get(
         path,
         queryParameters: queryParameters,
         options: options,
+        onReceiveProgress: onReceiveProgress,
       );
     } on DioException catch (e) {
       throw _handleDioError(e);
@@ -76,6 +78,8 @@ class BaseClient {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     Options? options,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
   }) async {
     try {
       return await _dio.post(
@@ -83,6 +87,8 @@ class BaseClient {
         data: data,
         queryParameters: queryParameters,
         options: options,
+        onSendProgress: onSendProgress,
+        onReceiveProgress: onReceiveProgress,
       );
     } on DioException catch (e) {
       throw _handleDioError(e);
@@ -95,6 +101,8 @@ class BaseClient {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     Options? options,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
   }) async {
     try {
       return await _dio.put(
@@ -102,6 +110,8 @@ class BaseClient {
         data: data,
         queryParameters: queryParameters,
         options: options,
+        onSendProgress: onSendProgress,
+        onReceiveProgress: onReceiveProgress,
       );
     } on DioException catch (e) {
       throw _handleDioError(e);
@@ -133,6 +143,8 @@ class BaseClient {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     Options? options,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
   }) async {
     try {
       return await _dio.patch(
@@ -140,6 +152,8 @@ class BaseClient {
         data: data,
         queryParameters: queryParameters,
         options: options,
+        onSendProgress: onSendProgress,
+        onReceiveProgress: onReceiveProgress,
       );
     } on DioException catch (e) {
       throw _handleDioError(e);
@@ -159,10 +173,9 @@ class BaseClient {
         );
 
       case DioExceptionType.badResponse:
-        return _handleHttpError(
-          error.response?.statusCode ?? 0,
-          error.response?.data,
-        );
+        final statusCode = error.response?.statusCode;
+        final responseData = error.response?.data;
+        return _handleHttpError(statusCode ?? 0, responseData);
 
       case DioExceptionType.cancel:
         return ApiException(
@@ -272,19 +285,30 @@ class _AuthInterceptor extends Interceptor {
   final Logger _logger;
   final Dio _dio; // Ajout de l'instance Dio
   final Function()? onTokenExpired;
-  static const String _tokenKey = 'jwt_token';
-  static const String _refreshTokenKey = 'refresh_token';
+  static const String _tokenKey = 'jwt_access_token';
+  static const String _refreshTokenKey = 'jwt_refresh_token';
   bool _isRefreshing = false;
 
-  _AuthInterceptor(this._secureStorage, this._logger, this._dio,
-      {this.onTokenExpired});
+  _AuthInterceptor(
+    this._secureStorage,
+    this._logger,
+    this._dio, {
+    this.onTokenExpired,
+  });
 
+  /// Vérifie si le chemin est public (ne nécessite pas d'authentification)
   bool _isPublicPath(String path) {
-    return path.contains('accounts/login/') ||
-        path.contains('accounts/register/') ||
-        path.contains('accounts/forgot-password/') ||
-        path.contains('accounts/google-auth/') ||
-        path.contains('accounts/token/refresh/');
+    final publicPaths = [
+      'accounts/login/',
+      'accounts/register/',
+      'accounts/refresh/',
+      'accounts/logout/',
+      'accounts/forgot-password/',
+      'accounts/google-auth/',
+      'accounts/token/refresh/',
+    ];
+
+    return publicPaths.any((publicPath) => path.contains(publicPath));
   }
 
   @override
@@ -308,56 +332,6 @@ class _AuthInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401 &&
         !_isPublicPath(err.requestOptions.path)) {
-<<<<<<< HEAD
-      final responseData = err.response?.data;
-
-      // Éviter les boucles infinies de refresh
-      if (_isRefreshing) {
-        _logger.w('Refresh déjà en cours, suppression des tokens');
-        await _clearTokens();
-        onTokenExpired?.call();
-        handler.next(err);
-        return;
-      }
-
-      _isRefreshing = true;
-
-      try {
-        // Tenter de rafraîchir le token
-        final refreshToken = await _secureStorage.read(key: _refreshTokenKey);
-
-        if (refreshToken != null && refreshToken.isNotEmpty) {
-          final refreshResponse = await _dio.post(
-            'accounts/token/refresh/',
-            data: {'refresh': refreshToken},
-            options: Options(
-              headers: {'Content-Type': 'application/json'},
-            ),
-          );
-
-          if (refreshResponse.statusCode == 200) {
-            final newAccessToken = refreshResponse.data['access'] as String?;
-
-            if (newAccessToken != null) {
-              // Sauvegarder le nouveau token
-              await _secureStorage.write(key: _tokenKey, value: newAccessToken);
-              _logger.i('✅ Token rafraîchi avec succès');
-
-              // Retenter la requête originale avec le nouveau token
-              final originalOptions = err.requestOptions;
-              originalOptions.headers['Authorization'] =
-                  'Bearer $newAccessToken';
-
-              try {
-                final retryResponse = await _dio.fetch(originalOptions);
-                _isRefreshing = false;
-                handler.resolve(retryResponse);
-                return;
-              } catch (retryError) {
-                _logger.e('Échec de la retry: ${retryError.toString()}');
-              }
-            }
-=======
       // Tenter de rafraîchir le token pour toute erreur 401
       _logger.w('401 reçu — tentative de rafraîchissement du token JWT');
       final refreshed = await _tryRefreshToken();
@@ -374,39 +348,21 @@ class _AuthInterceptor extends Interceptor {
             return;
           } catch (e) {
             _logger.e('Échec de la réessai après rafraîchissement: $e');
->>>>>>> baf250f (mmisse a jour ddu gradle)
           }
         }
-
-<<<<<<< HEAD
-        // Si le refresh a échoué, nettoyer les tokens
-        _logger
-            .w('JWT expiré et refresh échoué : suppression du stockage token');
-        await _clearTokens();
-        onTokenExpired?.call();
-      } catch (refreshError) {
-        _logger.e('Erreur lors du refresh: ${refreshError.toString()}');
-        await _clearTokens();
-        onTokenExpired?.call();
-      } finally {
-        _isRefreshing = false;
       }
-=======
+
       // Si le rafraîchissement échoue
       _logger.w('JWT expiré ou invalide : suppression du stockage token');
       await _secureStorage.delete(key: _tokenKey);
->>>>>>> baf250f (mmisse a jour ddu gradle)
+      await _secureStorage.delete(key: _refreshTokenKey);
+      await _secureStorage.delete(key: 'user_data');
+      onTokenExpired?.call();
     }
 
     handler.next(err);
   }
 
-<<<<<<< HEAD
-  Future<void> _clearTokens() async {
-    await _secureStorage.delete(key: _tokenKey);
-    await _secureStorage.delete(key: _refreshTokenKey);
-    await _secureStorage.delete(key: 'user_data');
-=======
   /// Tente de rafraîchir le token JWT
   Future<bool> _tryRefreshToken() async {
     try {
@@ -434,7 +390,6 @@ class _AuthInterceptor extends Interceptor {
       _logger.e('Échec du rafraîchissement du token: $e');
     }
     return false;
->>>>>>> baf250f (mmisse a jour ddu gradle)
   }
 }
 
@@ -465,10 +420,8 @@ class _LoggingInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    _logger.e(
-      '❌ [${err.response?.statusCode ?? 'ERROR'}] ${err.requestOptions.uri}',
-    );
-    _logger.e('📥 Error Response: ${err.response?.data}');
+    _logger.e('❌ [${err.response?.statusCode}] ${err.requestOptions.uri}');
+    _logger.e('📥 Error Data: ${err.response?.data}');
     _logger.e('📥 Error Message: ${err.message}');
     handler.next(err);
   }

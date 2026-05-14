@@ -57,14 +57,6 @@ class MainNavigationBar extends StatelessWidget {
               onTap: onTap,
             ),
           ),
-<<<<<<< HEAD
-          _NavItem(
-            index: 3,
-            currentIndex: currentIndex,
-            icon: Icons.lightbulb_rounded,
-            label: 'Opportunités',
-            onTap: onTap,
-=======
           Expanded(
             child: _NavItem(
               index: 3,
@@ -73,7 +65,6 @@ class MainNavigationBar extends StatelessWidget {
               label: 'Événements',
               onTap: onTap,
             ),
->>>>>>> baf250f (mmisse a jour ddu gradle)
           ),
           Expanded(
             child: _NavItem(

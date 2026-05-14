@@ -2,11 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
-import 'package:flutter/material.dart';
-import 'package:dio/dio.dart';
 
 import '../api/base_client.dart';
 import '../models/user_model.dart';
@@ -26,9 +25,7 @@ class AuthProvider extends ChangeNotifier {
 
   bool _isAuthenticated = false;
   bool _isLoading = false;
-
   String? _errorMessage;
-
   UserModel? _currentUser;
 
   // =========================
@@ -36,17 +33,11 @@ class AuthProvider extends ChangeNotifier {
   // =========================
 
   bool get isAuthenticated => _isAuthenticated;
-
   bool get isLoading => _isLoading;
-
   String? get errorMessage => _errorMessage;
-
   UserModel? get currentUser => _currentUser;
-
   bool get isAgent => _currentUser?.isAgent ?? false;
-
   bool get isClient => _currentUser?.isClient ?? false;
-
   bool get isVerified => _currentUser?.isVerified ?? false;
 
   // =========================
@@ -55,7 +46,6 @@ class AuthProvider extends ChangeNotifier {
 
   AuthProvider() {
     _loadUserData();
-    // Configurer le callback pour gérer l'expiration du token
     _baseClient.setOnTokenExpiredCallback(handleTokenExpired);
   }
 
@@ -73,12 +63,10 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Affiche une erreur avec le nouveau système de feedback
   void showErrorSnackBar(BuildContext context, String message) {
     FeedbackService.showError(context, message);
   }
 
-  /// Affiche un succès avec le nouveau système de feedback
   void showSuccessSnackBar(BuildContext context, String message) {
     FeedbackService.showSuccess(context, message);
   }
@@ -88,54 +76,14 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Gère la déconnexion automatique lors de l'expiration du token
   void handleTokenExpired() {
     _logger.w('Déconnexion automatique : token expiré');
     logout();
-
-    // Afficher un message d'erreur propre
     _setError('Votre session a expiré. Veuillez vous reconnecter.');
   }
 
-  /// Formate les messages d'erreur pour l'utilisateur
-  String formatErrorMessage(dynamic e) {
-    final errorString = e.toString().toLowerCase();
-
-    // Erreur de duplicate key
-    if (errorString.contains('duplicate key') ||
-        errorString.contains('unique constraint') ||
-        errorString.contains('already exists')) {
-      return 'Ce numéro ou cet email est déjà utilisé.';
-    }
-
-    // Erreur 500 serveur
-    if (errorString.contains('500') ||
-        errorString.contains('internal server error') ||
-        errorString.contains('server error')) {
-      return 'Le serveur rencontre un problème technique. Réessayez plus tard.';
-    }
-
-    // Erreur de connexion
-    if (errorString.contains('connection') ||
-        errorString.contains('network') ||
-        errorString.contains('timeout') ||
-        errorString.contains('unreachable')) {
-      return 'Vérifiez votre connexion internet.';
-    }
-
-    // Erreur de validation
-    if (errorString.contains('validation') ||
-        errorString.contains('invalid') ||
-        errorString.contains('required')) {
-      return 'Veuillez vérifier les informations saisies.';
-    }
-
-    // Erreur par défaut
-    return 'Une erreur est survenue. Veuillez réessayer.';
-  }
-
   // =========================
-  // LOGIN
+  // AUTH METHODS (LOGIN, REGISTER, GOOGLE)
   // =========================
 
   Future<bool> login(Map<String, dynamic> credentials) async {
@@ -143,234 +91,65 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
 
     try {
-      final response = await _baseClient.post(
-        'accounts/login/',
-        data: credentials,
-      );
-
-      _logger.d('LOGIN STATUS CODE: ${response.statusCode}');
-
-      _logger.i('LOGIN RESPONSE DATA: ${response.data}');
+      final response =
+          await _baseClient.post('accounts/login/', data: credentials);
 
       if (response.statusCode != 200) {
-        final errorMessage = response.data is Map
-            ? response.data['message'] ?? 'Erreur de connexion'
-            : 'Erreur de connexion';
-
-        _setError(errorMessage);
-
+        _setError(response.data['message'] ?? 'Erreur de connexion');
         return false;
       }
 
-      final responseData = response.data as Map<String, dynamic>;
-
-      final data = responseData['data'] as Map<String, dynamic>?;
-
-      final accessToken = data?['access_token'] as String?;
-
-      final userData = data?['user'] as Map<String, dynamic>?;
-
-      if (accessToken == null) {
-        _setError('Token manquant dans la réponse');
-
-        return false;
-      }
-
-      if (userData == null) {
-        _setError('Données utilisateur manquantes');
-
-        return false;
-      }
-
-      final refreshToken = data?['refresh_token'] as String?;
-
-      // Forcer le nettoyage des anciens tokens
-      await _secureStorage.deleteAll();
-
-      _logger.d('Connexion réussie à ${DateTime.now().toIso8601String()}');
-
-      // Sauvegarder les tokens
-      await _secureStorage.write(key: _tokenKey, value: accessToken);
-      if (refreshToken != null) {
-        await _secureStorage.write(key: _refreshTokenKey, value: refreshToken);
-      }
-
-      // Sauvegarder les données utilisateur
-      await _secureStorage.write(key: _userKey, value: jsonEncode(userData));
-
-      // Créer le user model
-      final user = UserModel.fromJson(userData);
-
-      _currentUser = user;
-
-      _isAuthenticated = true;
-
-      // Envoyer le FCM token au backend après connexion réussie
-      await NotificationService().sendTokenToBackend(accessToken);
-
-      notifyListeners();
-
+      final data = response.data['data'];
+      await _saveAuthData(data);
       return true;
     } catch (e) {
-      _logger.e('Erreur LOGIN: ${e.toString()}');
-
+      _logger.e('Erreur LOGIN: $e');
       _setError('Erreur réseau: ${e.toString()}');
-
       return false;
     } finally {
       _setLoading(false);
     }
   }
-
-  // =========================
-  // REGISTER
-  // =========================
 
   Future<bool> register(Map<String, dynamic> userData) async {
     _clearError();
-
     _setLoading(true);
 
     try {
-      _logger.d('Inscription : envoi des champs (sans mot de passe)');
-
-      final response = await _baseClient.post(
-        'accounts/register/',
-        data: userData,
-      );
-
-      _logger.d('REGISTER STATUS CODE: ${response.statusCode}');
-
-      _logger.i('REGISTER RESPONSE DATA: ${response.data}');
+      final response =
+          await _baseClient.post('accounts/register/', data: userData);
 
       if (response.statusCode != 201 && response.statusCode != 200) {
-        final errorMessage = response.data is Map
-            ? response.data['message'] ?? 'Erreur d\'inscription'
-            : 'Erreur d\'inscription';
-
-        _setError(errorMessage);
-
+        _setError(response.data['message'] ?? 'Erreur d\'inscription');
         return false;
       }
 
-      final responseData = response.data as Map<String, dynamic>;
-
-      final data = responseData['data'] as Map<String, dynamic>?;
-
-      final accessToken = data?['access_token'] as String?;
-
-      final refreshToken = data?['refresh_token'] as String?;
-
-      final userDataResponse = data?['user'] as Map<String, dynamic>?;
-
-      if (accessToken == null ||
-          refreshToken == null ||
-          userDataResponse == null) {
-        _setError('Données manquantes dans la réponse d\'inscription');
-
-        return false;
-      }
-
-      // Forcer le nettoyage des anciens tokens
-      await _secureStorage.deleteAll();
-
-      _logger.d('Inscription réussie à ${DateTime.now().toIso8601String()}');
-
-      // Sauvegarder les tokens
-      await _secureStorage.write(key: _tokenKey, value: accessToken);
-      await _secureStorage.write(key: 'refresh_token', value: refreshToken);
-
-      // Sauvegarder les données utilisateur
-      await _secureStorage.write(
-          key: _userKey, value: jsonEncode(userDataResponse));
-
-      // Créer le user model
-      final user = UserModel.fromJson(userDataResponse);
-
-      _currentUser = user;
-
-      _isAuthenticated = true;
-
-      // Envoyer le FCM token au backend après inscription réussie
-      await NotificationService().sendTokenToBackend(accessToken);
-
-      notifyListeners();
-
+      final data = response.data['data'];
+      await _saveAuthData(data);
       return true;
     } catch (e) {
-      _logger.e('Erreur REGISTER: ${e.toString()}');
-
+      _logger.e('Erreur REGISTER: $e');
       _setError('Erreur d\'inscription: ${e.toString()}');
-
       return false;
     } finally {
       _setLoading(false);
     }
   }
 
-  // =========================
-  // FORGOT PASSWORD
-  // =========================
-
-  Future<bool> forgotPassword(Map<String, dynamic> data) async {
-    _clearError();
-
-    _setLoading(true);
-
-    try {
-      final response = await _baseClient.post(
-        'accounts/forgot-password/',
-        data: data,
-      );
-
-      _logger.d('FORGOT PASSWORD STATUS: ${response.statusCode}');
-
-      _logger.i('FORGOT PASSWORD DATA: ${response.data}');
-
-      if (response.statusCode != 200) {
-        final errorMessage = response.data is Map
-            ? response.data['message'] ?? 'Erreur lors de l\'envoi du code'
-            : 'Erreur lors de l\'envoi du code';
-
-        _setError(errorMessage);
-
-        return false;
-      }
-
-      return true;
-    } catch (e) {
-      _logger.e('Erreur FORGOT PASSWORD: ${e.toString()}');
-
-      _setError('Erreur lors de l\'envoi du code: ${e.toString()}');
-
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // =========================
-  // GOOGLE AUTH
-  // =========================
-
-  /// Méthode d'authentification Google
   Future<bool> signInWithGoogle() async {
     _clearError();
     _setLoading(true);
 
     try {
-      // Étape 1: Authentifier avec Google Sign-In
       final GoogleSignIn googleSignIn =
           GoogleSignIn(scopes: ['email', 'profile']);
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
 
       if (googleUser == null) {
-        // L'utilisateur a annulé
         _setLoading(false);
         return false;
       }
 
-      // Étape 2: Envoyer les informations à notre backend Django
       final response = await _baseClient.post(
         'accounts/google-auth/',
         data: {
@@ -380,60 +159,14 @@ class AuthProvider extends ChangeNotifier {
         },
       );
 
-      // Logger détaillé pour debug
-      _logger.d('Status Code Google Auth: ${response.statusCode}');
-      _logger.i('Data reçue Google Auth: ${response.data}');
-
-      // Vérifier si la réponse contient les données attendues
-      if (response.statusCode != 200 && response.statusCode != 201) {
-        final errorMessage = response.data is Map
-            ? response.data['message'] ??
-                'Erreur lors de l\'authentification Google'
-            : 'Erreur lors de l\'authentification Google';
-        _setError(errorMessage);
-        return false;
-      }
-
-      // Étape 3: Gérer la réponse du backend (connexion existante ou nouveau compte)
-      final responseData = response.data;
-      if (responseData['status'] == 'success') {
-        final userData = responseData['data']['user'];
-        final accessToken = responseData['data']['access_token'];
-        final refreshToken = responseData['data']['refresh_token'];
-
-        // Sauvegarder les tokens et les données utilisateur
-        await _secureStorage.write(key: _tokenKey, value: accessToken);
-        if (refreshToken != null) {
-          await _secureStorage.write(
-              key: _refreshTokenKey, value: refreshToken);
-        }
-        final userMap = Map<String, dynamic>.from(userData as Map);
-        await _secureStorage.write(key: _userKey, value: jsonEncode(userMap));
-
-        _currentUser = UserModel.fromJson(userMap);
-        _isAuthenticated = true;
-
-        await NotificationService().sendTokenToBackend(accessToken);
-
-        _logger.i('Authentification Google réussie: ${userMap['email']}');
-        notifyListeners();
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = response.data['data'];
+        await _saveAuthData(data);
         return true;
-      } else {
-        _setError(
-          responseData['message'] ??
-              'Erreur lors de l\'authentification Google',
-        );
-        return false;
       }
+      return false;
     } catch (e) {
-      // Gérer les erreurs d'annulation Google
-      if (e.toString().contains('cancelled') ||
-          e.toString().contains('canceled')) {
-        _logger.i('Authentification Google annulée par l\'utilisateur');
-        return false;
-      }
-
-      _setError('Erreur lors de l\'authentification Google: $e');
+      _logger.e('Erreur Google Auth: $e');
       return false;
     } finally {
       _setLoading(false);
@@ -441,150 +174,36 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // =========================
-  // LOGOUT
+  // TOKEN MANAGEMENT
   // =========================
 
-  Future<void> logout() async {
-    _setLoading(true);
+  Future<void> _saveAuthData(Map<String, dynamic> data) async {
+    final accessToken = data['access_token'];
+    final refreshTokenValue = data['refresh_token'];
+    final userData = data['user'];
 
-    try {
-      await _secureStorage.delete(key: _tokenKey);
-      await _secureStorage.delete(key: _refreshTokenKey);
-      await _secureStorage.delete(key: _userKey);
-
-      _currentUser = null;
-
-      _isAuthenticated = false;
-
-      notifyListeners();
-    } catch (e) {
-      _setError('Erreur lors de la déconnexion');
-    } finally {
-      _setLoading(false);
+    await _secureStorage.deleteAll();
+    await _secureStorage.write(key: _tokenKey, value: accessToken);
+    if (refreshTokenValue != null) {
+      await _secureStorage.write(
+          key: _refreshTokenKey, value: refreshTokenValue);
     }
+    await _secureStorage.write(key: _userKey, value: jsonEncode(userData));
+
+    _currentUser = UserModel.fromJson(userData);
+    _isAuthenticated = true;
+
+    await NotificationService().sendTokenToBackend(accessToken);
+    notifyListeners();
   }
-
-  // =========================
-  // LOAD USER DATA
-  // =========================
-
-  Future<void> _loadUserData() async {
-    try {
-      final token = await _secureStorage.read(key: _tokenKey);
-
-      final userDataString = await _secureStorage.read(key: _userKey);
-
-      if (token != null && userDataString != null) {
-        final Map<String, dynamic> userData = jsonDecode(userDataString);
-
-        _currentUser = UserModel.fromJson(userData);
-
-        _isAuthenticated = true;
-      } else {
-        _currentUser = null;
-
-        _isAuthenticated = false;
-      }
-
-      notifyListeners();
-    } catch (e) {
-      _logger.e('Erreur chargement utilisateur: $e');
-    }
-  }
-
-  // =========================
-  // MISSIONS DISPONIBLES
-  // =========================
-
-  Future<List<Map<String, dynamic>>> fetchAvailableMissions({
-    double? lat,
-    double? lng,
-  }) async {
-    _setLoading(true);
-
-    _clearError();
-
-    try {
-      final token = await _secureStorage.read(key: _tokenKey);
-
-      _logger.i('TOKEN ACTUEL: $token');
-
-      Map<String, dynamic> queryParams = {};
-
-      if (lat != null && lng != null) {
-        queryParams['lat'] = lat.toString();
-
-        queryParams['lng'] = lng.toString();
-      }
-
-      final response = await _baseClient.get(
-        'missions/available/',
-        queryParameters: queryParams,
-      );
-
-      if (response.statusCode == 200) {
-        final responseData = response.data as Map<String, dynamic>;
-
-        final missionsData = responseData['data'] as List<dynamic>? ?? [];
-
-        return missionsData.cast<Map<String, dynamic>>();
-      } else {
-        _setError('Erreur lors de la récupération des missions');
-
-        return [];
-      }
-    } catch (e) {
-      _logger.e('Erreur missions: ${e.toString()}');
-
-      return [];
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // =========================
-  // REFRESH TOKEN
-  // =========================
 
   Future<bool> refreshToken() async {
     try {
-<<<<<<< HEAD
-      // Récupérer le refresh token depuis le secure storage
-      final refreshToken = await _secureStorage.read(key: 'refresh_token');
-
-      if (refreshToken == null || refreshToken.isEmpty) {
-        _logger.w('Refresh token manquant');
-        return false;
-      }
-
-      final response = await _baseClient.post(
-        'accounts/token/refresh/',
-        data: {'refresh': refreshToken},
-      );
-
-      _logger.d('REFRESH TOKEN STATUS CODE: ${response.statusCode}');
-
-      if (response.statusCode == 200) {
-        final responseData = response.data as Map<String, dynamic>;
-        final newAccessToken = responseData['access'] as String?;
-
-        if (newAccessToken != null) {
-          // Sauvegarder le nouveau access token
-          await _secureStorage.write(key: _tokenKey, value: newAccessToken);
-          _logger.i('✅ Access token rafraîchi avec succès');
-          return true;
-        }
-      }
-
-      _logger.w('Échec du rafraîchissement du token');
-      return false;
-    } catch (e) {
-      _logger.e('Erreur refreshToken: ${e.toString()}');
-=======
       final storedRefreshToken =
           await _secureStorage.read(key: _refreshTokenKey);
-      if (storedRefreshToken == null) {
-        _logger.w('Pas de refresh token stocké');
+
+      if (storedRefreshToken == null || storedRefreshToken.isEmpty) {
+        _logger.w('Refresh token manquant');
         return false;
       }
 
@@ -594,143 +213,56 @@ class AuthProvider extends ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        final responseData = response.data as Map<String, dynamic>;
-        final newAccessToken = responseData['access'] as String?;
+        final newAccessToken = response.data['access'];
         if (newAccessToken != null) {
           await _secureStorage.write(key: _tokenKey, value: newAccessToken);
-          _logger.i('Token rafraîchi avec succès');
+          _logger.i('✅ Access token rafraîchi avec succès');
           return true;
         }
       }
       return false;
     } catch (e) {
       _logger.e('Erreur rafraîchissement token: $e');
->>>>>>> baf250f (mmisse a jour ddu gradle)
-      _setError('Erreur rafraîchissement token');
       return false;
     }
   }
 
   // =========================
-  // CHECK AUTH
+  // LOGOUT & UTILS
   // =========================
 
-  Future<void> checkAuth() async {
-    await _loadUserData();
+  Future<void> logout() async {
+    _setLoading(true);
+    await _secureStorage.deleteAll();
+    _currentUser = null;
+    _isAuthenticated = false;
+    _setLoading(false);
+  }
 
-    // Si on a un token, vérifions sa validité
-    if (_isAuthenticated) {
+  Future<void> _loadUserData() async {
+    try {
       final token = await _secureStorage.read(key: _tokenKey);
-      if (token != null && token.isNotEmpty) {
-        // Tenter de rafraîchir le token pour vérifier sa validité
-        final refreshSuccess = await refreshToken();
-        if (!refreshSuccess) {
-          // Le refresh a échoué, le token est invalide
-          _logger.w('Token invalide, déconnexion');
-          await logout();
-        }
+      final userDataString = await _secureStorage.read(key: _userKey);
+
+      if (token != null && userDataString != null) {
+        _currentUser = UserModel.fromJson(jsonDecode(userDataString));
+        _isAuthenticated = true;
       }
-    }
-  }
-
-  // =========================
-  // GET TOKEN
-  // =========================
-
-  Future<String?> getToken() async {
-    return await _secureStorage.read(key: _tokenKey);
-  }
-
-  // =========================
-  // CHANGE PASSWORD
-  // =========================
-
-  Future<bool> changePassword(Map<String, dynamic> passwordData) async {
-    _clearError();
-    _setLoading(true);
-
-    try {
-      final response = await _baseClient.post(
-        'accounts/password/change/',
-        data: passwordData,
-      );
-
-      _logger.d('CHANGE PASSWORD STATUS CODE: ${response.statusCode}');
-      _logger.i('CHANGE PASSWORD RESPONSE DATA: ${response.data}');
-
-      if (response.statusCode != 200) {
-        final errorMessage = response.data is Map
-            ? response.data['message'] ??
-                'Erreur lors du changement de mot de passe'
-            : 'Erreur lors du changement de mot de passe';
-        _setError(errorMessage);
-        return false;
-      }
-
-      return true;
+      notifyListeners();
     } catch (e) {
-      _logger.e('Erreur CHANGE PASSWORD: ${e.toString()}');
-      _setError('Erreur lors du changement de mot de passe: ${e.toString()}');
-      return false;
-    } finally {
-      _setLoading(false);
+      _logger.e('Erreur chargement utilisateur: $e');
     }
   }
 
-  // =========================
-  // UPLOAD PROFILE IMAGE
-  // =========================
-
-  Future<String?> uploadProfileImage(File imageFile) async {
-    _clearError();
-    _setLoading(true);
-
-    try {
-      final formData = FormData.fromMap({
-        'avatar': await MultipartFile.fromFile(
-          imageFile.path,
-          filename: 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        ),
-      });
-
-      final response = await _baseClient.dio.post(
-        'accounts/profile/upload-avatar/',
-        data: formData,
-      );
-
-      _logger.d('UPLOAD AVATAR STATUS CODE: ${response.statusCode}');
-      _logger.i('UPLOAD AVATAR RESPONSE DATA: ${response.data}');
-
-      if (response.statusCode != 200) {
-        final errorMessage = response.data is Map
-            ? response.data['message'] ??
-                'Erreur lors de l\'upload de l\'avatar'
-            : 'Erreur lors de l\'upload de l\'avatar';
-        _setError(errorMessage);
-        return null;
-      }
-
-      final responseData = response.data as Map<String, dynamic>;
-      final avatarUrl = responseData['data']?['avatar_url'] as String?;
-
-      return avatarUrl;
-    } catch (e) {
-      _logger.e('Erreur UPLOAD AVATAR: ${e.toString()}');
-      _setError('Erreur lors de l\'upload de l\'avatar: ${e.toString()}');
-      return null;
-    } finally {
-      _setLoading(false);
-    }
-  }
+  Future<String?> getToken() async => await _secureStorage.read(key: _tokenKey);
 
   // =========================
-  // UPDATE PROFILE
+  // PROFILE & SETTINGS
   // =========================
 
   Future<bool> updateProfile(dynamic profileData) async {
     _clearError();
     _setLoading(true);
-
     try {
       final response = await _baseClient.patch(
         'accounts/profile/',
@@ -740,45 +272,103 @@ class AuthProvider extends ChangeNotifier {
             : null,
       );
 
-      _logger.d('UPDATE PROFILE STATUS CODE: ${response.statusCode}');
-      _logger.i('UPDATE PROFILE RESPONSE DATA: ${response.data}');
-
-      if (response.statusCode != 200) {
-        final errorMessage = response.data is Map
-            ? response.data['message'] ??
-                'Erreur lors de la mise à jour du profil'
-            : 'Erreur lors de la mise à jour du profil';
-        _setError(errorMessage);
-        return false;
-      }
-
-      final responseData = response.data as Map<String, dynamic>;
-      final userData = responseData['data'] as Map<String, dynamic>?;
-
-      if (userData != null) {
-        // Update local user data
-        final updatedUser = UserModel.fromJson(userData);
-        _currentUser = updatedUser;
-
-        // Save updated user data to secure storage
+      if (response.statusCode == 200) {
+        final userData = response.data['data'];
+        _currentUser = UserModel.fromJson(userData);
         await _secureStorage.write(key: _userKey, value: jsonEncode(userData));
-
         notifyListeners();
+        return true;
       }
-
-      return true;
+      return false;
     } catch (e) {
-      _logger.e('Erreur UPDATE PROFILE: ${e.toString()}');
-      if (e is ApiException && e.type == ApiErrorType.notFound) {
-        _setError(
-          'Profil introuvable (404). Vérifiez que l’API expose bien PATCH /api/v1/accounts/profile/.',
-        );
-      } else {
-        _setError('Erreur lors de la mise à jour du profil: ${e.toString()}');
-      }
+      _setError('Erreur lors de la mise à jour : $e');
       return false;
     } finally {
       _setLoading(false);
+    }
+  }
+
+  /// Vérifie si l'utilisateur est authentifié
+  Future<void> checkAuth() async {
+    try {
+      final token = await _secureStorage.read(key: _tokenKey);
+      final userData = await _secureStorage.read(key: _userKey);
+
+      if (token != null && userData != null) {
+        _currentUser = UserModel.fromJson(jsonDecode(userData));
+        _isAuthenticated = true;
+        notifyListeners();
+      } else {
+        _isAuthenticated = false;
+        _currentUser = null;
+        notifyListeners();
+      }
+    } catch (e) {
+      _logger.e('Erreur lors de la vérification de l\'authentification: $e');
+      _isAuthenticated = false;
+      _currentUser = null;
+      notifyListeners();
+    }
+  }
+
+  /// Mot de passe oublié
+  Future<bool> forgotPassword(Map<String, String> data) async {
+    try {
+      _setLoading(true);
+      _clearError();
+
+      final response = await _baseClient.post(
+        'accounts/forgot-password/',
+        data: data,
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        _setError('Erreur lors de l\'envoi de l\'email de réinitialisation');
+        return false;
+      }
+    } catch (e) {
+      _setError('Erreur: ${e.toString()}');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Changer le mot de passe
+  Future<bool> changePassword(Map<String, String> data) async {
+    try {
+      _setLoading(true);
+      _clearError();
+
+      final response = await _baseClient.post(
+        'accounts/change-password/',
+        data: data,
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      } else {
+        _setError('Erreur lors du changement de mot de passe');
+        return false;
+      }
+    } catch (e) {
+      _setError('Erreur: ${e.toString()}');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Formate les messages d'erreur
+  String formatErrorMessage(dynamic error) {
+    if (error is ApiException) {
+      return error.message;
+    } else if (error is String) {
+      return error;
+    } else {
+      return 'Une erreur est survenue';
     }
   }
 }

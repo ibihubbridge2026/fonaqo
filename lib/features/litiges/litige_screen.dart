@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
-
 import '../../core/api/base_client.dart';
 import '../../core/models/mission_model.dart';
 import '../missions/mission_repository.dart';
 import '../../widgets/custom_app_bar.dart';
-import '../../core/models/mission_model.dart';
-import '../missions/mission_repository.dart';
 
 /// Écran d'ouverture d'un litige depuis le dashboard.
 class LitigeScreen extends StatefulWidget {
@@ -16,12 +13,6 @@ class LitigeScreen extends StatefulWidget {
 }
 
 class _LitigeScreenState extends State<LitigeScreen> {
-<<<<<<< HEAD
-  final MissionRepository _missionRepository = MissionRepository();
-  List<MissionModel> _eligibleMissions = [];
-  bool _isLoading = false;
-  String? _selectedMissionId;
-=======
   final MissionRepository _missionRepo = MissionRepository();
   final BaseClient _api = BaseClient();
 
@@ -31,36 +22,10 @@ class _LitigeScreenState extends State<LitigeScreen> {
   String? _selectedMissionId;
   String _reason = '';
   bool _submitting = false;
->>>>>>> baf250f (mmisse a jour ddu gradle)
 
   @override
   void initState() {
     super.initState();
-<<<<<<< HEAD
-    _loadEligibleMissions();
-  }
-
-  Future<void> _loadEligibleMissions() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final missions = await _missionRepository.fetchMissionsList();
-      final eligible = missions.where((mission) {
-        // Seulement les missions en cours ou annulées peuvent avoir des litiges
-        return mission.status == MissionStatus.ACCEPTED ||
-            mission.status == MissionStatus.ON_THE_WAY ||
-            mission.status == MissionStatus.ARRIVED ||
-            mission.status == MissionStatus.IN_PROGRESS ||
-            mission.status == MissionStatus.CANCELLED;
-      }).toList();
-
-      setState(() {
-        _eligibleMissions = eligible;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-=======
     _loadMissions();
   }
 
@@ -72,13 +37,17 @@ class _LitigeScreenState extends State<LitigeScreen> {
     });
     try {
       final missions = await _missionRepo.fetchMissionsList();
-      // Only show missions that can be disputed (not already disputed)
-      final disputableMissions = missions
-          .where((m) =>
-              m.status != MissionStatus.DISPUTED &&
-              m.status != MissionStatus.CANCELLED &&
-              m.status != MissionStatus.COMPLETED)
-          .toList();
+      
+      // Filtrage des missions éligibles au litige (on exclut les terminées/déjà en litige)
+      final disputableMissions = missions.where((m) {
+        return m.status != MissionStatus.DISPUTED &&
+               m.status != MissionStatus.COMPLETED &&
+               (m.status == MissionStatus.ACCEPTED ||
+                m.status == MissionStatus.ON_THE_WAY ||
+                m.status == MissionStatus.ARRIVED ||
+                m.status == MissionStatus.IN_PROGRESS ||
+                m.status == MissionStatus.CANCELLED);
+      }).toList();
 
       if (!mounted) return;
       setState(() {
@@ -98,8 +67,7 @@ class _LitigeScreenState extends State<LitigeScreen> {
     if (_selectedMissionId == null || _reason.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text(
-                'Veuillez sélectionner une mission et décrire le problème')),
+            content: Text('Veuillez sélectionner une mission et décrire le problème')),
       );
       return;
     }
@@ -107,16 +75,21 @@ class _LitigeScreenState extends State<LitigeScreen> {
     setState(() {
       _submitting = true;
     });
+    
     try {
-      final response = await _api.post(
-        'missions/$_selectedMissionId/open_dispute/',
+      // Appel API vers ton backend Django
+      final response = await _api.dio.post(
+        '/missions/$_selectedMissionId/open_dispute/',
         data: {'reason': _reason.trim()},
       );
 
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Litige enregistré avec succès')),
+          const SnackBar(
+            content: Text('Litige enregistré avec succès'),
+            backgroundColor: Colors.green,
+          ),
         );
         Navigator.of(context).pop();
       } else {
@@ -125,7 +98,10 @@ class _LitigeScreenState extends State<LitigeScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: ${e.toString()}')),
+        SnackBar(
+          content: Text('Erreur: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       if (mounted) {
@@ -133,7 +109,6 @@ class _LitigeScreenState extends State<LitigeScreen> {
           _submitting = false;
         });
       }
->>>>>>> baf250f (mmisse a jour ddu gradle)
     }
   }
 
@@ -163,7 +138,9 @@ class _LitigeScreenState extends State<LitigeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(_error!, style: TextStyle(color: Colors.red[700])),
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text(_error!, textAlign: TextAlign.center),
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadMissions,
@@ -182,38 +159,6 @@ class _LitigeScreenState extends State<LitigeScreen> {
             'Aucune mission éligible pour un litige',
             style: TextStyle(color: Colors.grey),
           ),
-<<<<<<< HEAD
-          const SizedBox(height: 16),
-          _Card(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : DropdownButtonFormField<String>(
-                    value: _selectedMissionId,
-                    items: _eligibleMissions.isEmpty
-                        ? [
-                            const DropdownMenuItem(
-                              value: null,
-                              child: Text("Aucune mission éligible"),
-                            ),
-                          ]
-                        : _eligibleMissions.map((mission) {
-                            return DropdownMenuItem(
-                              value: mission.id,
-                              child: Text(
-                                  "${mission.title} • ${mission.formattedStatus}"),
-                            );
-                          }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedMissionId = value;
-                      });
-                    },
-                    decoration: const InputDecoration(
-                      labelText: 'Mission',
-                      border: InputBorder.none,
-                    ),
-                  ),
-=======
         ),
       );
     }
@@ -233,13 +178,12 @@ class _LitigeScreenState extends State<LitigeScreen> {
         const SizedBox(height: 16),
         _Card(
           child: DropdownButtonFormField<String>(
-            initialValue: _selectedMissionId,
+            value: _selectedMissionId,
             hint: const Text('Sélectionner une mission'),
             items: _missions
                 .map((mission) => DropdownMenuItem(
                       value: mission.id,
-                      child:
-                          Text('${mission.title} • ${mission.statusDisplay}'),
+                      child: Text(mission.title),
                     ))
                 .toList(),
             onChanged: (value) {
@@ -251,7 +195,6 @@ class _LitigeScreenState extends State<LitigeScreen> {
               labelText: 'Mission',
               border: InputBorder.none,
             ),
->>>>>>> baf250f (mmisse a jour ddu gradle)
           ),
         ),
         const SizedBox(height: 12),
@@ -287,10 +230,8 @@ class _LitigeScreenState extends State<LitigeScreen> {
               ),
               TextButton(
                 onPressed: () {
-                  // TODO: Implement file attachment
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Fonctionnalité bientôt disponible')),
+                    const SnackBar(content: Text('Bientôt disponible')),
                   );
                 },
                 child: const Text('Importer'),
@@ -316,8 +257,7 @@ class _LitigeScreenState extends State<LitigeScreen> {
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   )
                 : const Text(
                     'SOUMETTRE',
