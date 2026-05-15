@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
-import '../../features/agent/screens/agent_main_shell.dart';
 import '../../widgets/main_wrapper.dart';
 
 /// Routeur principal qui gère la bascule entre les shells Client et Agent
@@ -21,7 +20,8 @@ class MainRouter extends StatelessWidget {
         // Si l'utilisateur est authentifié, basculer selon le mode
         if (authProvider.isAgentMode) {
           // Mode Agent - afficher l'interface Agent
-          return const AgentMainShell();
+          // return const AgentMainShell();
+          return const MainWrapper();
         } else {
           // Mode Client - afficher l'interface Client
           return const MainWrapper();

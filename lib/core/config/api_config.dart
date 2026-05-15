@@ -19,6 +19,12 @@ class ApiConfig {
     defaultValue: 'http://192.168.1.73:8000/api/v1/',
   );
 
+  /// Host et port pour les WebSockets.
+  static String get apiHostAndPort {
+    final uri = Uri.parse(serverUrl);
+    return '${uri.host}:${uri.port}';
+  }
+
   /// Hôte et port extraits pour les WebSockets.
   static String get wsHost {
     final u = Uri.parse(serverUrl);

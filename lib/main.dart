@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'core/services/firebase_background_handler.dart';
 
 import 'core/services/feedback_service.dart';
 
@@ -25,7 +26,6 @@ import 'features/onboarding/onboarding_screen.dart';
 import 'features/client/screens/agent_profile_screen.dart' as agents;
 
 import 'widgets/main_wrapper.dart';
-import 'features/agent/screens/agent_main_shell.dart';
 
 import 'features/chat/chat_screen.dart';
 import 'features/chat/screens/chat_list_screen.dart';
@@ -97,9 +97,16 @@ Future<void> _initializeFirebaseMessaging(Logger log) async {
     // Open app from background
     FirebaseMessaging.onMessageOpenedApp.listen(
       (RemoteMessage message) {
+        final messageType = message.data['type'];
+
         log.i(
-          '📱 Notification ouverte: ${message.notification?.title}',
+          '📱 Notification ouverte: ${message.notification?.title} - Type: $messageType',
         );
+
+        // Navigation directe pour les nouvelles missions
+        if (messageType == 'NEW_MISSION') {
+          _navigateToMissionFromNotification(message);
+        }
       },
     );
 
@@ -107,13 +114,41 @@ Future<void> _initializeFirebaseMessaging(Logger log) async {
     final initialMessage = await messaging.getInitialMessage();
 
     if (initialMessage != null) {
+      final messageType = initialMessage.data['type'];
+
       log.i(
         '🚀 App ouverte via notification: '
-        '${initialMessage.notification?.title}',
+        '${initialMessage.notification?.title} - Type: $messageType',
       );
+
+      // Navigation directe pour les nouvelles missions
+      if (messageType == 'NEW_MISSION') {
+        _navigateToMissionFromNotification(initialMessage);
+      }
     }
   } catch (e) {
     log.e('❌ Erreur Firebase Messaging: $e');
+  }
+}
+
+/// Navigation directe vers l'écran des missions depuis une notification
+void _navigateToMissionFromNotification(RemoteMessage message) {
+  final missionId = message.data['mission_id'];
+
+  print('🧭 Navigation vers mission: $missionId');
+
+  // Navigation vers l'explorateur de missions agent
+  if (navigatorKey.currentContext != null) {
+    if (missionId != null) {
+      // Navigation vers le détail de la mission si ID fourni
+      navigatorKey.currentState?.pushNamed(
+        '/agent/mission-detail',
+        arguments: {'missionId': missionId},
+      );
+    } else {
+      // Navigation vers l'explorateur de missions
+      navigatorKey.currentState?.pushNamed('/agent/missions-explorer');
+    }
   }
 }
 
@@ -126,6 +161,9 @@ void main() async {
     await Firebase.initializeApp();
 
     log.i('✅ Firebase initialisé');
+
+    // Enregistrer le handler background pour Firebase
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
     await _initializeFirebaseMessaging(log);
 
@@ -235,7 +273,6 @@ class FonacoApp extends StatelessWidget {
                   const ForgotPasswordScreen(),
               AppRoutes.onboarding: (context) => const OnboardingScreen(),
               AppRoutes.mainShell: (context) => const MainWrapper(),
-              AppRoutes.agentMainShell: (context) => const AgentMainShell(),
               AppRoutes.missionDetail: (context) => const MissionDetailScreen(),
               AppRoutes.eventDetail: (context) => const EventDetailScreen(),
               AppRoutes.litige: (context) => const LitigeScreen(),

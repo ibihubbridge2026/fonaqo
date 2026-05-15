@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:logger/logger.dart';
 
 import '../../core/api/base_client.dart';
+import '../../core/services/feedback_service.dart';
 
 /// Service de gestion des notifications Firebase
 class NotificationService {
@@ -172,11 +173,48 @@ class NotificationService {
       'Message foreground: ${message.messageId}',
     );
 
+    final messageType = message.data['type'];
+
+    // Filtrage spécial pour les nouvelles missions
+    if (messageType == 'NEW_MISSION') {
+      await _handleNewMissionAlert(message);
+    } else {
+      // Notification standard pour les autres types
+      await _showLocalNotification(
+        title: message.notification?.title ?? 'Nouvelle notification',
+        body: message.notification?.body ?? 'Vous avez un nouveau message',
+        data: message.data,
+      );
+    }
+  }
+
+  /// Gère les alertes de nouvelles missions avec son et SnackBar
+  Future<void> _handleNewMissionAlert(RemoteMessage message) async {
+    final title = message.notification?.title ?? 'Nouvelle mission disponible!';
+    final body = message.notification?.body ??
+        'Une opportunité de gain vient d\'apparaître';
+
+    // Notification locale avec son d'alerte
     await _showLocalNotification(
-      title: message.notification?.title ?? 'Nouvelle notification',
-      body: message.notification?.body ?? 'Vous avez un nouveau message',
-      data: message.data,
+      title: title,
+      body: body,
+      data: {
+        ...message.data,
+        'priority': 'high',
+        'sound': 'alert',
+      },
     );
+
+    // SnackBar spécial pour les missions
+    _showMissionSnackBar(title, body, message.data);
+  }
+
+  /// Affiche un SnackBar spécial pour les alertes de mission
+  void _showMissionSnackBar(
+      String title, String body, Map<String, dynamic>? data) {
+    // Afficher un SnackBar global via FeedbackService
+    FeedbackService.showInfoGlobal('🚨 $title\n$body');
+    _logger.i('🚨 Alerte mission: $title - $body');
   }
 
   // =========================
@@ -190,11 +228,18 @@ class NotificationService {
       'Message background: ${message.messageId}',
     );
 
-    await _showLocalNotification(
-      title: message.notification?.title ?? 'Nouvelle notification',
-      body: message.notification?.body ?? 'Vous avez un nouveau message',
-      data: message.data,
-    );
+    final messageType = message.data['type'];
+
+    // Filtrage spécial pour les nouvelles missions
+    if (messageType == 'NEW_MISSION') {
+      await _handleNewMissionAlert(message);
+    } else {
+      await _showLocalNotification(
+        title: message.notification?.title ?? 'Nouvelle notification',
+        body: message.notification?.body ?? 'Vous avez un nouveau message',
+        data: message.data,
+      );
+    }
   }
 
   // =========================
@@ -229,6 +274,8 @@ class NotificationService {
       priority: Priority.high,
       color: Color(0xFFFFD400),
       playSound: true,
+      // Son d'alerte spécial pour les missions
+      // sound: data?['priority'] == 'high' ? 'alert' : 'default', // TODO: Ajouter fichier son alert
     );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
@@ -264,6 +311,8 @@ class NotificationService {
         _logger.w('Aucun token FCM à enregistrer');
         return;
       }
+
+      // 1. Envoyer vers l'endpoint de notification (existant)
       await _baseClient.post(
         'notifications/register-device/',
         data: {
@@ -278,7 +327,20 @@ class NotificationService {
         ),
       );
 
-      _logger.i('Token FCM enregistré sur le backend');
+      // 2. Envoyer vers le profil utilisateur (nouveau - spécification API)
+      await _baseClient.patch(
+        'accounts/profile/',
+        data: {
+          'fcm_token': token,
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer $accessToken',
+          },
+        ),
+      );
+
+      _logger.i('Token FCM enregistré sur le backend et le profil');
     } catch (e) {
       _logger.e('Erreur envoi token FCM au backend: $e');
     }
