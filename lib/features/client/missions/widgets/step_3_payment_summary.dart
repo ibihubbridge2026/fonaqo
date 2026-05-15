@@ -109,7 +109,7 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+              border: Border.all(color: Colors.black.withOpacity( 0.05)),
             ),
             child: Column(
               children: [
@@ -142,7 +142,7 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+              border: Border.all(color: Colors.black.withOpacity( 0.05)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -170,7 +170,7 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
                             'Le séquestre ne concernera que les frais de service',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey.withValues(alpha: 0.6),
+                              color: Colors.grey.withOpacity( 0.6),
                             ),
                           ),
                         ],
@@ -222,7 +222,7 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+              border: Border.all(color: Colors.black.withOpacity( 0.05)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -341,7 +341,7 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.black.withOpacity( 0.05)),
       ),
       child: Row(
         children: [
@@ -349,7 +349,7 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withOpacity( 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
             child: assetPath != null
