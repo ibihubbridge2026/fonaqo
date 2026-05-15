@@ -1,45 +1,74 @@
-# Miscellaneous
-*.class
-*.log
+```
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
 *.pyc
+*.pyo
+*.pyd
+.julia/
+.zig-cache/
+
+# Build artifacts
+dist/
+build/
+target/
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+*.tmp
 *.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+*.swo
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# Flutter/Dart specific
 .dart_tool/
-.flutter-plugins-dependencies
+.packages
 .pub-cache/
 .pub/
-/build/
-/coverage/
+build/
+*.g.dart
+*.freezed.dart
 
-# Symbolication related
-app.*.symbols
+# Environment variables
+.env
+.env.local
+.env.*
 
-# Obfuscation related
-app.*.map.json
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+```

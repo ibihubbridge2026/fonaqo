@@ -4,7 +4,6 @@ import 'package:logger/logger.dart';
 
 import '../../../core/providers/auth_provider.dart';
 import '../providers/agent_provider.dart';
-import '../../../core/services/app_mode_service.dart';
 
 class AgentHeader extends StatelessWidget implements PreferredSizeWidget {
   final String? title;
@@ -114,7 +113,6 @@ class AgentHeader extends StatelessWidget implements PreferredSizeWidget {
       IconButton(
         icon: const Icon(Icons.switch_account),
         onPressed: () async {
-          await AppModeService().switchToClient();
           if (context.mounted) {
             Navigator.pushReplacementNamed(context, '/main');
           }

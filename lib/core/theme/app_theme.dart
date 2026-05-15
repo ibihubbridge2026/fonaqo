@@ -222,11 +222,11 @@ class AppTheme {
       // Thème des cartes avec Glassmorphism
       cardTheme: CardThemeData(
         elevation: 8,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
+        shadowColor: Colors.black.withOpacity( 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
         ),
-        color: surfaceColor.withValues(alpha: 0.9),
+        color: surfaceColor.withOpacity( 0.9),
       ),
 
       // Thème des boutons
@@ -235,7 +235,7 @@ class AppTheme {
           backgroundColor: primaryColor,
           foregroundColor: secondaryColor,
           elevation: 4,
-          shadowColor: Colors.black.withValues(alpha: 0.2),
+          shadowColor: Colors.black.withOpacity( 0.2),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -251,11 +251,11 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+          borderSide: BorderSide(color: Colors.grey.withOpacity( 0.3)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.grey.withValues(alpha: 0.3)),
+          borderSide: BorderSide(color: Colors.grey.withOpacity( 0.3)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -346,16 +346,16 @@ class AppTheme {
   }) {
     return BoxDecoration(
       color:
-          color?.withValues(alpha: 0.1) ?? Colors.white.withValues(alpha: 0.1),
+          color?.withOpacity( 0.1) ?? Colors.white.withOpacity( 0.1),
       borderRadius: BorderRadius.circular(borderRadius),
       border: Border.all(
-        color: borderColor?.withValues(alpha: 0.2) ??
-            Colors.white.withValues(alpha: 0.2),
+        color: borderColor?.withOpacity( 0.2) ??
+            Colors.white.withOpacity( 0.2),
         width: 1,
       ),
       boxShadow: [
         BoxShadow(
-          color: Colors.black.withValues(alpha: 0.1),
+          color: Colors.black.withOpacity( 0.1),
           blurRadius: blur,
           spreadRadius: 2,
           offset: const Offset(0, 4),

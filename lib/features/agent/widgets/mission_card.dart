@@ -31,7 +31,7 @@ class MissionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity( 0.03),
             blurRadius: 10,
           ),
         ],
@@ -43,7 +43,7 @@ class MissionCard extends StatelessWidget {
               CircleAvatar(
                 radius: 24,
                 backgroundColor:
-                    const Color(0xFFFFD400).withValues(alpha: 0.15),
+                    const Color(0xFFFFD400).withOpacity( 0.15),
                 child: const Icon(
                   Icons.work_outline,
                   color: Colors.black,

@@ -27,9 +27,6 @@ class AuthProvider extends ChangeNotifier {
   String? _errorMessage;
   UserModel? _currentUser;
 
-  // Mode de l'application (Client/Agent)
-  bool _isAgentMode = false;
-
   // =========================
   // GETTERS
   // =========================
@@ -41,7 +38,6 @@ class AuthProvider extends ChangeNotifier {
   bool get isAgent => _currentUser?.isAgent ?? false;
   bool get isClient => _currentUser?.isClient ?? false;
   bool get isVerified => _currentUser?.isVerified ?? false;
-  bool get isAgentMode => _isAgentMode;
 
   // =========================
   // CONSTRUCTOR
@@ -577,77 +573,6 @@ class AuthProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
-  }
-
-  /// Bascule entre le mode Client et Agent
-  /// Retourne true si le basculement a réussi, false sinon
-  Future<bool> toggleAppMode() async {
-    if (_isLoading) return false;
-
-    _setLoading(true);
-    _clearError();
-
-    try {
-      // Vérifier si l'utilisateur est authentifié
-      if (!_isAuthenticated) {
-        _setError('Vous devez être connecté pour basculer de mode');
-        return false;
-      }
-
-      if (_currentUser == null) {
-        _setError('Utilisateur non trouvé');
-        return false;
-      }
-
-      // Si on veut passer en mode Agent
-      if (!_isAgentMode) {
-        // Vérifier si l'utilisateur a le droit d'être Agent
-        if (!_currentUser!.isAgent) {
-          if (_currentUser!.isClient) {
-            _setError(
-                'Votre compte est de type Client. Pour devenir Agent, veuillez contacter le support.');
-          } else {
-            _setError('Votre compte n\'est pas configuré pour être Agent');
-          }
-          return false;
-        }
-
-        // Vérifier si le numéro de téléphone est valide
-        if (_currentUser!.phoneNumber == null ||
-            _currentUser!.phoneNumber!.isEmpty) {
-          _setError(
-              'Un numéro de téléphone valide est requis pour accéder au mode Agent');
-          return false;
-        }
-
-        // TODO: Vérifier la localisation quand le service sera disponible
-        // final locationCheck = await _checkLocationAvailability();
-        // if (!locationCheck) {
-        //   _setError('La localisation est requise pour accéder au mode Agent');
-        //   return false;
-        // }
-      }
-
-      // Effectuer la bascule
-      _isAgentMode = !_isAgentMode;
-      _logger.i(
-          'Basculement mode ${_isAgentMode ? "Agent" : "Client"} pour utilisateur ${_currentUser!.id}');
-      notifyListeners();
-      return true;
-    } catch (e, st) {
-      _logger.e('Erreur lors du basculement de mode', error: e, stackTrace: st);
-      _setError('Une erreur est survenue: ${e.toString()}');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  /// Force le changement de mode (pour les tests ou admin)
-  void setAppMode(bool isAgentMode) {
-    _isAgentMode = isAgentMode;
-    _logger.d('Mode application forcé: ${isAgentMode ? "Agent" : "Client"}');
-    notifyListeners();
   }
 
   /// Formate les messages d'erreur
