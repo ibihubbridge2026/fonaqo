@@ -1,9 +1,14 @@
+import '../config/api_config.dart';
+
 /// Modèle utilisateur pour l'application FONACO
 /// Reflète la structure du backend Django
 class UserModel {
   final String id;
   final String email;
   final String? phoneNumber;
+
+  /// Nom d'utilisateur Django (connexion / chat), distinct du libellé d'affichage.
+  final String? djangoUsername;
   final String? firstName;
   final String? lastName;
   final String role; // 'agent' ou 'client' - avec valeur par défaut 'client'
@@ -18,6 +23,7 @@ class UserModel {
     required this.id,
     required this.email,
     this.phoneNumber,
+    this.djangoUsername,
     this.firstName,
     this.lastName,
     required this.role,
@@ -31,24 +37,34 @@ class UserModel {
 
   /// Crée un UserModel à partir d'un JSON (réponse API)
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    // Gestion des URLs d'avatar relatives
+    String? avatarUrl = json['avatar_url']?.toString();
+    if (avatarUrl != null && !avatarUrl.startsWith('http')) {
+      // Ajouter l'URL de base du serveur pour les URLs relatives
+      avatarUrl = '${ApiConfig.serverUrl}$avatarUrl';
+    }
+
     return UserModel(
       id: json['id']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       phoneNumber: json['phone_number']?.toString(),
+      djangoUsername: json['username']?.toString(),
       firstName: json['first_name']?.toString(),
       lastName: json['last_name']?.toString(),
       role: json['role']?.toString() ?? 'client',
       isVerified: json['is_verified'] as bool? ?? false,
-      avatarUrl: json['avatar_url']?.toString(),
+      avatarUrl: avatarUrl,
       walletBalance: (json['wallet_balance'] as num?)?.toDouble(),
       agentProfile: json['agent_profile'] != null
           ? AgentProfile.fromJson(json['agent_profile'] as Map<String, dynamic>)
           : null,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
-          : null,
+          ? DateTime.tryParse(json['created_at'].toString())
+          : json['date_joined'] != null
+              ? DateTime.tryParse(json['date_joined'].toString())
+              : null,
       updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
+          ? DateTime.tryParse(json['updated_at'].toString())
           : null,
     );
   }
@@ -71,6 +87,7 @@ class UserModel {
       'id': id,
       'email': email,
       if (phoneNumber != null) 'phone_number': phoneNumber,
+      if (djangoUsername != null) 'username': djangoUsername,
       if (firstName != null) 'first_name': firstName,
       if (lastName != null) 'last_name': lastName,
       'role': role,
@@ -88,6 +105,7 @@ class UserModel {
     String? id,
     String? email,
     String? phoneNumber,
+    String? djangoUsername,
     String? firstName,
     String? lastName,
     String? role,
@@ -102,6 +120,7 @@ class UserModel {
       id: id ?? this.id,
       email: email ?? this.email,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      djangoUsername: djangoUsername ?? this.djangoUsername,
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
       role: role ?? this.role,
@@ -193,8 +212,7 @@ class AgentProfile {
   factory AgentProfile.fromJson(Map<String, dynamic> json) {
     return AgentProfile(
       bio: json['bio']?.toString(),
-      skills:
-          (json['skills'] as List<dynamic>?)
+      skills: (json['skills'] as List<dynamic>?)
               ?.map((skill) => skill.toString())
               .toList() ??
           [],
@@ -202,8 +220,7 @@ class AgentProfile {
       totalMissions: json['total_missions'] as int? ?? 0,
       isAvailable: json['is_available'] as bool? ?? false,
       location: json['location']?.toString(),
-      certifications:
-          (json['certifications'] as List<dynamic>?)
+      certifications: (json['certifications'] as List<dynamic>?)
               ?.map((cert) => cert.toString())
               .toList() ??
           [],

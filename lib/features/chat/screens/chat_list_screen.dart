@@ -13,7 +13,7 @@ class ChatListScreen extends StatefulWidget {
 
 class _ChatListScreenState extends State<ChatListScreen> {
   final List<ChatPreview> _chats = [
-    ChatPreview(
+    const ChatPreview(
       id: '1',
       userName: 'Marie Kouakou',
       userAvatar: 'assets/images/avatar/female_1.png',
@@ -22,7 +22,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       unreadCount: 2,
       isOnline: true,
     ),
-    ChatPreview(
+    const ChatPreview(
       id: '2',
       userName: 'Paul Assaba',
       userAvatar: 'assets/images/avatar/male_1.png',
@@ -31,7 +31,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       unreadCount: 0,
       isOnline: false,
     ),
-    ChatPreview(
+    const ChatPreview(
       id: '3',
       userName: 'Service Client FONACO',
       userAvatar: 'assets/images/avatar/support.png',
@@ -47,7 +47,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
-      appBar: const CustomAppBar.detailStack(title: 'Messages'),
+      appBar: const CustomAppBar.detailStack(title: 'Discussion'),
       body: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _chats.length,

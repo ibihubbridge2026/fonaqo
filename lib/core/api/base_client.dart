@@ -2,14 +2,19 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logger/logger.dart';
 
+import '../config/api_config.dart';
+import '../utils/retry_utils.dart';
+
 /// Client HTTP centralisé pour toutes les appels API
 /// Utilise Dio avec intercepteurs pour authentification et logging
 class BaseClient {
-  // Pour émulateur Android: http://10.0.2.2:8000/api/v1/
-  // Pour vrai téléphone sur réseau local: http://192.168.x.x:8000/api/v1/
-  static const String _baseUrl = 'http://192.168.1.73:8000/api/v1/';
+  /// Base API (suffixe /api/v1/). Les chemins passés à Dio sont relatifs, ex. `accounts/login/`.
+  static String get _baseUrl => ApiConfig.baseUrl;
   static const Duration _connectTimeout = Duration(seconds: 30);
   static const Duration _receiveTimeout = Duration(seconds: 30);
+
+  /// Hôte et port du serveur (ex. `192.168.1.73:8000`) pour WebSockets `ws://…`.
+  static String get apiHostAndPort => ApiConfig.wsHost;
 
   late final Dio _dio;
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
@@ -20,6 +25,15 @@ class BaseClient {
   factory BaseClient() => _instance;
   BaseClient._internal() {
     _initializeDio();
+  }
+
+  /// Set the callback for token expiration
+  void setOnTokenExpiredCallback(Function()? callback) {
+    // Remove existing auth interceptor and add new one with callback
+    _dio.interceptors
+        .removeWhere((interceptor) => interceptor is _AuthInterceptor);
+    _dio.interceptors.add(_AuthInterceptor(_secureStorage, _logger, _dio,
+        onTokenExpired: callback));
   }
 
   void _initializeDio() {
@@ -36,8 +50,9 @@ class BaseClient {
     );
 
     // Ajout des intercepteurs
-    _dio.interceptors.add(_AuthInterceptor(_secureStorage));
+    _dio.interceptors.add(_AuthInterceptor(_secureStorage, _logger, _dio));
     _dio.interceptors.add(_LoggingInterceptor(_logger));
+    _dio.interceptors.add(RetryUtils.createRetryInterceptor(logger: _logger));
   }
 
   /// Méthode GET
@@ -45,12 +60,14 @@ class BaseClient {
     String path, {
     Map<String, dynamic>? queryParameters,
     Options? options,
+    ProgressCallback? onReceiveProgress,
   }) async {
     try {
       return await _dio.get(
         path,
         queryParameters: queryParameters,
         options: options,
+        onReceiveProgress: onReceiveProgress,
       );
     } on DioException catch (e) {
       throw _handleDioError(e);
@@ -63,6 +80,8 @@ class BaseClient {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     Options? options,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
   }) async {
     try {
       return await _dio.post(
@@ -70,6 +89,8 @@ class BaseClient {
         data: data,
         queryParameters: queryParameters,
         options: options,
+        onSendProgress: onSendProgress,
+        onReceiveProgress: onReceiveProgress,
       );
     } on DioException catch (e) {
       throw _handleDioError(e);
@@ -82,6 +103,8 @@ class BaseClient {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     Options? options,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
   }) async {
     try {
       return await _dio.put(
@@ -89,6 +112,8 @@ class BaseClient {
         data: data,
         queryParameters: queryParameters,
         options: options,
+        onSendProgress: onSendProgress,
+        onReceiveProgress: onReceiveProgress,
       );
     } on DioException catch (e) {
       throw _handleDioError(e);
@@ -120,6 +145,8 @@ class BaseClient {
     dynamic data,
     Map<String, dynamic>? queryParameters,
     Options? options,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
   }) async {
     try {
       return await _dio.patch(
@@ -127,6 +154,8 @@ class BaseClient {
         data: data,
         queryParameters: queryParameters,
         options: options,
+        onSendProgress: onSendProgress,
+        onReceiveProgress: onReceiveProgress,
       );
     } on DioException catch (e) {
       throw _handleDioError(e);
@@ -146,10 +175,9 @@ class BaseClient {
         );
 
       case DioExceptionType.badResponse:
-        return _handleHttpError(
-          error.response?.statusCode ?? 0,
-          error.response?.data,
-        );
+        final statusCode = error.response?.statusCode;
+        final responseData = error.response?.data;
+        return _handleHttpError(statusCode ?? 0, responseData);
 
       case DioExceptionType.cancel:
         return ApiException(
@@ -171,7 +199,6 @@ class BaseClient {
         );
 
       case DioExceptionType.unknown:
-      default:
         return ApiException(
           message: 'Une erreur inattendue est survenue',
           type: ApiErrorType.unknown,
@@ -257,22 +284,45 @@ class BaseClient {
 /// Intercepteur pour ajouter le token JWT aux requêtes
 class _AuthInterceptor extends Interceptor {
   final FlutterSecureStorage _secureStorage;
-  static const String _tokenKey = 'jwt_token';
+  final Logger _logger;
+  final Dio _dio; // Ajout de l'instance Dio
+  final Function()? onTokenExpired;
+  static const String _tokenKey = 'jwt_access_token';
+  static const String _refreshTokenKey = 'jwt_refresh_token';
+  bool _isRefreshing = false;
 
-  _AuthInterceptor(this._secureStorage);
+  _AuthInterceptor(
+    this._secureStorage,
+    this._logger,
+    this._dio, {
+    this.onTokenExpired,
+  });
+
+  /// Vérifie si le chemin est public (ne nécessite pas d'authentification)
+  bool _isPublicPath(String path) {
+    final publicPaths = [
+      'accounts/login/',
+      'accounts/register/',
+      'accounts/refresh/',
+      'accounts/logout/',
+      'accounts/forgot-password/',
+      'accounts/google-auth/',
+      'accounts/token/refresh/',
+    ];
+
+    return publicPaths.any((publicPath) => path.contains(publicPath));
+  }
 
   @override
   void onRequest(
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    // Ne pas ajouter de token pour l'endpoint de login
-    if (options.path.contains('login/')) {
+    if (_isPublicPath(options.path)) {
       handler.next(options);
       return;
     }
 
-    // Ajouter le token JWT s'il existe
     final token = await _secureStorage.read(key: _tokenKey);
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
@@ -281,28 +331,95 @@ class _AuthInterceptor extends Interceptor {
   }
 
   @override
-  void onError(DioException err, ErrorInterceptorHandler handler) {
-    // Si erreur 401 avec token_not_valid, supprimer le token et logger
-    if (err.response?.statusCode == 401) {
-      final responseData = err.response?.data;
-      if (responseData is Map && responseData['code'] == 'token_not_valid') {
-        print('DEBUG - Token expiré détecté, suppression du token');
-        _secureStorage.delete(key: _tokenKey);
+  void onError(DioException err, ErrorInterceptorHandler handler) async {
+    // FILTRAGE STRICT : Seules les vraies erreurs 401 déclenchent la déconnexion
+    final isExact401 = err.response?.statusCode == 401;
+    final isNotPublicPath = !_isPublicPath(err.requestOptions.path);
+    final hasResponse = err.response != null;
 
-        // Déclencher la déconnexion automatique
-        _handleTokenExpired();
+    _logger.d(
+        '🔍 Analyse erreur: statusCode=${err.response?.statusCode}, isPublicPath=${_isPublicPath(err.requestOptions.path)}');
+
+    if (isExact401 && isNotPublicPath && hasResponse) {
+      // Log détaillé pour debug des erreurs 401
+      _logger.e('🔴 VRAIE ERREUR 401 DÉTECTÉE:');
+      _logger.e('📍 URL: ${err.requestOptions.uri}');
+      _logger.e('📍 Méthode: ${err.requestOptions.method}');
+      _logger.e('📍 Headers: ${err.requestOptions.headers}');
+      _logger.e('📍 Corps de l\'erreur: ${err.response?.data}');
+      _logger.e('📍 Message: ${err.message}');
+
+      // Tenter de rafraîchir le token pour toute erreur 401
+      _logger.w('🔄 401 reçu — tentative de rafraîchissement du token JWT');
+      final refreshed = await _tryRefreshToken();
+
+      if (refreshed) {
+        // Réessayer la requête originale avec le nouveau token
+        final newToken = await _secureStorage.read(key: _tokenKey);
+        if (newToken != null) {
+          err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+
+          try {
+            final response = await _dio.fetch(err.requestOptions);
+            handler.resolve(response);
+            return;
+          } catch (e) {
+            _logger.e('Échec de la réessai après rafraîchissement: $e');
+          }
+        }
       }
+
+      // Si le rafraîchissement échoue, SEULEMENT là on déconnecte
+      _logger.w('🚨 JWT expiré ou invalide : DÉCONNEXION confirmée');
+      _logger.w('📍 Suppression du stockage token et appel de onTokenExpired');
+      await _secureStorage.delete(key: _tokenKey);
+      await _secureStorage.delete(key: _refreshTokenKey);
+      await _secureStorage.delete(key: 'user_data');
+      onTokenExpired?.call();
+      return; // Important : ne pas appeler handler.next(err) après déconnexion
     }
+
+    // Pour toutes les autres erreurs (404, 500, réseau, etc.), on ne fait rien de spécial
+    if (err.response?.statusCode != null) {
+      _logger.d(
+          'ℹ️ Erreur ${err.response?.statusCode} gérée normalement: ${err.requestOptions.uri}');
+    } else {
+      _logger.d('ℹ️ Erreur réseau/générale: ${err.type} - ${err.message}');
+    }
+
     handler.next(err);
   }
 
-  void _handleTokenExpired() {
-    // Notifier l'AuthProvider pour gérer la déconnexion
-    print('DEBUG - Token expiré, notification du AuthProvider');
+  /// Tente de rafraîchir le token JWT
+  Future<bool> _tryRefreshToken() async {
+    try {
+      final refreshToken = await _secureStorage.read(key: 'jwt_refresh_token');
+      if (refreshToken == null) return false;
 
-    // Importer et utiliser le AuthProvider pour gérer la déconnexion
-    // Note: Cette implémentation nécessite une refactorisation pour accéder au AuthProvider
-    // Pour l'instant, on supprime juste le token
+      final dio = Dio(BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+        headers: {
+          'No-Auth': 'True'
+        }, // Évite l'interception par l'auth interceptor
+      ));
+
+      final response = await dio.post(
+        'accounts/token/refresh/',
+        data: {'refresh': refreshToken},
+      );
+
+      if (response.statusCode == 200) {
+        final newAccessToken = response.data['access'];
+        await _secureStorage.write(key: _tokenKey, value: newAccessToken);
+        _logger.i('Token JWT rafraîchi avec succès');
+        return true;
+      }
+    } catch (e) {
+      _logger.e('Échec du rafraîchissement du token: $e');
+    }
+    return false;
   }
 }
 
@@ -333,11 +450,37 @@ class _LoggingInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
-    _logger.e(
-      '❌ [${err.response?.statusCode ?? 'ERROR'}] ${err.requestOptions.uri}',
-    );
-    _logger.e('📥 Error Response: ${err.response?.data}');
-    _logger.e('📥 Error Message: ${err.message}');
+    // Catégoriser et logger les erreurs de manière plus intelligente
+    switch (err.type) {
+      case DioExceptionType.connectionError:
+        _logger.w('🔌 Connexion refusée: ${err.requestOptions.uri.host}');
+        break;
+      case DioExceptionType.connectionTimeout:
+        _logger.w('⏱️ Timeout de connexion: ${err.requestOptions.uri}');
+        break;
+      case DioExceptionType.receiveTimeout:
+        _logger.w('⏱️ Timeout de réception: ${err.requestOptions.uri}');
+        break;
+      case DioExceptionType.sendTimeout:
+        _logger.w('⏱️ Timeout d\'envoi: ${err.requestOptions.uri}');
+        break;
+      case DioExceptionType.badResponse:
+        _logger.e('❌ [${err.response?.statusCode}] ${err.requestOptions.uri}');
+        if (err.response?.data != null) {
+          _logger.d('📥 Response Data: ${err.response?.data}');
+        }
+        break;
+      case DioExceptionType.cancel:
+        _logger.d('🚫 Requête annulée: ${err.requestOptions.uri}');
+        break;
+      case DioExceptionType.badCertificate:
+        _logger.e('� Erreur SSL: ${err.requestOptions.uri}');
+        break;
+      case DioExceptionType.unknown:
+        _logger.e('❌ Erreur inconnue: ${err.message}');
+        break;
+    }
+
     handler.next(err);
   }
 }

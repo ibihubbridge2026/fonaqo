@@ -7,9 +7,13 @@ abstract final class AppRoutes {
   static const login = '/login';
   static const register = '/register';
   static const forgotPassword = '/forgot-password';
+  static const completeProfile = '/complete-profile';
 
   /// Conteneur principal avec barre inférieure (post-authentification).
   static const mainShell = '/main';
+
+  /// Conteneur principal pour l'interface Agent (post-authentification).
+  static const agentMainShell = '/agent';
 
   /// Sous-écrans profil (pile détail).
   static const profilePersonalInfo = '/profile/personal-info';
@@ -27,6 +31,9 @@ abstract final class AppRoutes {
   /// Mission detail (route empilée).
   static const String missionDetail = '/mission-detail';
 
+  /// Suivi GPS live (mission).
+  static const String missionTracking = '/mission-tracking';
+
   /// Détail événement (route empilée).
   static const String eventDetail = '/event-detail';
 
@@ -43,16 +50,19 @@ abstract final class AppRoutes {
   static const String missionsAvailable = '/missions-available';
 
   /// Centre d'aide
-  static const String helpCenter = '/help-center';
+  static const String helpCenter = '/profile/help';
+
+  /// Carte des agents
+  static const String agentsMap = '/agents-map';
 
   /// Paramètres de notifications
   static const String notificationsSettings = '/notifications-settings';
 
   /// Informations personnelles
-  static const String personalInfo = '/personal-info';
+  static const String personalInfo = '/profile/personal-info';
 
   /// Paramètres de sécurité
-  static const String securitySettings = '/security-settings';
+  static const String securitySettings = '/profile/security';
 
-  static const String language = '/language';
+  static const String language = '/profile/language';
 }

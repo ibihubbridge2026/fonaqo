@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 
-import '../features/home/home_screen.dart';
-import '../features/missions/missions_screen.dart';
-import '../features/profile/profile_screen.dart';
-import '../features/agents/agents_screen.dart';
+import '../features/client/home/home_screen.dart';
+import '../features/client/missions/missions_screen.dart';
+import '../features/client/profile/profile_screen.dart';
+import '../features/client/agents_screen.dart';
 import '../features/events/events_screen.dart';
 import 'custom_app_bar.dart';
 import 'main_navigation_bar.dart';
@@ -49,11 +49,11 @@ class _MainWrapperState extends State<MainWrapper> {
   bool _showLocationBanner = false;
 
   late final List<Widget> _pages = [
-    HomeScreen(),
+    const HomeScreen(),
     MissionsScreen(showCreateMissionListenable: _showCreateMission),
-    AgentsScreen(),
-    EventsScreen(),
-    ProfileScreen(),
+    const AgentsScreen(),
+    const EventsScreen(),
+    const ProfileScreen(),
   ];
 
   @override

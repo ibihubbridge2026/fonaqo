@@ -39,7 +39,7 @@ class EventDetailScreen extends StatelessWidget {
               child: Image.asset(
                 imagePath,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => Container(
+                errorBuilder: (_, __, ___) => Container(
                   color: Colors.grey[200],
                   alignment: Alignment.center,
                   child: const Icon(

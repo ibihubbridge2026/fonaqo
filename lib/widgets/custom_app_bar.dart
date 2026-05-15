@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../core/routes/app_routes.dart';
+import '../core/providers/auth_provider.dart';
 
 /// Variante d'en-tête : logo marque pour l’accueil shell, titre d’onglet, ou pile détail avec retour.
 enum CustomAppBarVariant {
@@ -47,21 +49,21 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
     this.onNotificationsPressed,
     this.onChatPressed,
-  }) : variant = CustomAppBarVariant.mainShellHome,
-       sectionTitle = null,
-       detailTitleWidget = null,
-       detailTrailingActions = null,
-       leadingOnBackPressed = null;
+  })  : variant = CustomAppBarVariant.mainShellHome,
+        sectionTitle = null,
+        detailTitleWidget = null,
+        detailTrailingActions = null,
+        leadingOnBackPressed = null;
 
   const CustomAppBar.mainShellSection({
     super.key,
     required String this.sectionTitle,
-  }) : variant = CustomAppBarVariant.mainShellSection,
-       detailTitleWidget = null,
-       detailTrailingActions = null,
-       leadingOnBackPressed = null,
-       onNotificationsPressed = null,
-       onChatPressed = null;
+  })  : variant = CustomAppBarVariant.mainShellSection,
+        detailTitleWidget = null,
+        detailTrailingActions = null,
+        leadingOnBackPressed = null,
+        onNotificationsPressed = null,
+        onChatPressed = null;
 
   const CustomAppBar.detailStack({
     super.key,
@@ -69,10 +71,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.leadingOnBackPressed,
     this.detailTrailingActions,
     required String title,
-  }) : variant = CustomAppBarVariant.detailStack,
-       sectionTitle = null,
-       onNotificationsPressed = null,
-       onChatPressed = null;
+  })  : variant = CustomAppBarVariant.detailStack,
+        sectionTitle = null,
+        onNotificationsPressed = null,
+        onChatPressed = null;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -98,19 +100,27 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         return Padding(
           padding: const EdgeInsets.only(left: 8),
           child: Center(
-            child: CircleAvatar(
-              radius: 20,
-              child: ClipOval(
-                child: Image.asset(
-                  'assets/images/avatar/user.png',
-                  fit: BoxFit.cover,
-                  width: 40,
-                  height: 40,
-                  errorBuilder: (_, _, _) {
-                    return const Icon(Icons.person, color: Colors.black54);
-                  },
-                ),
-              ),
+            child: Consumer<AuthProvider>(
+              builder: (context, auth, _) {
+                final user = auth.currentUser;
+                final avatarUrl = user?.avatarUrl;
+                final imageUrl = avatarUrl != null
+                    ? "${avatarUrl}?t=${DateTime.now().millisecondsSinceEpoch}"
+                    : null;
+
+                return CircleAvatar(
+                  key: ValueKey(avatarUrl), // Force rebuild when URL changes
+                  radius: 20,
+                  backgroundImage: imageUrl != null
+                      ? NetworkImage(imageUrl) as ImageProvider
+                      : const AssetImage('assets/images/avatar/user.png'),
+                  backgroundColor: Colors.grey[200],
+                  child: avatarUrl == null
+                      ? const Icon(Icons.person,
+                          color: Colors.black54, size: 20)
+                      : null,
+                );
+              },
             ),
           ),
         );
@@ -173,11 +183,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   List<Widget> _buildActions(BuildContext context) {
     switch (variant) {
       case CustomAppBarVariant.mainShellHome:
-        final chat =
-            onChatPressed ??
+        final chat = onChatPressed ??
             () => Navigator.pushNamed(context, AppRoutes.chatList);
-        final bell =
-            onNotificationsPressed ??
+        final bell = onNotificationsPressed ??
             () => Navigator.pushNamed(context, AppRoutes.notifications);
         return [
           IconButton(
