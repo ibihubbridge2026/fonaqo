@@ -1,38 +1,47 @@
 ```
-# Backup files
-*.backup
-
-# Flutter/Dart specific
+# Dependency directories
 .dart_tool/
 .build/
-coverage/
-*.g.dart
-*.freezed.dart
+dependencies/
 
-# Logs
-*.log
+# Generated files
+lib/generated/
+android/build/
+ios/build/
+windows/runner/Release/
+windows/runner/Profile/
+windows/runner/Debug/
+macos/Build/
+linux/Build/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Dependencies
-node_modules/
-vendor/
+# Logs
+*.log
+**/logs/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
+# OS generated files
 .DS_Store
 Thumbs.db
 
-# Build outputs
-dist/
-build/
-target/
+# Coverage
+coverage/
+*.coverage
+
+# Distribution / packaging
+*.tar.gz
+*.zip
+*.app
+*.dmg
+*.deb
+*.rpm
 ```

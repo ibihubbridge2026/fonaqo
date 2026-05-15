@@ -10,7 +10,6 @@ class AgentProvider extends ChangeNotifier {
   final Logger _logger = Logger();
   final AgentRepository _agentRepository = AgentRepository();
 
-  bool _isAgentMode = false;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -22,7 +21,6 @@ class AgentProvider extends ChangeNotifier {
   Map<String, dynamic> _stats = {};
 
   // Getters
-  bool get isAgentMode => _isAgentMode;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   double get balance => _balance;
@@ -213,59 +211,6 @@ class AgentProvider extends ChangeNotifier {
     }
   }
 
-  /// Bascule vers le mode agent si l'utilisateur a les droits nécessaires
-  /// Retourne true si le basculement a réussi, false sinon
-  Future<bool> toggleAgentMode(AuthProvider authProvider) async {
-    if (_isLoading) return false;
-
-    _setLoading(true);
-    _clearError();
-
-    try {
-      // Vérifier si l'utilisateur est authentifié
-      if (!authProvider.isAuthenticated) {
-        _setError('Vous devez être connecté pour accéder au mode agent');
-        return false;
-      }
-
-      final currentUser = authProvider.currentUser;
-      if (currentUser == null) {
-        _setError('Utilisateur non trouvé');
-        return false;
-      }
-
-      // Vérifier si l'utilisateur a le droit d'être agent
-      if (!currentUser.isAgent && !currentUser.isClient) {
-        _setError('Votre compte n\'est pas configuré pour être agent');
-        return false;
-      }
-
-      // Si l'utilisateur est déjà agent, basculer le mode
-      if (currentUser.isAgent) {
-        _isAgentMode = !_isAgentMode;
-        _logger.d(
-            'Mode agent basculé: $_isAgentMode pour utilisateur ${currentUser.id}');
-        return true;
-      }
-
-      // Si l'utilisateur est client mais veut devenir agent
-      if (currentUser.isClient) {
-        _setError(
-            'Votre compte est de type Client. Pour devenir Agent, veuillez contacter le support.');
-        return false;
-      }
-
-      return false;
-    } catch (e, st) {
-      _logger.e('Erreur lors du basculement mode agent',
-          error: e, stackTrace: st);
-      _setError('Une erreur est survenue: ${e.toString()}');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
-
   /// Vérifie si l'utilisateur peut accéder au mode agent
   bool canAccessAgentMode(AuthProvider authProvider) {
     if (!authProvider.isAuthenticated) return false;
@@ -274,13 +219,6 @@ class AgentProvider extends ChangeNotifier {
     if (currentUser == null) return false;
 
     return currentUser.isAgent;
-  }
-
-  /// Force l'activation du mode agent (pour les tests ou admin)
-  void forceAgentMode(bool enabled) {
-    _isAgentMode = enabled;
-    _logger.d('Mode agent forcé: $enabled');
-    notifyListeners();
   }
 
   /// Met à jour le solde de l'agent
@@ -350,7 +288,6 @@ class AgentProvider extends ChangeNotifier {
 
   /// Réinitialise le provider
   void reset() {
-    _isAgentMode = false;
     _isLoading = false;
     _errorMessage = null;
     _balance = 0.0;
