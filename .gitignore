@@ -1,40 +1,38 @@
 ```
-# Dependencies
+# Backup files
+*.backup
+
+# Flutter/Dart specific
 .dart_tool/
 .build/
-dependencies/
+coverage/
+*.g.dart
+*.freezed.dart
 
 # Logs
 *.log
-**/logs
 
-# Environment variables
+# Environment
 .env
 .env.local
-.env.*
+*.env.*
 
-# IDE files
-.idea/
+# Dependencies
+node_modules/
+vendor/
+
+# IDE
 .vscode/
+.idea/
 *.swp
 *.swo
 
-# OS generated files
+# OS
 .DS_Store
 Thumbs.db
 
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# Distribution / packaging
+# Build outputs
 dist/
 build/
-*.tar.gz
-*.zip
-
-# Temporary files
-*.tmp
-*.temp
+target/
 ```
