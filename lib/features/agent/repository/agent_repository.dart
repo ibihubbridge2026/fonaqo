@@ -179,20 +179,42 @@ class AgentRepository {
     }
   }
 
-  /// Soumet la preuve de complétion (photo)
+  /// Soumet la preuve de complétion (photo) avec upload réel via FormData
   Future<bool> submitCompletion(String missionId, String photoPath) async {
     try {
-      // TODO: Implémenter l'upload de fichier via FormData
+      final file = File(photoPath);
+      if (!await file.exists()) {
+        _logger.e('Fichier photo inexistant: $photoPath');
+        return false;
+      }
+
+      final fileName = photoPath.split('/').last;
+      final fileSize = await file.length();
+
+      _logger.d('Upload preuve de complétion: $fileName (${fileSize} bytes)');
+
+      // Créer FormData pour l'upload
+      final formData = FormData.fromMap({
+        'photo': await MultipartFile.fromFile(
+          photoPath,
+          filename: fileName,
+        ),
+        'mission_id': missionId,
+        'submitted_at': DateTime.now().toIso8601String(),
+      });
+
       final response = await _baseClient.post(
         'missions/$missionId/submit_completion/',
-        data: {
-          'photo_path': photoPath,
-          'submitted_at': DateTime.now().toIso8601String(),
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+        onSendProgress: (sent, total) {
+          final progress = sent / total;
+          _logger.d('Upload progression: ${(progress * 100).toInt()}%');
         },
       );
 
-      if (response.statusCode == 200) {
-        _logger.d('Preuve de complétion soumise: $missionId');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        _logger.d('Preuve de complétion soumise avec succès: $missionId');
         return true;
       } else {
         _logger.e('Erreur soumission preuve: ${response.statusCode}');
