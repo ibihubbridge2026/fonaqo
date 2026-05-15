@@ -22,7 +22,7 @@ class StepIndicator extends StatelessWidget {
           height: 4,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(2),
-            color: Colors.grey.withValues(alpha: 0.2),
+            color: Colors.grey.withOpacity( 0.2),
           ),
           child: FractionallySizedBox(
             alignment: Alignment.centerLeft,
@@ -56,10 +56,10 @@ class StepIndicator extends StatelessWidget {
                       shape: BoxShape.circle,
                       color: isActive 
                           ? AppTheme.primaryColor 
-                          : Colors.grey.withValues(alpha: 0.3),
+                          : Colors.grey.withOpacity( 0.3),
                       boxShadow: isCurrent ? [
                         BoxShadow(
-                          color: AppTheme.primaryColor.withValues(alpha: 0.3),
+                          color: AppTheme.primaryColor.withOpacity( 0.3),
                           blurRadius: 8,
                           spreadRadius: 2,
                         ),
@@ -87,7 +87,7 @@ class StepIndicator extends StatelessWidget {
                     style: TextStyle(
                       color: isActive 
                           ? AppTheme.secondaryColor 
-                          : Colors.grey.withValues(alpha: 0.6),
+                          : Colors.grey.withOpacity( 0.6),
                       fontSize: 12,
                       fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
                     ),

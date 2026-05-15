@@ -358,8 +358,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
             decoration: BoxDecoration(
               color: _getStatusColor(
                 _mission!.status,
-              ).withValues(
-                alpha: 0.1,
+              ).withOpacity(
+                0.1,
               ),
               borderRadius: BorderRadius.circular(
                 10,

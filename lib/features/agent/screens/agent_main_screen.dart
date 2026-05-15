@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../../../core/providers/auth_provider.dart';
 import '../providers/agent_provider.dart';
-import '../../../core/services/app_mode_service.dart';
 
 /// Écran principal pour l'interface Agent (temporaire pour tester la structure)
 class AgentMainScreen extends StatefulWidget {
@@ -14,7 +13,6 @@ class AgentMainScreen extends StatefulWidget {
 }
 
 class _AgentMainScreenState extends State<AgentMainScreen> {
-  final AppModeService _appModeService = AppModeService();
 
   @override
   Widget build(BuildContext context) {
@@ -40,10 +38,6 @@ class _AgentMainScreenState extends State<AgentMainScreen> {
           IconButton(
             icon: const Icon(Icons.switch_account),
             onPressed: () async {
-              final success = await _appModeService.switchToClient();
-              if (success && mounted) {
-                Navigator.pushReplacementNamed(context, '/main');
-              }
             },
           ),
         ],
