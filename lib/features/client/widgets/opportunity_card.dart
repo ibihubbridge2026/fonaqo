@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../models/opportunity_model.dart';
+import '../models/opportunity_model.dart';
 
 /// Widget Carte d'Opportunité (Service)
 /// Design inspiré du HTML fourni : Image, Badge Note, Titre, Prix, Bouton Action.
@@ -11,17 +11,14 @@ class OpportunityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colors = AppColors(isDark: isDark);
-
     return Container(
       decoration: BoxDecoration(
-        color: colors.surfaceContainerLowest,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.outlineVariant.withOpacity(0.3)),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -36,15 +33,17 @@ class OpportunityCard extends StatelessWidget {
             child: Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(20)),
                   child: Image.network(
                     opportunity.imageUrl,
                     width: double.infinity,
                     height: double.infinity,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => Container(
-                      color: colors.surfaceContainer,
-                      child: Icon(Icons.image_not_supported, color: colors.outlineVariant, size: 40),
+                      color: AppColors.cardBackground,
+                      child: Icon(Icons.image_not_supported,
+                          color: AppColors.border, size: 40),
                     ),
                   ),
                 ),
@@ -52,20 +51,21 @@ class OpportunityCard extends StatelessWidget {
                   top: 12,
                   right: 12,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: colors.primaryContainer,
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.star, size: 14, color: colors.onPrimaryContainer),
+                        Icon(Icons.star, size: 14, color: AppColors.primary),
                         const SizedBox(width: 4),
                         Text(
                           opportunity.rating.toString(),
                           style: TextStyle(
-                            color: colors.onPrimaryContainer,
+                            color: AppColors.primary,
                             fontWeight: FontWeight.bold,
                             fontSize: 12,
                           ),
@@ -79,9 +79,10 @@ class OpportunityCard extends StatelessWidget {
                     top: 12,
                     left: 12,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
-                        color: colors.error,
+                        color: AppColors.error,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -97,7 +98,7 @@ class OpportunityCard extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Contenu Texte
           Expanded(
             flex: 5,
@@ -114,7 +115,7 @@ class OpportunityCard extends StatelessWidget {
                         child: Text(
                           opportunity.title,
                           style: TextStyle(
-                            color: colors.onSurface,
+                            color: AppColors.textPrimary,
                             fontWeight: FontWeight.w600,
                             fontSize: 16,
                           ),
@@ -124,15 +125,16 @@ class OpportunityCard extends StatelessWidget {
                       ),
                       if (opportunity.isOpen)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: colors.secondary.withOpacity(0.1),
+                            color: AppColors.secondary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             'OUVERT',
                             style: TextStyle(
-                              color: colors.secondary,
+                              color: AppColors.secondary,
                               fontWeight: FontWeight.bold,
                               fontSize: 10,
                             ),
@@ -140,19 +142,20 @@ class OpportunityCard extends StatelessWidget {
                         ),
                     ],
                   ),
-                  
+
                   const SizedBox(height: 4),
-                  
+
                   // Localisation
                   Row(
                     children: [
-                      Icon(Icons.location_on, size: 16, color: colors.onSurfaceVariant),
+                      Icon(Icons.location_on,
+                          size: 16, color: AppColors.textSecondary),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
                           opportunity.location,
                           style: TextStyle(
-                            color: colors.onSurfaceVariant,
+                            color: AppColors.textSecondary,
                             fontSize: 12,
                           ),
                           maxLines: 1,
@@ -161,9 +164,9 @@ class OpportunityCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  
+
                   const Spacer(),
-                  
+
                   // Catégorie et Prix + Bouton
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -175,7 +178,7 @@ class OpportunityCard extends StatelessWidget {
                           Text(
                             opportunity.category,
                             style: TextStyle(
-                              color: colors.onSurfaceVariant,
+                              color: AppColors.textSecondary,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                               letterSpacing: 0.5,
@@ -185,7 +188,7 @@ class OpportunityCard extends StatelessWidget {
                           Text(
                             opportunity.price,
                             style: TextStyle(
-                              color: colors.primary,
+                              color: AppColors.primary,
                               fontWeight: FontWeight.w700,
                               fontSize: 16,
                             ),
@@ -200,12 +203,12 @@ class OpportunityCard extends StatelessWidget {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: colors.primaryContainer.withOpacity(0.2),
+                            color: AppColors.primary.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(
                             Icons.arrow_forward,
-                            color: colors.primary,
+                            color: AppColors.primary,
                           ),
                         ),
                       ),

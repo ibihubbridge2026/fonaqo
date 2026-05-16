@@ -9,7 +9,7 @@ class TutorialService {
   TutorialService._internal();
 
   bool _isInitialized = false;
-  
+
   // Clés pour stocker si le tutorial a déjà été vu
   static const String _agentTutorialKey = 'agent_tutorial_seen';
   static const String _clientTutorialKey = 'client_tutorial_seen';
@@ -43,160 +43,93 @@ class TutorialService {
   /// Crée un Coach Mark pour le Dashboard Agent
   TutorialCoachMark createAgentDashboardTutorial({
     required BuildContext context,
-    required List<FocusTarget> targets,
+    required List<TargetFocus> targets,
     Function()? onFinish,
   }) {
     return TutorialCoachMark(
       targets: targets,
-      colorShadow: Colors.black.withOpacity(0.7),
+      colorShadow: Colors.black.withValues(alpha: 0.7),
       textSkip: "PASSER",
       textStyleSkip: TextStyle(
         color: Colors.white,
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
       ),
-      paddingFocus: 10,
-      opacityShadow: 0.8,
-      onFinish: () {
-        markAgentTutorialAsSeen();
-        if (onFinish != null) onFinish();
-      },
-      onClickTarget: (target) {
-        debugPrint('🎯 Cible cliquée: $target');
-      },
-      onClickTargetWithTapPosition: (target, tapDetails) {
-        debugPrint('🎯 Cible cliquée à la position: ${tapDetails.localPosition}');
-      },
-      onClickOverlay: (target) {
-        debugPrint('🎯 Overlay cliqué: $target');
-      },
-      onHighlight: (target) {
-        debugPrint('✨ Cible en surbrillance: $target');
-      },
     );
   }
 
-  /// Génère les cibles de focus pour le Dashboard Agent
-  List<FocusTarget> getAgentDashboardTargets(GlobalKeys keys) {
+  /// Génère les cibles pour le dashboard agent
+  List<TargetFocus> getAgentDashboardTargets(Map<String, GlobalKey> keys) {
     return [
-      FocusTarget(
-        id: "wallet_card",
-        align: ContentAlign.bottom,
-        child: keys['walletCard']!,
-        text: "Votre Solde",
-        description:
-            "Consultez vos gains en temps réel et demandez des retraits vers Mobile Money.",
-        borderRadius: BorderRadius.circular(20),
+      TargetFocus(
+        identify: "profile_button",
+        keyTarget: keys['profileButton']!,
+        contents: [
+          TargetContent(
+            align: ContentAlign.top,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Profil",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Accédez à votre profil et à vos paramètres personnels.",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-      FocusTarget(
-        id: "stats_section",
-        align: ContentAlign.top,
-        child: keys['statsSection']!,
-        text: "Vos Performances",
-        description:
-            "Suivez votre note moyenne, le nombre de missions réussies et votre taux d'acceptation.",
-        borderRadius: BorderRadius.circular(20),
-      ),
-      FocusTarget(
-        id: "timeline_missions",
-        align: ContentAlign.top,
-        child: keys['timelineMissions']!,
-        text: "Timeline des Missions",
-        description:
-            "Visualisez toutes vos missions : à venir, en cours et terminées.",
-        borderRadius: BorderRadius.circular(20),
-      ),
-      FocusTarget(
-        id: "boost_button",
-        align: ContentAlign.left,
-        child: keys['boostButton']!,
-        text: "Boost de Visibilité",
-        description:
-            "Augmentez votre visibilité auprès des clients en activant un Boost premium.",
-        borderRadius: BorderRadius.circular(20),
-      ),
-      FocusTarget(
-        id: "online_toggle",
-        align: ContentAlign.right,
-        child: keys['onlineToggle']!,
-        text: "Statut En Ligne",
-        description:
-            "Activez/désactivez votre disponibilité pour recevoir de nouvelles missions.",
-        borderRadius: BorderRadius.circular(20),
+      TargetFocus(
+        identify: "online_toggle",
+        keyTarget: keys['onlineToggle']!,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  "Statut En Ligne",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "Activez/désactivez votre disponibilité pour recevoir de nouvelles missions.",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white70,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     ];
   }
 
   /// Génère les cibles pour l'écran de création de mission (Client)
-  List<FocusTarget> getClientCreateMissionTargets(GlobalKeys keys) {
-    return [
-      FocusTarget(
-        id: "mission_type",
-        align: ContentAlign.bottom,
-        child: keys['missionType']!,
-        text: "Type de Mission",
-        description: "Sélectionnez la catégorie de service dont vous avez besoin.",
-        borderRadius: BorderRadius.circular(16),
-      ),
-      FocusTarget(
-        id: "mission_details",
-        align: ContentAlign.top,
-        child: keys['missionDetails']!,
-        text: "Détails",
-        description:
-            "Décrivez précisément votre besoin pour que les agents puissent vous aider efficacement.",
-        borderRadius: BorderRadius.circular(16),
-      ),
-      FocusTarget(
-        id: "location_picker",
-        align: ContentAlign.bottom,
-        child: keys['locationPicker']!,
-        text: "Localisation",
-        description: "Indiquez où la mission doit se dérouler avec précision.",
-        borderRadius: BorderRadius.circular(16),
-      ),
-      FocusTarget(
-        id: "budget_input",
-        align: ContentAlign.top,
-        child: keys['budgetInput']!,
-        text: "Budget",
-        description:
-            "Définissez votre budget ou laissez les agents faire des offres.",
-        borderRadius: BorderRadius.circular(16),
-      ),
-    ];
+  List<TargetFocus> getClientCreateMissionTargets(Map<String, GlobalKey> keys) {
+    return [];
   }
 
   /// Génère les cibles pour l'écran des missions actives (Agent)
-  List<FocusTarget> getActiveMissionTargets(GlobalKeys keys) {
-    return [
-      FocusTarget(
-        id: "proof_upload",
-        align: ContentAlign.bottom,
-        child: keys['proofUpload']!,
-        text: "Preuves Photo",
-        description:
-            "Prenez des photos pour valider chaque étape de la mission (arrivée, début, fin).",
-        borderRadius: BorderRadius.circular(16),
-      ),
-      FocusTarget(
-        id: "chat_button",
-        align: ContentAlign.left,
-        child: keys['chatButton']!,
-        text: "Chat Client",
-        description: "Communiquez directement avec votre client pendant la mission.",
-        borderRadius: BorderRadius.circular(16),
-      ),
-      FocusTarget(
-        id: "complete_button",
-        align: ContentAlign.top,
-        child: keys['completeButton']!,
-        text: "Terminer la Mission",
-        description:
-            "Soumettez la mission terminée avec vos preuves pour recevoir le paiement.",
-        borderRadius: BorderRadius.circular(16),
-      ),
-    ];
+  List<TargetFocus> getActiveMissionTargets(Map<String, GlobalKey> keys) {
+    return [];
   }
 
   /// Affiche un popup de bienvenue pour les nouveaux agents
@@ -286,7 +219,7 @@ class TutorialService {
 /// Extension pour faciliter la création de GlobalKeys nommées
 extension GlobalKeyExtension on Map<String, GlobalKey> {
   void initialize() {
-    keys.forEach((key, value) {
+    forEach((key, value) {
       if (value == null) {
         this[key] = GlobalKey();
       }

@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../../widgets/main_wrapper.dart';
-import '../features/agent/screens/agent_main_shell.dart';
 
 /// Routeur principal qui gère l'affichage selon le rôle utilisateur
 /// Le rôle est déterminé UNIQUEMENT par le profil utilisateur (UserModel.role)
@@ -22,13 +21,8 @@ class MainRouter extends StatelessWidget {
 
         // Navigation basée sur le rôle utilisateur (défini dans UserModel.role)
         // Les agents voient l'interface Agent, les clients voient l'interface Client
-        if (authProvider.isAgent) {
-          // Interface Agent - tableau de bord, missions, wallet, profil
-          return const AgentMainShell();
-        } else {
-          // Interface Client - home, création mission, agents, événements, profil
-          return const MainWrapper();
-        }
+        // Interface unifiée (Agent et Client) - le MainWrapper s'adapte selon le rôle
+        return const MainWrapper();
       },
     );
   }

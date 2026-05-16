@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../core/theme/app_colors.dart';
-import '../providers/opportunity_provider.dart';
-import '../widgets/opportunity_card.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../providers/opportunity_provider.dart';
+import '../../widgets/opportunity_card.dart';
 
 /// Écran "Opportunités" pour le Client
 /// Remplace l'ancien écran "Événements".
@@ -16,7 +16,7 @@ class OpportunityScreen extends StatefulWidget {
 
 class _OpportunityScreenState extends State<OpportunityScreen> {
   String _selectedCategory = 'Tout';
-  
+
   final List<String> _categories = [
     'Tout',
     'Banque',
@@ -36,25 +36,23 @@ class _OpportunityScreenState extends State<OpportunityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colors = AppColors(isDark: isDark);
-    
+
     return Scaffold(
-      backgroundColor: colors.background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: colors.surface.withOpacity(0.9),
+        backgroundColor: AppColors.surface.withOpacity(0.9),
         elevation: 0,
         title: Text(
           'Opportunités',
           style: TextStyle(
-            color: colors.primary,
+            color: AppColors.primary,
             fontWeight: FontWeight.w800,
             fontSize: 24,
           ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.tune, color: colors.primary),
+            icon: Icon(Icons.tune, color: AppColors.primary),
             onPressed: () {
               // Ouvrir filtres avancés
             },
@@ -64,35 +62,42 @@ class _OpportunityScreenState extends State<OpportunityScreen> {
       body: Column(
         children: [
           // Barre de recherche et Filtres
-          _buildSearchAndFilter(colors),
-          
+          _buildSearchAndFilter(),
+
           // Grille des opportunités
           Expanded(
             child: Consumer<OpportunityProvider>(
               builder: (context, provider, _) {
                 if (provider.isLoading) {
-                  return Center(child: CircularProgressIndicator(color: colors.primary));
+                  return Center(
+                      child: CircularProgressIndicator(color: AppColors.primary));
                 }
                 if (provider.error != null) {
-                  return Center(child: Text(provider.error!, style: TextStyle(color: colors.error)));
+                  return Center(
+                      child: Text(provider.error!,
+                          style: TextStyle(color: AppColors.error)));
                 }
-                
+
                 final opportunities = provider.opportunities;
                 // Filtrage simple par catégorie
-                final filtered = _selectedCategory == 'Tout' 
-                    ? opportunities 
-                    : opportunities.where((o) => o.category == _selectedCategory).toList();
+                final filtered = _selectedCategory == 'Tout'
+                    ? opportunities
+                    : opportunities
+                        .where((o) => o.category == _selectedCategory)
+                        .toList();
 
                 if (filtered.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.search_off, size: 64, color: colors.outlineVariant),
+                        Icon(Icons.search_off,
+                            size: 64, color: AppColors.outlineVariant),
                         SizedBox(height: 16),
                         Text(
                           'Aucune opportunité trouvée',
-                          style: TextStyle(color: colors.onSurfaceVariant, fontSize: 16),
+                          style: TextStyle(
+                              color: AppColors.onSurfaceVariant, fontSize: 16),
                         ),
                       ],
                     ),
@@ -102,7 +107,8 @@ class _OpportunityScreenState extends State<OpportunityScreen> {
                 return GridView.builder(
                   padding: const EdgeInsets.all(16),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: MediaQuery.of(context).size.width > 600 ? 2 : 1,
+                    crossAxisCount:
+                        MediaQuery.of(context).size.width > 600 ? 2 : 1,
                     childAspectRatio: 1.1,
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
@@ -120,19 +126,19 @@ class _OpportunityScreenState extends State<OpportunityScreen> {
     );
   }
 
-  Widget _buildSearchAndFilter(AppColors colors) {
+  Widget _buildSearchAndFilter() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: colors.surface,
+      color: AppColors.surface,
       child: Column(
         children: [
           // Recherche
           Container(
             height: 56,
             decoration: BoxDecoration(
-              color: colors.surfaceContainerLowest,
+              color: AppColors.surfaceContainerLowest,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: colors.outlineVariant.withOpacity(0.5)),
+              border: Border.all(color: AppColors.outlineVariant.withOpacity(0.5)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
@@ -144,14 +150,14 @@ class _OpportunityScreenState extends State<OpportunityScreen> {
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Rechercher un service...',
-                prefixIcon: Icon(Icons.search, color: colors.onSurfaceVariant),
+                prefixIcon: Icon(Icons.search, color: AppColors.onSurfaceVariant),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               ),
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // Catégories Scrollable
           SizedBox(
             height: 50,
@@ -162,30 +168,45 @@ class _OpportunityScreenState extends State<OpportunityScreen> {
               itemBuilder: (context, index) {
                 final cat = _categories[index];
                 final isSelected = cat == _selectedCategory;
-                
+
                 return GestureDetector(
                   onTap: () => setState(() => _selectedCategory = cat),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
                     decoration: BoxDecoration(
-                      color: isSelected ? colors.primary : colors.surfaceContainerLowest,
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: isSelected ? Colors.transparent : colors.outlineVariant.withOpacity(0.3),
+                        color: isSelected
+                            ? Colors.transparent
+                            : AppColors.outlineVariant.withOpacity(0.3),
                       ),
-                      boxShadow: isSelected 
-                        ? [BoxShadow(color: colors.primary.withOpacity(0.3), blurRadius: 8)] 
-                        : [],
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.3),
+                                  blurRadius: 8)
+                            ]
+                          : [],
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (isSelected)
-                          Icon(Icons.apps, size: 18, color: colors.onPrimary, marginRight: 8),
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Icon(Icons.apps,
+                                size: 18, color: AppColors.onPrimary),
+                          ),
                         Text(
                           cat,
                           style: TextStyle(
-                            color: isSelected ? colors.onPrimary : colors.onSurfaceVariant,
+                            color: isSelected
+                                ? AppColors.onPrimary
+                                : AppColors.onSurfaceVariant,
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                           ),

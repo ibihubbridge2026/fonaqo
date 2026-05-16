@@ -23,20 +23,19 @@ class AiSearchProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Endpoint : POST /api/ai/search-agents/
-      // Body: { "query": "J'ai besoin de..." }
+      // Endpoint : POST /api/v1/ai/search/
+      // Body: { "query": "...", "type": "agent" }
       final response = await _apiService.post(
-        '/ai/search-agents/',
-        data: {'query': query},
+        '/ai/search/',
+        data: {'query': query, 'type': 'agent'},
       );
 
       if (response is Map<String, dynamic>) {
         _analysisResult = response['analysis'] ?? 'Analyse terminée.';
-        
+
         final agentsJson = response['agents'] as List<dynamic>? ?? [];
-        _suggestedAgents = agentsJson
-            .map((json) => AgentModel.fromJson(json))
-            .toList();
+        _suggestedAgents =
+            agentsJson.map((json) => AgentModel.fromJson(json)).toList();
       }
     } catch (e) {
       _error = "L'analyse IA a échoué. Veuillez réessayer.";
@@ -51,7 +50,8 @@ class AiSearchProvider extends ChangeNotifier {
 
   /// Simulation de réponse pour démo (à supprimer en prod)
   void _simulateMockResponse(String query) {
-    _analysisResult = "Je cherche un agent disponible pour une démarche bancaire.";
+    _analysisResult =
+        "Je cherche un agent disponible pour une démarche bancaire.";
     _suggestedAgents = [
       AgentModel(
         id: '1',

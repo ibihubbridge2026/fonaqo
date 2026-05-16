@@ -7,10 +7,13 @@ class ThemeProvider with ChangeNotifier {
   bool get isDarkMode => _isDarkMode;
 
   // Couleurs Light Mode (Défaut - Style Fintech Clean)
-  static const Color lightBackground = Color(0xFFF5F5F7); // Gris très clair doux
+  static const Color lightBackground =
+      Color(0xFFF5F5F7); // Gris très clair doux
   static const Color lightSurface = Color(0xFFFFFFFF); // Blanc pur
-  static const Color lightPrimary = Color(0xFF000000); // Noir pour textes principaux
-  static const Color lightSecondary = Color(0xFF8E8E93); // Gris pour textes secondaires
+  static const Color lightPrimary =
+      Color(0xFF000000); // Noir pour textes principaux
+  static const Color lightSecondary =
+      Color(0xFF8E8E93); // Gris pour textes secondaires
   static const Color lightAccent = Color(0xFFFFD400); // Jaune FONACO
   static const Color lightSuccess = Color(0xFF32D74B); // Vert
   static const Color lightError = Color(0xFFFF4D4F); // Rouge
@@ -40,7 +43,8 @@ class ThemeProvider with ChangeNotifier {
       brightness: _isDarkMode ? Brightness.dark : Brightness.light,
       scaffoldBackgroundColor: backgroundColor,
       primaryColor: accentColor,
-      fontFamily: 'Poppins', // Assure-toi d'avoir cette police dans pubspec.yaml
+      fontFamily:
+          'Poppins', // Assure-toi d'avoir cette police dans pubspec.yaml
       textTheme: TextTheme(
         displayLarge: TextStyle(
           fontSize: 32,
@@ -76,14 +80,15 @@ class ThemeProvider with ChangeNotifier {
           color: primaryTextColor,
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: surfaceColor,
         elevation: _isDarkMode ? 0 : 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-            color: cardBorderColor,
-            width: 1,
+            color: _isDarkMode
+                ? Colors.white.withOpacity(0.1)
+                : Colors.black.withOpacity(0.05),
           ),
         ),
       ),
@@ -105,7 +110,8 @@ class ThemeProvider with ChangeNotifier {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: _isDarkMode ? darkSurface : const Color(0xFFF2F2F7),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,

@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import '../models/mission_model.dart';
-import '../../../../core/services/api_service.dart';
+import '../../../core/models/mission_model.dart';
+import '../../../core/services/api_service.dart';
 
 /// Provider pour la Recherche Assistée par IA (Côté AGENT)
 class AiMissionSearchProvider extends ChangeNotifier {
@@ -23,24 +23,23 @@ class AiMissionSearchProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Endpoint : POST /api/ai/search-missions/
-      // Body: { "query": "Je veux une mission..." }
+      // Endpoint : POST /api/v1/ai/search/
+      // Body: { "query": "...", "type": "mission" }
       final response = await _apiService.post(
-        '/ai/search-missions/',
-        data: {'query': query},
+        '/ai/search/',
+        data: {'query': query, 'type': 'mission'},
       );
 
       if (response is Map<String, dynamic>) {
         _analysisResult = response['analysis'] ?? 'Analyse terminée.';
-        
+
         final missionsJson = response['missions'] as List<dynamic>? ?? [];
-        _suggestedMissions = missionsJson
-            .map((json) => MissionModel.fromJson(json))
-            .toList();
+        _suggestedMissions =
+            missionsJson.map((json) => MissionModel.fromJson(json)).toList();
       }
     } catch (e) {
       _error = "L'analyse IA a échoué. Veuillez réessayer.";
-      print("Erreur AiMissionSearchProvider: $e");
+      debugPrint("Erreur AiMissionSearchProvider: $e");
       // Mock pour démo si l'API n'est pas prête
       _simulateMockResponse(query);
     } finally {
@@ -51,23 +50,27 @@ class AiMissionSearchProvider extends ChangeNotifier {
 
   /// Simulation de réponse pour démo (à supprimer en prod)
   void _simulateMockResponse(String query) {
-    _analysisResult = "Je cherche une mission de livraison rapide près de Cocody.";
+    _analysisResult =
+        "Je cherche une mission de livraison rapide près de Cocody.";
     _suggestedMissions = [
       MissionModel(
         id: '1',
         title: 'Livraison Document Urgent',
-        location: 'Cocody, Abidjan',
-        price: '7 500 FCFA',
-        distance: '2.5 km',
-        type: 'Livraison',
+        description: '',
+        price: 7500,
+        status: MissionStatus.PENDING,
+        address: 'Cocody, Abidjan',
+        category: 'Livraison',
+        isUrgent: true,
       ),
       MissionModel(
         id: '2',
         title: 'Course Supermarché',
-        location: 'Plateau, Abidjan',
-        price: '5 000 FCFA',
-        distance: '1.8 km',
-        type: 'Courses',
+        description: '',
+        price: 5000,
+        status: MissionStatus.PENDING,
+        address: 'Plateau, Abidjan',
+        category: 'Courses',
       ),
     ];
   }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../models/agent_model.dart';
+import '../models/agent_model.dart';
 
 /// Widget Carte Agent pour la Recherche IA
 class AiAgentCard extends StatelessWidget {
@@ -11,17 +11,16 @@ class AiAgentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colors = AppColors(isDark: isDark);
 
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerLowest,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.outlineVariant.withOpacity(0.3)),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -42,8 +41,8 @@ class AiAgentCard extends StatelessWidget {
                   errorBuilder: (_, __, ___) => Container(
                     width: 64,
                     height: 64,
-                    color: colors.surfaceContainer,
-                    child: Icon(Icons.person, color: colors.onSurfaceVariant),
+                    color: AppColors.cardBackground,
+                    child: Icon(Icons.person, color: AppColors.textSecondary),
                   ),
                 ),
               ),
@@ -51,20 +50,21 @@ class AiAgentCard extends StatelessWidget {
                 bottom: -4,
                 right: -4,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: colors.primary,
+                    color: AppColors.primary,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.star, size: 12, color: colors.onPrimary),
+                      Icon(Icons.star, size: 12, color: Colors.white),
                       const SizedBox(width: 2),
                       Text(
                         agent.rating.toStringAsFixed(1),
                         style: TextStyle(
-                          color: colors.onPrimary,
+                          color: Colors.white,
                           fontWeight: FontWeight.bold,
                           fontSize: 10,
                         ),
@@ -75,9 +75,9 @@ class AiAgentCard extends StatelessWidget {
               ),
             ],
           ),
-          
+
           const SizedBox(width: 16),
-          
+
           // Infos
           Expanded(
             child: Column(
@@ -89,7 +89,7 @@ class AiAgentCard extends StatelessWidget {
                       child: Text(
                         agent.name,
                         style: TextStyle(
-                          color: colors.onSurface,
+                          color: AppColors.textPrimary,
                           fontWeight: FontWeight.w600,
                           fontSize: 16,
                         ),
@@ -99,9 +99,10 @@ class AiAgentCard extends StatelessWidget {
                     ),
                     if (agent.isTopChoice)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: colors.secondary,
+                          color: AppColors.secondary,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -119,7 +120,7 @@ class AiAgentCard extends StatelessWidget {
                 Text(
                   agent.specialty,
                   style: TextStyle(
-                    color: colors.onSurfaceVariant,
+                    color: AppColors.textSecondary,
                     fontSize: 12,
                   ),
                 ),
@@ -127,7 +128,7 @@ class AiAgentCard extends StatelessWidget {
                 Text(
                   '${agent.completedMissions} missions réussies',
                   style: TextStyle(
-                    color: colors.onSurfaceVariant,
+                    color: AppColors.textSecondary,
                     fontSize: 10,
                     fontWeight: FontWeight.w500,
                   ),
@@ -135,7 +136,7 @@ class AiAgentCard extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Prix
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -143,7 +144,7 @@ class AiAgentCard extends StatelessWidget {
               Text(
                 agent.estimatedPrice,
                 style: TextStyle(
-                  color: colors.primary,
+                  color: AppColors.primary,
                   fontWeight: FontWeight.w700,
                   fontSize: 16,
                 ),
@@ -151,7 +152,7 @@ class AiAgentCard extends StatelessWidget {
               Text(
                 'Estimation',
                 style: TextStyle(
-                  color: colors.onSurfaceVariant,
+                  color: AppColors.textSecondary,
                   fontSize: 9,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,

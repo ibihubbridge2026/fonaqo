@@ -105,7 +105,7 @@ dependencies:
   # =========================
   # MONITORING & CRASH REPORTING
   # =========================
-  sentry_flutter: ^8.15.0
+  # sentry_flutter: désactivé (incompatibilité Kotlin 1.6) - utiliser stub local
   
   # =========================
   # ANIMATIONS & TUTORIEL

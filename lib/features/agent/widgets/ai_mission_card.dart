@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/models/mission_model.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/models/mission_model.dart';
 
 /// Widget Carte Mission pour la Recherche IA (Agent)
 class AiMissionCard extends StatelessWidget {
@@ -10,18 +10,15 @@ class AiMissionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colors = AppColors(isDark: isDark);
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerLowest,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.outlineVariant.withOpacity(0.3)),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -30,20 +27,21 @@ class AiMissionCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header: Type + Statut
+          // Header: Catégorie + Statut Urgent
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: colors.secondary.withOpacity(0.1),
+                  color: AppColors.secondary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  mission.type,
+                  mission.category ?? 'Mission',
                   style: TextStyle(
-                    color: colors.secondary,
+                    color: AppColors.secondary,
                     fontWeight: FontWeight.bold,
                     fontSize: 10,
                   ),
@@ -51,20 +49,21 @@ class AiMissionCard extends StatelessWidget {
               ),
               if (mission.isUrgent)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: colors.error.withOpacity(0.1),
+                    color: AppColors.error.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.flash_on, size: 14, color: colors.error),
+                      Icon(Icons.flash_on, size: 14, color: AppColors.error),
                       const SizedBox(width: 4),
                       Text(
                         'URGENT',
                         style: TextStyle(
-                          color: colors.error,
+                          color: AppColors.error,
                           fontWeight: FontWeight.bold,
                           fontSize: 10,
                         ),
@@ -74,53 +73,44 @@ class AiMissionCard extends StatelessWidget {
                 ),
             ],
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Titre
           Text(
             mission.title,
             style: TextStyle(
-              color: colors.onSurface,
+              color: AppColors.textPrimary,
               fontWeight: FontWeight.w700,
               fontSize: 16,
             ),
           ),
-          
+
           const SizedBox(height: 8),
-          
-          // Localisation + Distance
-          Row(
-            children: [
-              Icon(Icons.location_on, size: 16, color: colors.onSurfaceVariant),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  mission.location,
-                  style: TextStyle(
-                    color: colors.onSurfaceVariant,
-                    fontSize: 12,
+
+          // Localisation (address)
+          if (mission.address != null && mission.address!.isNotEmpty)
+            Row(
+              children: [
+                Icon(Icons.location_on,
+                    size: 16, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    mission.address!,
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              const SizedBox(width: 12),
-              Icon(Icons.near_me, size: 16, color: colors.onSurfaceVariant),
-              const SizedBox(width: 4),
-              Text(
-                mission.distance ?? '-',
-                style: TextStyle(
-                  color: colors.onSurfaceVariant,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          
+              ],
+            ),
+
           const SizedBox(height: 16),
-          
+
           // Prix + Bouton Action
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -131,15 +121,15 @@ class AiMissionCard extends StatelessWidget {
                   Text(
                     'Gain estimé',
                     style: TextStyle(
-                      color: colors.onSurfaceVariant,
+                      color: AppColors.textSecondary,
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   Text(
-                    mission.price,
+                    '${mission.price.toStringAsFixed(0)} FCFA',
                     style: TextStyle(
-                      color: colors.primary,
+                      color: AppColors.primary,
                       fontWeight: FontWeight.w800,
                       fontSize: 20,
                     ),
@@ -153,10 +143,13 @@ class AiMissionCard extends StatelessWidget {
                 icon: const Icon(Icons.check_circle_outline),
                 label: const Text('Accepter'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: colors.primary,
-                  foregroundColor: colors.onPrimary,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
               ),
             ],

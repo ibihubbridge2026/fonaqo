@@ -1,6 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/material.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
+// sentry_flutter retiré - voir error_monitoring_service.dart
 
 /// Service central pour la gestion du cache offline avec Hive
 class OfflineCacheService {
@@ -36,7 +36,7 @@ class OfflineCacheService {
       debugPrint('📦 ${missions.length} missions mises en cache');
     } catch (e) {
       debugPrint('❌ Erreur cache missions: $e');
-      await Sentry.captureException(e);
+      // Erreur capturée localement (Sentry retiré)
     }
   }
 
@@ -72,7 +72,7 @@ class OfflineCacheService {
       await Hive.box(profileBox).put('profile', profile);
       debugPrint('👤 Profil mis en cache');
     } catch (e) {
-      await Sentry.captureException(e);
+      // Erreur capturée localement (Sentry retiré)
     }
   }
 

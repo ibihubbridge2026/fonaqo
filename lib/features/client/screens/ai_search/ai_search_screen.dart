@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../core/theme/app_colors.dart';
-import '../providers/ai_search_provider.dart';
-import '../widgets/ai_agent_card.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../providers/ai_search_provider.dart';
+import '../../widgets/ai_agent_card.dart';
 
 /// Écran de Recherche Assistée par IA (Côté CLIENT)
 /// L'utilisateur décrit son besoin en langage naturel.
@@ -37,19 +37,17 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colors = AppColors(isDark: isDark);
     final provider = context.watch<AiSearchProvider>();
 
     return Scaffold(
-      backgroundColor: colors.background,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: colors.surface.withOpacity(0.9),
+        backgroundColor: AppColors.surface.withOpacity(0.9),
         elevation: 0,
         title: Text(
           'Recherche IA',
           style: TextStyle(
-            color: colors.primary,
+            color: AppColors.primary,
             fontWeight: FontWeight.w800,
             fontSize: 24,
           ),
@@ -61,19 +59,19 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Section Input IA
-            _buildInputSection(colors, provider),
+            _buildInputSection(provider),
             
             const SizedBox(height: 24),
             
             // Section Résultat IA (Compréhension)
             if (provider.analysisResult != null)
-              _buildAnalysisSection(colors, provider),
+              _buildAnalysisSection(provider),
             
             const SizedBox(height: 24),
             
             // Section Agents Recommandés
             if (provider.suggestedAgents.isNotEmpty)
-              _buildAgentsSection(colors, provider),
+              _buildAgentsSection(provider),
               
             // Loading State
             if (provider.isLoading)
@@ -89,25 +87,25 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
     );
   }
 
-  Widget _buildInputSection(AppColors colors, AiSearchProvider provider) {
+  Widget _buildInputSection(AiSearchProvider provider) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colors.surfaceContainerLowest,
+        color: AppColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.outlineVariant.withOpacity(0.5)),
+        border: Border.all(color: AppColors.outlineVariant.withOpacity(0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.auto_awesome, color: colors.secondary, size: 24),
+              Icon(Icons.auto_awesome, color: AppColors.secondary, size: 24),
               const SizedBox(width: 8),
               Text(
                 'Décrivez votre besoin',
                 style: TextStyle(
-                  color: colors.secondary,
+                  color: AppColors.secondary,
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
                   letterSpacing: 0.5,
@@ -119,16 +117,16 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
           TextField(
             controller: _controller,
             maxLines: 3,
-            style: TextStyle(color: colors.onSurface, fontSize: 16),
+            style: TextStyle(color: AppColors.onSurface, fontSize: 16),
             decoration: InputDecoration(
               hintText: 'Ex: "J\'ai besoin de quelqu\'un pour faire la queue à la banque demain matin..."',
-              hintStyle: TextStyle(color: colors.onSurfaceVariant),
+              hintStyle: TextStyle(color: AppColors.onSurfaceVariant),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
               ),
               filled: true,
-              fillColor: colors.surfaceContainer,
+              fillColor: AppColors.surfaceContainer,
             ),
           ),
           const SizedBox(height: 16),
@@ -142,8 +140,8 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
                 : const Icon(Icons.search),
               label: Text(_isSearching ? 'Analyse en cours...' : 'Lancer la recherche'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: colors.primary,
-                foregroundColor: colors.onPrimary,
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
             ),
@@ -153,13 +151,13 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
     );
   }
 
-  Widget _buildAnalysisSection(AppColors colors, AiSearchProvider provider) {
+  Widget _buildAnalysisSection(AiSearchProvider provider) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: colors.secondaryContainer.withOpacity(0.1),
+        color: AppColors.secondaryContainer.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colors.secondary.withOpacity(0.2)),
+        border: Border.all(color: AppColors.secondary.withOpacity(0.2)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -167,7 +165,7 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
           Text(
             'Compris !',
             style: TextStyle(
-              color: colors.secondary,
+              color: AppColors.secondary,
               fontWeight: FontWeight.w800,
               fontSize: 20,
             ),
@@ -175,16 +173,16 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
           const SizedBox(height: 8),
           Text(
             provider.analysisResult ?? '',
-            style: TextStyle(color: colors.onSurfaceVariant, fontSize: 15),
+            style: TextStyle(color: AppColors.onSurfaceVariant, fontSize: 15),
           ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              _buildChip(colors, Icons.schedule, 'Demain Matin'),
-              _buildChip(colors, Icons.location_on, 'Proche de vous'),
-              _buildChip(colors, Icons.account_balance, 'Banque'),
+              _buildChip(Icons.schedule, 'Demain Matin'),
+              _buildChip(Icons.location_on, 'Proche de vous'),
+              _buildChip(Icons.account_balance, 'Banque'),
             ],
           ),
         ],
@@ -192,22 +190,22 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
     );
   }
 
-  Widget _buildChip(AppColors colors, IconData icon, String label) {
+  Widget _buildChip(IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: colors.primary.withOpacity(0.1),
+        color: AppColors.primary.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: colors.primary),
+          Icon(icon, size: 16, color: AppColors.primary),
           const SizedBox(width: 4),
           Text(
             label,
             style: TextStyle(
-              color: colors.primary,
+              color: AppColors.primary,
               fontWeight: FontWeight.bold,
               fontSize: 12,
             ),
@@ -217,7 +215,7 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
     );
   }
 
-  Widget _buildAgentsSection(AppColors colors, AiSearchProvider provider) {
+  Widget _buildAgentsSection(AiSearchProvider provider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -227,14 +225,14 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
             Text(
               'Agents Recommandés',
               style: TextStyle(
-                color: colors.onSurface,
+                color: AppColors.onSurface,
                 fontWeight: FontWeight.w700,
                 fontSize: 20,
               ),
             ),
             TextButton(
               onPressed: () {},
-              child: Text('Voir tout', style: TextStyle(color: colors.secondary, fontWeight: FontWeight.bold)),
+              child: Text('Voir tout', style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold)),
             ),
           ],
         ),

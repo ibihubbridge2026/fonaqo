@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:fonaco/core/config/splash_config.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
@@ -7,11 +6,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/services/firebase_background_handler.dart';
 
 import 'core/services/feedback_service.dart';
-import 'core/services/cache_service.dart';
 import 'core/services/tutorial_service.dart';
 import 'core/services/lottie_animation_service.dart';
 import 'core/services/image_compression_service.dart';
@@ -144,7 +141,7 @@ Future<void> _initializeFirebaseMessaging(Logger log) async {
 void _navigateToMissionFromNotification(RemoteMessage message) {
   final missionId = message.data['mission_id'];
 
-  print('🧭 Navigation vers mission: $missionId');
+  debugPrint('🧭 Navigation vers mission: $missionId');
 
   // Navigation vers l'explorateur de missions agent
   if (navigatorKey.currentContext != null) {
@@ -193,11 +190,12 @@ void main() async {
     await _initializeFirebaseMessaging(log);
 
     FeedbackService.navigatorKey = navigatorKey;
-    
+
     log.i('🚀 FONAQO prêt à démarrer');
   } catch (e) {
     log.e('❌ Erreur initialisation: $e');
-    await ErrorMonitoringService().captureException(e, message: 'Erreur initialisation main()');
+    await ErrorMonitoringService()
+        .captureException(e, message: 'Erreur initialisation main()');
   }
 
   SplashConfig.initializeSplash(widgetsBinding);
@@ -334,7 +332,7 @@ class FonacoApp extends StatelessWidget {
                   ),
               AppRoutes.agentsMap: (context) => const AgentsMapScreen(),
               '/agent-profile': (context) {
-                final args = ModalRoute.of(context)?.settings?.arguments
+                final args = ModalRoute.of(context)?.settings.arguments
                     as Map<String, dynamic>?;
 
                 return agents.AgentProfileScreen(

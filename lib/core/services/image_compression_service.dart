@@ -1,7 +1,7 @@
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:sentry_flutter/sentry_flutter.dart';
+// sentry_flutter retiré
 
 /// Service de compression d'images pour optimiser les uploads
 /// Réduit la taille des fichiers avant envoi au backend
@@ -13,10 +13,10 @@ class ImageCompressionService {
 
   /// Qualité de compression (0-100)
   static const int defaultQuality = 75;
-  
+
   /// Taille maximale en pixels (côté le plus long)
   static const int maxWidthHeight = 1920;
-  
+
   /// Taille maximale du fichier en Mo
   static const double maxFileSizeMB = 3.0;
 
@@ -30,7 +30,7 @@ class ImageCompressionService {
   }) async {
     try {
       final file = File(filePath);
-      
+
       if (!await file.exists()) {
         debugPrint('❌ Fichier inexistant: $filePath');
         return null;
@@ -47,7 +47,6 @@ class ImageCompressionService {
         quality: quality,
         minWidth: maxWidth,
         minHeight: maxWidth,
-        preserveExif: keepExif,
         format: CompressFormat.jpeg,
       );
 
@@ -58,14 +57,14 @@ class ImageCompressionService {
 
       final compressedSize = await result.length();
       final reduction = ((1 - compressedSize / originalSize) * 100);
-      
+
       debugPrint(
           '✅ Image compressée: ${(compressedSize / 1024 / 1024).toStringAsFixed(2)} Mo (-${reduction.toStringAsFixed(1)}%)');
 
-      return result;
+      return File(result.path);
     } catch (e) {
       debugPrint('❌ Erreur compression image: $e');
-      await Sentry.captureException(e);
+      // Erreur capturée localement
       // En cas d'erreur, retourner le fichier original
       return File(filePath);
     }
@@ -90,20 +89,21 @@ class ImageCompressionService {
       );
     } catch (e) {
       debugPrint('❌ Erreur compression XFile: $e');
-      await Sentry.captureException(e);
+      // Erreur capturée localement
       return null;
     }
   }
 
   /// Vérifie si une image dépasse la taille maximale
-  Future<bool> isImageTooLarge(String filePath, {double maxSizeMB = maxFileSizeMB}) async {
+  Future<bool> isImageTooLarge(String filePath,
+      {double maxSizeMB = maxFileSizeMB}) async {
     try {
       final file = File(filePath);
       if (!await file.exists()) return false;
-      
+
       final size = await file.length();
       final sizeMB = size / 1024 / 1024;
-      
+
       return sizeMB > maxSizeMB;
     } catch (e) {
       debugPrint('❌ Erreur vérification taille: $e');
@@ -120,37 +120,38 @@ class ImageCompressionService {
     try {
       File currentFile = File(filePath);
       int quality = defaultQuality;
-      
+
       while (quality >= minQuality) {
         final compressed = await compressImage(
           filePath: currentFile.path,
           quality: quality,
         );
-        
+
         if (compressed == null) break;
-        
+
         final size = await compressed.length();
         final sizeMB = size / 1024 / 1024;
-        
+
         if (sizeMB <= targetSizeMB) {
-          debugPrint('✅ Taille cible atteinte: ${sizeMB.toStringAsFixed(2)} Mo');
+          debugPrint(
+              '✅ Taille cible atteinte: ${sizeMB.toStringAsFixed(2)} Mo');
           return compressed;
         }
-        
+
         // Supprimer le fichier temporaire précédent s'il est différent de l'original
         if (currentFile.path != filePath) {
           await currentFile.delete();
         }
-        
+
         currentFile = compressed;
         quality -= 10;
       }
-      
+
       debugPrint('⚠️ Taille minimale atteinte sans succès');
       return currentFile;
     } catch (e) {
       debugPrint('❌ Erreur compression progressive: $e');
-      await Sentry.captureException(e);
+      // Erreur capturée localement
       return File(filePath);
     }
   }
@@ -173,7 +174,7 @@ class ImageCompressionService {
       final size = await file.length();
       // Note: Pour obtenir les dimensions exactes, on pourrait utiliser
       // un package comme `image` ou `flutter_native_image`
-      
+
       return {
         'path': filePath,
         'size_bytes': size,
@@ -191,29 +192,29 @@ class ImageCompressionService {
     try {
       final tempDir = Directory.systemTemp;
       final entries = tempDir.listSync();
-      
+
       int deletedCount = 0;
       for (var entry in entries) {
-        if (entry is File && 
-            entry.path.contains('compressed_') && 
+        if (entry is File &&
+            entry.path.contains('compressed_') &&
             entry.path.endsWith('.jpg')) {
           // Supprimer les fichiers de plus de 1 heure
           final stat = await entry.stat();
           final age = DateTime.now().difference(stat.modified);
-          
+
           if (age.inHours > 1) {
             await entry.delete();
             deletedCount++;
           }
         }
       }
-      
+
       if (deletedCount > 0) {
         debugPrint('🧹 $deletedCount fichiers temporaires nettoyés');
       }
     } catch (e) {
       debugPrint('❌ Erreur nettoyage fichiers temporaires: $e');
-      await Sentry.captureException(e);
+      // Erreur capturée localement
     }
   }
 }

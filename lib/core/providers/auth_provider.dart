@@ -557,7 +557,7 @@ class AuthProvider extends ChangeNotifier {
       _clearError();
 
       final response = await _baseClient.post(
-        'accounts/change-password/',
+        'accounts/password/change/',
         data: data,
       );
 

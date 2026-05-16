@@ -51,7 +51,7 @@ class AgentRepository {
 
         // Rayon par défaut si non spécifié (50km pour le Bénin)
         queryParams['radius'] = radius ?? 50000; // 50km en mètres
-        
+
         // Sauvegarder la position dans le cache
         await _cacheService.saveUserLocation(latitude, longitude);
       }
@@ -68,37 +68,43 @@ class AgentRepository {
             missionsData.map((data) => MissionModel.fromJson(data)).toList();
         _logger.d(
             'Missions disponibles récupérées: ${missions.length} avec localisation');
-        
+
         // Mettre en cache les missions pour mode offline
         final missionsJson = missions.map((m) => m.toJson()).toList();
         await _cacheService.cacheMissions(missionsJson);
         await _cacheService.setOnlineStatus(true);
-        
+
         return missions;
       } else {
         _logger.e('Erreur récupération missions: ${response.statusCode}');
-        
+
         // En cas d'erreur, retourner les données en cache si disponibles
         _logger.w('📦 Tentative de récupération depuis le cache...');
         final cachedMissions = _cacheService.getCachedMissions();
         if (cachedMissions.isNotEmpty) {
-          _logger.i('✅ ${cachedMissions.length} missions récupérées depuis le cache');
-          return cachedMissions.map((data) => MissionModel.fromJson(data)).toList();
+          _logger.i(
+              '✅ ${cachedMissions.length} missions récupérées depuis le cache');
+          return cachedMissions
+              .map((data) => MissionModel.fromJson(data))
+              .toList();
         }
-        
+
         return [];
       }
     } catch (e) {
       _logger.e('Erreur getAvailableMissions: $e');
-      
+
       // En cas d'exception (pas de connexion), retourner le cache
       _logger.w('📦 Récupération des missions depuis le cache (offline)...');
       final cachedMissions = _cacheService.getCachedMissions();
       if (cachedMissions.isNotEmpty) {
-        _logger.i('✅ ${cachedMissions.length} missions récupérées depuis le cache (offline)');
-        return cachedMissions.map((data) => MissionModel.fromJson(data)).toList();
+        _logger.i(
+            '✅ ${cachedMissions.length} missions récupérées depuis le cache (offline)');
+        return cachedMissions
+            .map((data) => MissionModel.fromJson(data))
+            .toList();
       }
-      
+
       return [];
     }
   }
@@ -267,13 +273,13 @@ class AgentRepository {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         _logger.d('✅ Preuve de complétion soumise avec succès: $missionId');
-        
+
         // Mettre en cache la mission comme complétée
         await _cacheService.cacheMission(missionId, {
           'status': 'completed',
           'completion_date': DateTime.now().toIso8601String(),
         });
-        
+
         return true;
       } else {
         _logger.e('❌ Erreur soumission preuve: ${response.statusCode}');
@@ -312,7 +318,7 @@ class AgentRepository {
   /// Rafraîchit le solde du portefeuille
   Future<double> refreshWalletBalance() async {
     try {
-      final response = await _baseClient.get('wallets/me/');
+      final response = await _baseClient.get('wallets/balance/');
 
       if (response.statusCode == 200) {
         final balance = response.data['data']['balance'] ?? 0.0;
@@ -357,7 +363,7 @@ class AgentRepository {
   /// Récupère le solde du portefeuille
   Future<double> getWalletBalance() async {
     try {
-      final response = await _baseClient.get('wallets/me/');
+      final response = await _baseClient.get('wallets/balance/');
 
       if (response.statusCode == 200) {
         final balance = response.data['data']['balance'] ?? 0.0;
