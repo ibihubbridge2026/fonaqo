@@ -38,7 +38,7 @@ class ErrorState extends StatelessWidget {
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  color: AppTheme.errorColor.withValues(alpha: 0.1),
+                  color: AppTheme.errorColor.withOpacity( 0.1),
                   borderRadius: BorderRadius.circular(50),
                 ),
                 child: Icon(
@@ -185,7 +185,7 @@ class EmptyState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withValues(alpha: 0.1),
+                color: AppTheme.primaryColor.withOpacity( 0.1),
                 borderRadius: BorderRadius.circular(40),
               ),
               child: Icon(

@@ -23,6 +23,7 @@ import 'core/providers/wallet_provider.dart';
 import 'core/providers/mission_provider.dart';
 import 'core/routes/app_routes.dart';
 import 'features/agent/providers/agent_provider.dart';
+import 'core/theme/theme_provider.dart';
 
 import 'features/auth/forgot_password_screen.dart';
 import 'features/auth/login_screen.dart';
@@ -246,6 +247,9 @@ class FonacoApp extends StatelessWidget {
           value: authProvider,
         ),
         ChangeNotifierProvider(
+          create: (_) => ThemeProvider()..loadTheme(),
+        ),
+        ChangeNotifierProvider(
           create: (_) => WalletProvider(),
         ),
         ChangeNotifierProvider(
@@ -255,15 +259,13 @@ class FonacoApp extends StatelessWidget {
           create: (_) => AgentProvider(),
         ),
       ],
-      child: Consumer<AuthProvider>(
-        builder: (context, authProvider, child) {
+      child: Consumer2<AuthProvider, ThemeProvider>(
+        builder: (context, authProvider, themeProvider, child) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'FONACO',
             navigatorKey: navigatorKey,
-            theme: ThemeData(
-              useMaterial3: true,
-            ),
+            theme: themeProvider.themeData,
             initialRoute: _getInitialRoute(),
             routes: {
               AppRoutes.splash: (context) => GettingScreen(
