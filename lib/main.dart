@@ -6,15 +6,24 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/services/firebase_background_handler.dart';
 
 import 'core/services/feedback_service.dart';
+import 'core/services/cache_service.dart';
+import 'core/services/tutorial_service.dart';
+import 'core/services/lottie_animation_service.dart';
+import 'core/services/image_compression_service.dart';
+import 'core/services/error_monitoring_service.dart';
+import 'core/services/offline_cache_service.dart';
 
 import 'core/providers/auth_provider.dart';
 import 'core/providers/wallet_provider.dart';
 import 'core/providers/mission_provider.dart';
 import 'core/routes/app_routes.dart';
 import 'features/agent/providers/agent_provider.dart';
+import 'core/theme/theme_provider.dart';
 
 import 'features/auth/forgot_password_screen.dart';
 import 'features/auth/login_screen.dart';
@@ -158,6 +167,22 @@ void main() async {
   final log = Logger();
 
   try {
+    // Initialisation de Sentry pour le monitoring d'erreurs
+    await ErrorMonitoringService().init(
+      dsn: 'VOTRE_DSN_SENTRY_ICI', // Remplacer par votre DSN Sentry
+    );
+
+    // Initialisation de Hive pour le cache offline
+    await Hive.initFlutter();
+    await OfflineCacheService().init();
+    log.i('✅ Hive & Cache offline initialisés');
+
+    // Initialisation des autres services
+    TutorialService().init();
+    LottieAnimationService().init();
+    ImageCompressionService(); // Préchargement du singleton
+    log.i('✅ Services Tutoriel, Animations & Compression initialisés');
+
     await Firebase.initializeApp();
 
     log.i('✅ Firebase initialisé');
@@ -168,8 +193,11 @@ void main() async {
     await _initializeFirebaseMessaging(log);
 
     FeedbackService.navigatorKey = navigatorKey;
+    
+    log.i('🚀 FONAQO prêt à démarrer');
   } catch (e) {
-    log.e('❌ Erreur Firebase: $e');
+    log.e('❌ Erreur initialisation: $e');
+    await ErrorMonitoringService().captureException(e, message: 'Erreur initialisation main()');
   }
 
   SplashConfig.initializeSplash(widgetsBinding);
@@ -219,6 +247,9 @@ class FonacoApp extends StatelessWidget {
           value: authProvider,
         ),
         ChangeNotifierProvider(
+          create: (_) => ThemeProvider()..loadTheme(),
+        ),
+        ChangeNotifierProvider(
           create: (_) => WalletProvider(),
         ),
         ChangeNotifierProvider(
@@ -228,15 +259,13 @@ class FonacoApp extends StatelessWidget {
           create: (_) => AgentProvider(),
         ),
       ],
-      child: Consumer<AuthProvider>(
-        builder: (context, authProvider, child) {
+      child: Consumer2<AuthProvider, ThemeProvider>(
+        builder: (context, authProvider, themeProvider, child) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'FONACO',
             navigatorKey: navigatorKey,
-            theme: ThemeData(
-              useMaterial3: true,
-            ),
+            theme: themeProvider.themeData,
             initialRoute: _getInitialRoute(),
             routes: {
               AppRoutes.splash: (context) => GettingScreen(

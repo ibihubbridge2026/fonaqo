@@ -430,7 +430,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
+                              color: Colors.black.withOpacity( 0.08),
                               blurRadius: 14,
                             ),
                           ],
@@ -503,7 +503,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.10),
+                      color: Colors.black.withOpacity( 0.10),
                       blurRadius: 18,
                       offset: const Offset(0, -6),
                     ),
@@ -631,7 +631,7 @@ class AgentListTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
+            color: Colors.black.withOpacity( 0.02),
             blurRadius: 10,
           ),
         ],
@@ -991,7 +991,7 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
                       color: Colors.grey[50],
                       borderRadius: BorderRadius.circular(30),
                       border: Border.all(
-                        color: Colors.black.withValues(alpha: 0.06),
+                        color: Colors.black.withOpacity( 0.06),
                       ),
                     ),
                     child: SwitchListTile(

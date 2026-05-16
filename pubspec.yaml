@@ -94,6 +94,25 @@ dependencies:
   # OUTILS
   # =========================
   local_auth: ^2.3.0
+  
+  # =========================
+  # CACHE OFFLINE & PERFORMANCE
+  # =========================
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  flutter_image_compress: ^2.3.0
+  
+  # =========================
+  # MONITORING & CRASH REPORTING
+  # =========================
+  sentry_flutter: ^8.15.0
+  
+  # =========================
+  # ANIMATIONS & TUTORIEL
+  # =========================
+  lottie: ^3.1.0
+  tutorial_coach_mark: ^1.2.12
+  rxdart: ^0.28.0
 
 dev_dependencies:
   flutter_test:
@@ -111,6 +130,7 @@ flutter:
     - assets/images/hero/
     - assets/images/avatar/
     - assets/images/events/
+    - assets/animations/
     - favicon.png
 
 flutter_launcher_icons:

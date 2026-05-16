@@ -3,8 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../providers/auth_provider.dart';
 import '../../widgets/main_wrapper.dart';
+import '../features/agent/screens/agent_main_shell.dart';
 
-/// Routeur principal qui gère la bascule entre les shells Client et Agent
+/// Routeur principal qui gère l'affichage selon le rôle utilisateur
+/// Le rôle est déterminé UNIQUEMENT par le profil utilisateur (UserModel.role)
+/// Aucune bascule manuelle n'est possible - l'expérience est unifiée mais spécialisée
 class MainRouter extends StatelessWidget {
   const MainRouter({super.key});
 
@@ -17,13 +20,13 @@ class MainRouter extends StatelessWidget {
           return const MainWrapper(); // MainWrapper gère déjà la redirection vers login
         }
 
-        // Si l'utilisateur est authentifié, basculer selon le mode
-        if (authProvider.isAgentMode) {
-          // Mode Agent - afficher l'interface Agent
-          // return const AgentMainShell();
-          return const MainWrapper();
+        // Navigation basée sur le rôle utilisateur (défini dans UserModel.role)
+        // Les agents voient l'interface Agent, les clients voient l'interface Client
+        if (authProvider.isAgent) {
+          // Interface Agent - tableau de bord, missions, wallet, profil
+          return const AgentMainShell();
         } else {
-          // Mode Client - afficher l'interface Client
+          // Interface Client - home, création mission, agents, événements, profil
           return const MainWrapper();
         }
       },

@@ -362,7 +362,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
                     borderRadius: BorderRadius.circular(22),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
+                        color: Colors.black.withOpacity( 0.03),
                         blurRadius: 10,
                       ),
                     ],

@@ -61,7 +61,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.03),
+                    color: Colors.black.withOpacity( 0.03),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -419,7 +419,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withOpacity( 0.03),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -581,7 +581,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         CircleAvatar(
-          backgroundColor: const Color(0xFFFFD400).withValues(alpha: 0.2),
+          backgroundColor: const Color(0xFFFFD400).withOpacity( 0.2),
           child: Text(
             user[0],
             style: const TextStyle(
