@@ -1,6 +1,7 @@
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 /// Service de compression d'images pour optimiser les uploads
 /// Réduit la taille des fichiers avant envoi au backend
@@ -64,6 +65,7 @@ class ImageCompressionService {
       return result;
     } catch (e) {
       debugPrint('❌ Erreur compression image: $e');
+      await Sentry.captureException(e);
       // En cas d'erreur, retourner le fichier original
       return File(filePath);
     }
@@ -88,6 +90,7 @@ class ImageCompressionService {
       );
     } catch (e) {
       debugPrint('❌ Erreur compression XFile: $e');
+      await Sentry.captureException(e);
       return null;
     }
   }
@@ -147,6 +150,7 @@ class ImageCompressionService {
       return currentFile;
     } catch (e) {
       debugPrint('❌ Erreur compression progressive: $e');
+      await Sentry.captureException(e);
       return File(filePath);
     }
   }
@@ -209,6 +213,7 @@ class ImageCompressionService {
       }
     } catch (e) {
       debugPrint('❌ Erreur nettoyage fichiers temporaires: $e');
+      await Sentry.captureException(e);
     }
   }
 }

@@ -1,32 +1,57 @@
 ```
 # Dependencies
-.pub/
 .dart_tool/
-build/
+.build/
+.packages
 
-# Logs
+# Logs and temp files
 *.log
-**/logs
+*.tmp
 
-# Environment variables
+# Environment
 .env
-.env.*
 .env.local
+*.env.*
 
-# IDE files
+# Editor/IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# OS generated files
-.DS_Store
-Thumbs.db
-
 # Coverage
 coverage/
 htmlcov/
 .coverage
+
+# Distribution / Build artifacts
+dist/
+build/
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+*.o
+*.obj
+*.a
+*.class
+*.pyc
+*.jar
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Testing
+.dart_test_command.json
+
+# Cache directories
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+.gradle/
+target/
 
 # Compressed files
 *.zip

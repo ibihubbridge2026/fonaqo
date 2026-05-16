@@ -102,6 +102,11 @@ dependencies:
   flutter_image_compress: ^2.3.0
   
   # =========================
+  # MONITORING & CRASH REPORTING
+  # =========================
+  sentry_flutter: ^8.15.0
+  
+  # =========================
   # ANIMATIONS & TUTORIEL
   # =========================
   lottie: ^3.1.0

@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/services/firebase_background_handler.dart';
 
 import 'core/services/feedback_service.dart';
@@ -14,6 +15,8 @@ import 'core/services/cache_service.dart';
 import 'core/services/tutorial_service.dart';
 import 'core/services/lottie_animation_service.dart';
 import 'core/services/image_compression_service.dart';
+import 'core/services/error_monitoring_service.dart';
+import 'core/services/offline_cache_service.dart';
 
 import 'core/providers/auth_provider.dart';
 import 'core/providers/wallet_provider.dart';
@@ -163,15 +166,21 @@ void main() async {
   final log = Logger();
 
   try {
+    // Initialisation de Sentry pour le monitoring d'erreurs
+    await ErrorMonitoringService().init(
+      dsn: 'VOTRE_DSN_SENTRY_ICI', // Remplacer par votre DSN Sentry
+    );
+
     // Initialisation de Hive pour le cache offline
     await Hive.initFlutter();
-    await CacheService().init();
-    log.i('✅ Hive & Cache initialisés');
+    await OfflineCacheService().init();
+    log.i('✅ Hive & Cache offline initialisés');
 
     // Initialisation des autres services
     TutorialService().init();
     LottieAnimationService().init();
-    log.i('✅ Services Tutoriel & Animations initialisés');
+    ImageCompressionService(); // Préchargement du singleton
+    log.i('✅ Services Tutoriel, Animations & Compression initialisés');
 
     await Firebase.initializeApp();
 
@@ -183,8 +192,11 @@ void main() async {
     await _initializeFirebaseMessaging(log);
 
     FeedbackService.navigatorKey = navigatorKey;
+    
+    log.i('🚀 FONAQO prêt à démarrer');
   } catch (e) {
     log.e('❌ Erreur initialisation: $e');
+    await ErrorMonitoringService().captureException(e, message: 'Erreur initialisation main()');
   }
 
   SplashConfig.initializeSplash(widgetsBinding);
