@@ -6,9 +6,14 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'core/services/firebase_background_handler.dart';
 
 import 'core/services/feedback_service.dart';
+import 'core/services/cache_service.dart';
+import 'core/services/tutorial_service.dart';
+import 'core/services/lottie_animation_service.dart';
+import 'core/services/image_compression_service.dart';
 
 import 'core/providers/auth_provider.dart';
 import 'core/providers/wallet_provider.dart';
@@ -158,6 +163,16 @@ void main() async {
   final log = Logger();
 
   try {
+    // Initialisation de Hive pour le cache offline
+    await Hive.initFlutter();
+    await CacheService().init();
+    log.i('✅ Hive & Cache initialisés');
+
+    // Initialisation des autres services
+    TutorialService().init();
+    LottieAnimationService().init();
+    log.i('✅ Services Tutoriel & Animations initialisés');
+
     await Firebase.initializeApp();
 
     log.i('✅ Firebase initialisé');
@@ -169,7 +184,7 @@ void main() async {
 
     FeedbackService.navigatorKey = navigatorKey;
   } catch (e) {
-    log.e('❌ Erreur Firebase: $e');
+    log.e('❌ Erreur initialisation: $e');
   }
 
   SplashConfig.initializeSplash(widgetsBinding);
