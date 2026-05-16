@@ -5,11 +5,15 @@ import 'package:dio/dio.dart';
 import '../../../core/api/base_client.dart';
 import '../../../core/models/mission_model.dart';
 import '../../../core/services/location_service.dart';
+import '../../../core/services/image_compression_service.dart';
+import '../../../core/services/cache_service.dart';
 
 /// Repository pour les appels API spécifiques à l'Agent
 class AgentRepository {
   final Logger _logger = Logger();
   final BaseClient _baseClient = BaseClient();
+  final ImageCompressionService _compressionService = ImageCompressionService();
+  final CacheService _cacheService = CacheService();
 
   /// Récupère le solde de l'agent
   Future<double> getAgentBalance() async {
@@ -31,6 +35,7 @@ class AgentRepository {
   }
 
   /// Récupère les missions disponibles pour l'agent avec coordonnées GPS
+  /// Met en cache les missions pour consultation offline
   Future<List<MissionModel>> getAvailableMissions({
     double? latitude,
     double? longitude,
@@ -46,6 +51,9 @@ class AgentRepository {
 
         // Rayon par défaut si non spécifié (50km pour le Bénin)
         queryParams['radius'] = radius ?? 50000; // 50km en mètres
+        
+        // Sauvegarder la position dans le cache
+        await _cacheService.saveUserLocation(latitude, longitude);
       }
 
       final response = await _baseClient.get(
@@ -60,13 +68,37 @@ class AgentRepository {
             missionsData.map((data) => MissionModel.fromJson(data)).toList();
         _logger.d(
             'Missions disponibles récupérées: ${missions.length} avec localisation');
+        
+        // Mettre en cache les missions pour mode offline
+        final missionsJson = missions.map((m) => m.toJson()).toList();
+        await _cacheService.cacheMissions(missionsJson);
+        await _cacheService.setOnlineStatus(true);
+        
         return missions;
       } else {
         _logger.e('Erreur récupération missions: ${response.statusCode}');
+        
+        // En cas d'erreur, retourner les données en cache si disponibles
+        _logger.w('📦 Tentative de récupération depuis le cache...');
+        final cachedMissions = _cacheService.getCachedMissions();
+        if (cachedMissions.isNotEmpty) {
+          _logger.i('✅ ${cachedMissions.length} missions récupérées depuis le cache');
+          return cachedMissions.map((data) => MissionModel.fromJson(data)).toList();
+        }
+        
         return [];
       }
     } catch (e) {
       _logger.e('Erreur getAvailableMissions: $e');
+      
+      // En cas d'exception (pas de connexion), retourner le cache
+      _logger.w('📦 Récupération des missions depuis le cache (offline)...');
+      final cachedMissions = _cacheService.getCachedMissions();
+      if (cachedMissions.isNotEmpty) {
+        _logger.i('✅ ${cachedMissions.length} missions récupérées depuis le cache (offline)');
+        return cachedMissions.map((data) => MissionModel.fromJson(data)).toList();
+      }
+      
       return [];
     }
   }
@@ -180,23 +212,43 @@ class AgentRepository {
   }
 
   /// Soumet la preuve de complétion (photo) avec upload réel via FormData
+  /// Compression automatique de l'image avant envoi
   Future<bool> submitCompletion(String missionId, String photoPath) async {
     try {
-      final file = File(photoPath);
-      if (!await file.exists()) {
+      // Vérifier si le fichier existe
+      final originalFile = File(photoPath);
+      if (!await originalFile.exists()) {
         _logger.e('Fichier photo inexistant: $photoPath');
         return false;
       }
 
-      final fileName = photoPath.split('/').last;
-      final fileSize = await file.length();
+      // Compresser l'image avant upload
+      _logger.d('📷 Compression de l\'image avant upload...');
+      final compressedFile = await _compressionService.compressUntilTargetSize(
+        filePath: photoPath,
+        targetSizeMB: 3.0, // Max 3 Mo
+        minQuality: 50,
+      );
 
-      _logger.d('Upload preuve de complétion: $fileName (${fileSize} bytes)');
+      if (compressedFile == null) {
+        _logger.e('Échec de la compression');
+        return false;
+      }
+
+      final fileName = compressedFile.path.split('/').last;
+      final fileSize = await compressedFile.length();
+      final originalSize = await originalFile.length();
+      final reduction = ((1 - fileSize / originalSize) * 100);
+
+      _logger.d(
+        '✅ Image compressée: ${fileName} '
+        '(${(fileSize / 1024 / 1024).toStringAsFixed(2)} Mo, -$reduction%)',
+      );
 
       // Créer FormData pour l'upload
       final formData = FormData.fromMap({
         'photo': await MultipartFile.fromFile(
-          photoPath,
+          compressedFile.path,
           filename: fileName,
         ),
         'mission_id': missionId,
@@ -209,19 +261,26 @@ class AgentRepository {
         options: Options(contentType: 'multipart/form-data'),
         onSendProgress: (sent, total) {
           final progress = sent / total;
-          _logger.d('Upload progression: ${(progress * 100).toInt()}%');
+          _logger.d('📤 Upload progression: ${(progress * 100).toInt()}%');
         },
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        _logger.d('Preuve de complétion soumise avec succès: $missionId');
+        _logger.d('✅ Preuve de complétion soumise avec succès: $missionId');
+        
+        // Mettre en cache la mission comme complétée
+        await _cacheService.cacheMission(missionId, {
+          'status': 'completed',
+          'completion_date': DateTime.now().toIso8601String(),
+        });
+        
         return true;
       } else {
-        _logger.e('Erreur soumission preuve: ${response.statusCode}');
+        _logger.e('❌ Erreur soumission preuve: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      _logger.e('Erreur submitCompletion: $e');
+      _logger.e('❌ Erreur submitCompletion: $e');
       return false;
     }
   }
