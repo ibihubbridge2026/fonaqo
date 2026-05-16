@@ -23,11 +23,12 @@ dependencies:
   font_awesome_flutter: ^10.8.0
   flutter_native_splash: ^2.4.7
   shimmer: ^3.0.0
-
+  google_fonts: ^6.2.1  # Pour la police Poppins
+  flutter_svg: ^2.0.10
   # =========================
   # AUDIO & VOIX
   # =========================
-  record: ^5.1.2
+  record: ^6.2.0
   audioplayers: ^6.1.0
   path_provider: ^2.1.5
   

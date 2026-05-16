@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AgentBottomNav extends StatelessWidget {
   final int currentIndex;
@@ -12,36 +13,48 @@ class AgentBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      onTap: onTap,
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: Colors.white,
-      selectedItemColor: const Color(0xFFFFD400),
-      unselectedItemColor: Colors.grey,
-      elevation: 8,
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.dashboard_outlined),
-          activeIcon: Icon(Icons.dashboard),
-          label: 'Dashboard',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.explore_outlined),
-          activeIcon: Icon(Icons.explore),
-          label: 'Explorer',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.account_balance_wallet_outlined),
-          activeIcon: Icon(Icons.account_balance_wallet),
-          label: 'Wallet',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline),
-          activeIcon: Icon(Icons.person),
-          label: 'Profil',
-        ),
-      ],
+    return Container(
+      margin: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 30,
+              offset: const Offset(0, 10))
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _navItem(Icons.home_filled, "Accueil", 0),
+          _navItem(Icons.assignment_outlined, "Missions", 1),
+          _navItem(Icons.account_balance_wallet_outlined, "Wallet", 2),
+          _navItem(Icons.person_outline, "Profil", 3),
+        ],
+      ),
+    );
+  }
+
+  Widget _navItem(IconData icon, String label, int index) {
+    bool isSel = currentIndex == index;
+    return GestureDetector(
+      onTap: () => onTap(index),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon,
+              color: isSel ? const Color(0xFFFFB800) : Colors.grey, size: 26),
+          const SizedBox(height: 4),
+          Text(label,
+              style: GoogleFonts.poppins(
+                  fontSize: 10,
+                  color: isSel ? const Color(0xFFFFB800) : Colors.grey,
+                  fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
+        ],
+      ),
     );
   }
 }

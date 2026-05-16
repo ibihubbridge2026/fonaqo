@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../core/providers/auth_provider.dart';
 import '../features/client/home/home_screen.dart';
 import '../features/client/missions/missions_screen.dart';
 import '../features/client/profile/profile_screen.dart';
 import '../features/client/agents_screen.dart';
 import '../features/events/events_screen.dart';
+import '../features/agent/screens/agent_main_screen.dart';
+import '../features/agent/widgets/agent_bottom_nav.dart';
+import '../features/agent/widgets/agent_header.dart';
 import 'custom_app_bar.dart';
 import 'main_navigation_bar.dart';
 
@@ -56,6 +61,15 @@ class _MainWrapperState extends State<MainWrapper> {
     const ProfileScreen(),
   ];
 
+  /// Pages pour les agents
+  late final List<Widget> _agentPages = [
+    const AgentMainScreen(),
+    const AgentMainScreen(), // Missions - temporairement même page
+    const AgentMainScreen(), // Notifications - temporairement même page
+    const AgentMainScreen(), // Wallet - temporairement même page
+    const AgentMainScreen(), // Profile - temporairement même page
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -101,12 +115,45 @@ class _MainWrapperState extends State<MainWrapper> {
   }
 
   PreferredSizeWidget _appBarForIndex() {
-    // Demande: mêmes header pour Missions/Agents/Événements/Profil que pour Home.
+    // Vérifier si l'utilisateur est un agent
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final isAgent = authProvider.isAgent;
+
+    // Header différent selon le rôle
+    if (isAgent) {
+      return AppBar(
+        backgroundColor: const Color(0xFFFFD400),
+        elevation: 0,
+        title: const Text(
+          'FONACO Agent',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            onPressed: () {
+              // TODO: Notifications
+            },
+            icon: const Icon(Icons.notifications, color: Colors.black),
+          ),
+        ],
+      );
+    }
+
+    // Header client par défaut
     return const CustomAppBar.mainShellHome();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Vérifier si l'utilisateur est un agent
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final isAgent = authProvider.isAgent;
+
     return MainShellScope(
       currentIndex: _currentIndex,
       setIndex: (index) {
@@ -118,7 +165,7 @@ class _MainWrapperState extends State<MainWrapper> {
       closeCreateMission: () => _showCreateMission.value = false,
       child: Scaffold(
         backgroundColor: const Color(0xFFF9F9F9),
-        appBar: _appBarForIndex(),
+        appBar: isAgent ? const AgentHeader() : _appBarForIndex(),
         body: Column(
           children: [
             // Bannière discrète si GPS refusé
@@ -173,20 +220,32 @@ class _MainWrapperState extends State<MainWrapper> {
                   ],
                 ),
               ),
-            // Contenu principal
+            // Contenu principal - pages différentes selon le rôle
             Expanded(
-              child: IndexedStack(index: _currentIndex, children: _pages),
+              child: IndexedStack(
+                index: _currentIndex,
+                children: isAgent ? _agentPages : _pages,
+              ),
             ),
           ],
         ),
-        bottomNavigationBar: MainNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() {
-              _currentIndex = index;
-            });
-          },
-        ),
+        bottomNavigationBar: isAgent
+            ? AgentBottomNav(
+                currentIndex: _currentIndex,
+                onTap: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                },
+              )
+            : MainNavigationBar(
+                currentIndex: _currentIndex,
+                onTap: (index) {
+                  setState(() {
+                    _currentIndex = index;
+                  });
+                },
+              ),
       ),
     );
   }

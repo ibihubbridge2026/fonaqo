@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:logger/logger.dart';
 
 import '../../../core/providers/auth_provider.dart';
-import '../providers/agent_provider.dart';
-import '../../../core/services/app_mode_service.dart';
+import 'agent_notification_badge.dart';
 
 class AgentHeader extends StatelessWidget implements PreferredSizeWidget {
   final String? title;
@@ -21,164 +20,145 @@ class AgentHeader extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize => const Size.fromHeight(80);
 
   @override
   Widget build(BuildContext context) {
-    return AppBar(
-      title: title != null
-          ? Text(
-              title!,
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                color: Colors.black,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      decoration: const BoxDecoration(
+        color: Color(0xFFF5F7FB),
+        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
+      ),
+      child: SafeArea(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Section gauche: Salutation et nom
+            Expanded(
+              child: Consumer<AuthProvider>(
+                builder: (context, authProvider, child) {
+                  final user = authProvider.currentUser;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Bonjour",
+                        style: GoogleFonts.poppins(
+                            color: Colors.grey[600], fontSize: 15),
+                      ),
+                      Text(
+                        "${user?.firstName ?? 'Jean'} ${user?.lastName ?? 'Agent'} 👋",
+                        style: GoogleFonts.poppins(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: const Color(0xFF111827)),
+                      ),
+                    ],
+                  );
+                },
               ),
-            )
-          : _buildDefaultHeader(context),
-      backgroundColor: const Color(0xFFFFD400),
-      foregroundColor: Colors.black,
-      elevation: 0,
-      leading: showBackButton
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded),
-              onPressed: onBackPressed ?? () => Navigator.pop(context),
-            )
-          : null,
-      actions: actions ?? _buildDefaultActions(context),
+            ),
+
+            // Section droite: Actions
+            Row(
+              children: [
+                // Switch disponibilité
+                _buildAvailabilitySwitch(),
+                const SizedBox(width: 12),
+
+                // Bouton messages
+                _buildIconButton(Icons.comment_outlined),
+                const SizedBox(width: 12),
+
+                // Bouton notifications avec badge
+                AgentNotificationBadge(
+                  count: 3,
+                  child: _buildIconButton(Icons.notifications_none_outlined),
+                ),
+                const SizedBox(width: 12),
+
+                // Avatar
+                Container(
+                  decoration: BoxDecoration(
+                    border:
+                        Border.all(color: const Color(0xFFFFCC00), width: 2),
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(13),
+                    child: Image.network("https://i.pravatar.cc/100?img=12",
+                        width: 45, height: 45),
+                  ),
+                )
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildDefaultHeader(BuildContext context) {
+  Widget _buildAvailabilitySwitch() {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
-        final user = authProvider.currentUser;
-        return Row(
+        bool isAvailable = authProvider.isAgent;
+
+        return Column(
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundImage: const NetworkImage('https://i.pravatar.cc/300'),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Bonjour 👋',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.black54,
+            GestureDetector(
+              onTap: () {
+                // TODO: Implémenter le toggle de disponibilité
+              },
+              child: Container(
+                width: 50,
+                height: 26,
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: isAvailable ? Colors.green : Colors.grey[400],
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: AnimatedAlign(
+                  duration: const Duration(milliseconds: 200),
+                  alignment: isAvailable
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(
+                        color: Colors.white, shape: BoxShape.circle),
                   ),
                 ),
-                Text(
-                  '${user?.firstName ?? 'Agent'} ${user?.lastName ?? ''}',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.black,
-                  ),
-                ),
-              ],
+              ),
             ),
+            const SizedBox(height: 4),
+            Text(isAvailable ? "Disponible" : "Hors-ligne",
+                style: GoogleFonts.poppins(
+                    color: isAvailable ? Colors.green : Colors.grey,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 10)),
           ],
         );
       },
     );
   }
 
-  List<Widget> _buildDefaultActions(BuildContext context) {
-    return [
-      Consumer<AgentProvider>(
-        builder: (context, agentProvider, child) {
-          return FutureBuilder<bool>(
-            future: _toggleOnlineStatusWithFeedback(context, agentProvider),
-            builder: (context, snapshot) {
-              return Switch(
-                value: agentProvider.isOnline,
-                activeColor: Colors.green,
-                inactiveThumbColor: Colors.grey,
-                onChanged: (value) {
-                  // La gestion est faite dans _toggleOnlineStatusWithFeedback
-                  _toggleOnlineStatusWithFeedback(context, agentProvider);
-                },
-              );
-            },
-          );
-        },
+  Widget _buildIconButton(IconData icon) {
+    return Container(
+      width: 45,
+      height: 45,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5))
+        ],
       ),
-      IconButton(
-        icon: const Icon(Icons.notifications_outlined),
-        onPressed: () {
-          // TODO: Implémenter les notifications
-        },
-      ),
-      IconButton(
-        icon: const Icon(Icons.switch_account),
-        onPressed: () async {
-          await AppModeService().switchToClient();
-          if (context.mounted) {
-            Navigator.pushReplacementNamed(context, '/main');
-          }
-        },
-      ),
-    ];
+      child: Icon(icon, size: 22),
+    );
   }
-
-  /// Gère le changement de statut online/offline avec feedback utilisateur
-  Future<bool> _toggleOnlineStatusWithFeedback(
-      BuildContext context, AgentProvider agentProvider) async {
-    final originalStatus = agentProvider.isOnline;
-
-    try {
-      await agentProvider.toggleOnlineStatus();
-
-      // Succès - afficher un message discret
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              agentProvider.isOnline
-                  ? 'Vous êtes maintenant en ligne'
-                  : 'Vous êtes maintenant hors ligne',
-            ),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-      }
-
-      return true;
-    } catch (e) {
-      // Erreur - revenir à l'état original et afficher un message d'erreur
-      _logger.e('Erreur changement statut online: $e');
-
-      // Forcer la restauration du statut original
-      agentProvider.setOnlineStatus(originalStatus);
-
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content:
-                const Text('Erreur de connexion. Vérifiez votre internet.'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
-            action: SnackBarAction(
-              label: 'Réessayer',
-              textColor: Colors.white,
-              onPressed: () =>
-                  _toggleOnlineStatusWithFeedback(context, agentProvider),
-            ),
-          ),
-        );
-      }
-
-      return false;
-    }
-  }
-
-  static final Logger _logger = Logger();
 }
