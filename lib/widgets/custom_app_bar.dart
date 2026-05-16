@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../core/routes/app_routes.dart';
 import '../core/providers/auth_provider.dart';
+import '../features/client/screens/ai_search_modal.dart';
 
 /// Variante d'en-tête : logo marque pour l’accueil shell, titre d’onglet, ou pile détail avec retour.
 enum CustomAppBarVariant {
@@ -144,15 +145,27 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget? _buildTitle(BuildContext context) {
     switch (variant) {
       case CustomAppBarVariant.mainShellHome:
-        // Demande: enlever l’icône centrée du header.
-        // On conserve un wordmark texte propre et stable (sans asset central).
-        return const Text(
-          'FONAQO',
-          style: TextStyle(
-            color: _accent,
-            fontWeight: FontWeight.w900,
-            fontSize: 18,
-            letterSpacing: 0.5,
+        // Remplacement du texte par une icône recherche qui ouvre le modal IA
+        return GestureDetector(
+          onTap: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => const AiSearchModal(),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: _accent.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.search,
+              color: _accent,
+              size: 20,
+            ),
           ),
         );
 

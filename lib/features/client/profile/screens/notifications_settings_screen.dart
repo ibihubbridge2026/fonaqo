@@ -86,8 +86,10 @@ class _SwitchTile extends StatelessWidget {
         activeThumbColor: const Color(0xFFFFD400),
         value: value,
         onChanged: onChanged,
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-        subtitle: Text(subtitle, style: const TextStyle(color: Colors.grey)),
+        title: Text(title,
+            style: const TextStyle(
+                fontWeight: FontWeight.w800, color: Colors.black)),
+        subtitle: Text(subtitle, style: const TextStyle(color: Colors.black)),
       ),
     );
   }

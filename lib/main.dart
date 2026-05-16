@@ -177,7 +177,7 @@ void main() async {
     // Initialisation des autres services
     TutorialService().init();
     LottieAnimationService().init();
-    ImageCompressionService(); // Préchargement du singleton
+    MediaCompressionService(); // Préchargement du singleton
     log.i('✅ Services Tutoriel, Animations & Compression initialisés');
 
     await Firebase.initializeApp();
@@ -281,6 +281,14 @@ class FonacoApp extends StatelessWidget {
 
                       if (!context.mounted) return;
 
+                      // FORCER L'ONBOARDING À CHAQUE LANCEMENT POUR LES TESTS UX
+                      Navigator.pushReplacementNamed(
+                        context,
+                        AppRoutes.onboarding,
+                      );
+
+                      // Code original désactivé temporairement
+                      /*
                       if (authProvider.isAuthenticated) {
                         Navigator.pushReplacementNamed(
                           context,
@@ -292,6 +300,7 @@ class FonacoApp extends StatelessWidget {
                           AppRoutes.login,
                         );
                       }
+                      */
                     },
                   ),
               AppRoutes.login: (context) => const LoginScreen(),
@@ -348,6 +357,11 @@ class FonacoApp extends StatelessWidget {
   }
 
   String _getInitialRoute() {
+    // FORCER L'ONBOARDING À CHAQUE LANCEMENT POUR LES TESTS UX
+    return AppRoutes.splash;
+
+    // Code original désactivé temporairement
+    /*
     if (isFirstTime) {
       return AppRoutes.splash;
     }
@@ -357,5 +371,6 @@ class FonacoApp extends StatelessWidget {
     }
 
     return AppRoutes.login;
+    */
   }
 }

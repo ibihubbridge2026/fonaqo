@@ -26,7 +26,7 @@ class HelpCenterScreen extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: Colors.grey[800],
+                color: Colors.black,
                 letterSpacing: 0.3,
               ),
             ),
@@ -63,7 +63,7 @@ class HelpCenterScreen extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: Colors.grey[800],
+                color: Colors.black,
                 letterSpacing: 0.3,
               ),
             ),
@@ -122,7 +122,7 @@ class _FaqTile extends StatelessWidget {
               child: Text(
                 answer,
                 style: TextStyle(
-                  color: Colors.grey[800],
+                  color: Colors.black,
                   fontSize: 13,
                   height: 1.45,
                 ),
@@ -165,7 +165,7 @@ class _PolicyCard extends StatelessWidget {
           Text(
             body,
             style: TextStyle(
-              color: Colors.grey[800],
+              color: Colors.black,
               fontSize: 13,
               height: 1.45,
             ),

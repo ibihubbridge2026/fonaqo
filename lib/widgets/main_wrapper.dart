@@ -7,10 +7,13 @@ import '../features/client/home/home_screen.dart';
 import '../features/client/missions/missions_screen.dart';
 import '../features/client/profile/profile_screen.dart';
 import '../features/client/agents_screen.dart';
-import '../features/events/events_screen.dart';
-import '../features/agent/screens/agent_main_screen.dart';
+import '../features/events/services_screen.dart';
+import '../features/agent/screens/agent_dashboard_screen.dart';
+import '../features/agent/screens/agent_missions_explorer_screen.dart';
+import '../features/agent/screens/agent_wallet_screen.dart';
+import '../features/agent/screens/agent_profile_screen.dart';
 import '../features/agent/widgets/agent_bottom_nav.dart';
-import '../features/agent/widgets/agent_header.dart';
+import '../features/agent/widgets/agent_custom_header.dart';
 import 'custom_app_bar.dart';
 import 'main_navigation_bar.dart';
 
@@ -57,17 +60,16 @@ class _MainWrapperState extends State<MainWrapper> {
     const HomeScreen(),
     MissionsScreen(showCreateMissionListenable: _showCreateMission),
     const AgentsScreen(),
-    const EventsScreen(),
+    const ServicesScreen(),
     const ProfileScreen(),
   ];
 
   /// Pages pour les agents
   late final List<Widget> _agentPages = [
-    const AgentMainScreen(),
-    const AgentMainScreen(), // Missions - temporairement même page
-    const AgentMainScreen(), // Notifications - temporairement même page
-    const AgentMainScreen(), // Wallet - temporairement même page
-    const AgentMainScreen(), // Profile - temporairement même page
+    const AgentDashboardScreen(), // Accueil - dashboard plus complet
+    const AgentMissionsExplorerScreen(), // Missions
+    const AgentWalletScreen(), // Wallet
+    const AgentProfileScreen(), // Profile
   ];
 
   @override
@@ -165,7 +167,7 @@ class _MainWrapperState extends State<MainWrapper> {
       closeCreateMission: () => _showCreateMission.value = false,
       child: Scaffold(
         backgroundColor: const Color(0xFFF9F9F9),
-        appBar: isAgent ? const AgentHeader() : _appBarForIndex(),
+        appBar: isAgent ? const AgentCustomHeader() : _appBarForIndex(),
         body: Column(
           children: [
             // Bannière discrète si GPS refusé

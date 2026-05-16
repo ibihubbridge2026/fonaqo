@@ -207,7 +207,6 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-
                     if (_isLoading)
                       const Column(
                         children: [
@@ -215,7 +214,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
                           SizedBox(height: 16),
                           Text(
                             'Détermination de votre position...',
-                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                            style: TextStyle(color: Colors.black, fontSize: 14),
                           ),
                         ],
                       )
@@ -365,7 +364,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
                                   '📍 ${_currentPosition!.latitude.toStringAsFixed(6)}, ${_currentPosition!.longitude.toStringAsFixed(6)}',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.grey[600],
+                                    color: Colors.black,
                                     fontFamily: 'monospace',
                                   ),
                                 ),
@@ -374,7 +373,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
                                   '🎯 Précision: ±${_currentPosition!.accuracy.toStringAsFixed(0)}m',
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.grey[600],
+                                    color: Colors.black,
                                   ),
                                 ),
                               ],
@@ -385,7 +384,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
                     else
                       const Text(
                         'Position non disponible',
-                        style: TextStyle(color: Colors.grey, fontSize: 14),
+                        style: TextStyle(color: Colors.black, fontSize: 14),
                       ),
                   ],
                 ),
@@ -461,7 +460,7 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
                       'FONACO utilise votre position pour vous proposer des agents proches de vous et améliorer votre expérience.',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey,
+                        color: Colors.black,
                         height: 1.4,
                       ),
                     ),

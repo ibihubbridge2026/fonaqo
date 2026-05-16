@@ -76,9 +76,12 @@ class AuthProvider extends ChangeNotifier {
   }
 
   void handleTokenExpired() {
-    _logger.w('Déconnexion automatique : token expiré');
-    _clearUserDataAndNotify();
-    _setError('Votre session a expiré. Veuillez vous reconnecter.');
+    _logger.w('Token expiré détecté - DÉSACTIVÉ pour le moment');
+    // DÉSACTIVÉ TEMPORAIREMENT - Ne pas déconnecter automatiquement
+    // _clearUserDataAndNotify();
+    // _setError('Votre session a expiré. Veuillez vous reconnecter.');
+    _logger
+        .i('🛑 Expiration de session désactivée - utilisateur reste connecté');
   }
 
   /// Nettoie les données utilisateur et notifie les listeners
@@ -578,8 +581,28 @@ class AuthProvider extends ChangeNotifier {
   /// Formate les messages d'erreur
   String formatErrorMessage(dynamic error) {
     if (error is ApiException) {
+      // Pour les erreurs d'authentification, afficher un message plus clair
+      if (error.message
+              .toLowerCase()
+              .contains('numéro de téléphone ou mot de passe incorrect') ||
+          error.message
+              .toLowerCase()
+              .contains('phone number or password incorrect') ||
+          error.message.toLowerCase().contains('invalid credentials') ||
+          error.message.toLowerCase().contains('authentication failed')) {
+        return 'Identifiant erroné';
+      }
       return error.message;
     } else if (error is String) {
+      // Pour les erreurs d'authentification en format string
+      if (error
+              .toLowerCase()
+              .contains('numéro de téléphone ou mot de passe incorrect') ||
+          error.toLowerCase().contains('phone number or password incorrect') ||
+          error.toLowerCase().contains('invalid credentials') ||
+          error.toLowerCase().contains('authentication failed')) {
+        return 'Identifiant erroné';
+      }
       return error;
     } else {
       return 'Une erreur est survenue';

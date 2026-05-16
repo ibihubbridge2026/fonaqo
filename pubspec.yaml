@@ -101,6 +101,8 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   flutter_image_compress: ^2.3.0
+  cached_network_image: ^3.3.1
+  path: ^1.9.0
   
   # =========================
   # MONITORING & CRASH REPORTING

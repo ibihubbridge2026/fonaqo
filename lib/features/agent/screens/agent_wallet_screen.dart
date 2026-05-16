@@ -20,6 +20,15 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
   final AgentRepository _agentRepository = AgentRepository();
 
   @override
+  void initState() {
+    super.initState();
+    // Charger les données du wallet automatiquement
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AgentProvider>().fetchWalletDetails();
+    });
+  }
+
+  @override
   void dispose() {
     super.dispose();
   }
@@ -272,9 +281,15 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFFFFD400).withOpacity(.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
+                          color: const Color(0xFFFFD400).withOpacity(.4),
+                          blurRadius: 25,
+                          offset: const Offset(0, 10),
+                          spreadRadius: 2,
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withOpacity(.1),
+                          blurRadius: 15,
+                          offset: const Offset(0, 5),
                         ),
                       ],
                     ),
@@ -350,9 +365,10 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
                       borderRadius: BorderRadius.circular(22),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(.03),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          color: Colors.black.withOpacity(.08),
+                          blurRadius: 15,
+                          offset: const Offset(0, 6),
+                          spreadRadius: 1,
                         ),
                       ],
                     ),
@@ -386,9 +402,10 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
                       borderRadius: BorderRadius.circular(22),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(.03),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          color: Colors.black.withOpacity(.08),
+                          blurRadius: 15,
+                          offset: const Offset(0, 6),
+                          spreadRadius: 1,
                         ),
                       ],
                     ),

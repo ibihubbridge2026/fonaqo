@@ -12,13 +12,13 @@ import '../../../core/services/cache_service.dart';
 class AgentRepository {
   final Logger _logger = Logger();
   final BaseClient _baseClient = BaseClient();
-  final ImageCompressionService _compressionService = ImageCompressionService();
+  final MediaCompressionService _compressionService = MediaCompressionService();
   final CacheService _cacheService = CacheService();
 
   /// Récupère le solde de l'agent
   Future<double> getAgentBalance() async {
     try {
-      final response = await _baseClient.get('agent/balance/');
+      final response = await _baseClient.get('wallets/balance/');
 
       if (response.statusCode == 200) {
         final balance = response.data['data']['balance']?.toDouble() ?? 0.0;
@@ -34,7 +34,41 @@ class AgentRepository {
     }
   }
 
-  /// Récupère les missions disponibles pour l'agent avec coordonnées GPS
+  /// Récupère TOUTES les missions PENDING sans restriction géographique (pour le chargement par défaut)
+  Future<List<MissionModel>> getAllPendingMissions() async {
+    try {
+      _logger.d(
+          '🔍 Récupération de toutes les missions PENDING (chargement global)...');
+
+      final response = await _baseClient.get(
+        'missions/?status=PENDING',
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> missionsData =
+            response.data['data']['missions'] ?? [];
+        final missions =
+            missionsData.map((data) => MissionModel.fromJson(data)).toList();
+        _logger.d('Missions PENDING globales récupérées: ${missions.length}');
+
+        // Mettre en cache les missions pour mode offline
+        final missionsJson = missions.map((m) => m.toJson()).toList();
+        await _cacheService.cacheMissions(missionsJson);
+        await _cacheService.setOnlineStatus(true);
+
+        return missions;
+      } else {
+        _logger
+            .e('Erreur récupération missions globales: ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      _logger.e('Erreur getAllPendingMissions: $e');
+      return [];
+    }
+  }
+
+  /// Récupère les missions disponibles pour l'agent avec coordonnées GPS (pour les filtres manuels)
   /// Met en cache les missions pour consultation offline
   Future<List<MissionModel>> getAvailableMissions({
     double? latitude,
@@ -112,8 +146,8 @@ class AgentRepository {
   /// Met à jour le statut en ligne de l'agent
   Future<bool> updateOnlineStatus(bool isOnline) async {
     try {
-      final response = await _baseClient.patch(
-        'agent/status/',
+      final response = await _baseClient.post(
+        'accounts/agent/status/',
         data: {
           'is_online': isOnline,
         },
@@ -230,14 +264,14 @@ class AgentRepository {
 
       // Compresser l'image avant upload
       _logger.d('📷 Compression de l\'image avant upload...');
-      final compressedFile = await _compressionService.compressUntilTargetSize(
+      final compressedFile = await _compressionService.compressImageProgressive(
         filePath: photoPath,
         targetSizeMB: 3.0, // Max 3 Mo
         minQuality: 50,
       );
 
-      if (compressedFile == null) {
-        _logger.e('Échec de la compression');
+      if (!await compressedFile.exists()) {
+        _logger.e('Fichier compressé inexistant');
         return false;
       }
 

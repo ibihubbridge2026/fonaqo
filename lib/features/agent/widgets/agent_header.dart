@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/auth_provider.dart';
+import '../providers/agent_provider.dart';
 import 'agent_notification_badge.dart';
 
 class AgentHeader extends StatelessWidget implements PreferredSizeWidget {
@@ -41,18 +42,23 @@ class AgentHeader extends StatelessWidget implements PreferredSizeWidget {
                   final user = authProvider.currentUser;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         "Bonjour",
                         style: GoogleFonts.poppins(
-                            color: Colors.grey[600], fontSize: 15),
+                            color: Colors.grey[600], fontSize: 13),
                       ),
-                      Text(
-                        "${user?.firstName ?? 'Jean'} ${user?.lastName ?? 'Agent'} 👋",
-                        style: GoogleFonts.poppins(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF111827)),
+                      Flexible(
+                        child: Text(
+                          "${user?.firstName ?? 'Jean'} ${user?.lastName ?? 'Agent'}",
+                          style: GoogleFonts.poppins(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF111827)),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
                     ],
                   );
@@ -100,15 +106,16 @@ class AgentHeader extends StatelessWidget implements PreferredSizeWidget {
   }
 
   Widget _buildAvailabilitySwitch() {
-    return Consumer<AuthProvider>(
-      builder: (context, authProvider, child) {
-        bool isAvailable = authProvider.isAgent;
+    return Consumer2<AuthProvider, AgentProvider>(
+      builder: (context, authProvider, agentProvider, child) {
+        bool isAvailable = agentProvider.isOnline;
 
         return Column(
           children: [
             GestureDetector(
               onTap: () {
-                // TODO: Implémenter le toggle de disponibilité
+                // Implémentation du toggle de disponibilité
+                agentProvider.toggleOnlineStatus();
               },
               child: Container(
                 width: 50,

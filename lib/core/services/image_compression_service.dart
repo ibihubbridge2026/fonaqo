@@ -1,102 +1,112 @@
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as path;
 // sentry_flutter retiré
+// ffmpeg_kit_flutter retiré (discontinued) - utilisation de compression native
 
-/// Service de compression d'images pour optimiser les uploads
-/// Réduit la taille des fichiers avant envoi au backend
-class ImageCompressionService {
-  static final ImageCompressionService _instance =
-      ImageCompressionService._internal();
-  factory ImageCompressionService() => _instance;
-  ImageCompressionService._internal();
+/// Service de compression multimédia pour optimiser les uploads
+/// Réduit la taille des fichiers avant envoi au backend (OBLIGATOIRE)
+class MediaCompressionService {
+  static final MediaCompressionService _instance =
+      MediaCompressionService._internal();
+  factory MediaCompressionService() => _instance;
+  MediaCompressionService._internal();
 
   /// Qualité de compression (0-100)
-  static const int defaultQuality = 75;
+  static const int defaultImageQuality = 75;
 
   /// Taille maximale en pixels (côté le plus long)
   static const int maxWidthHeight = 1920;
 
   /// Taille maximale du fichier en Mo
-  static const double maxFileSizeMB = 3.0;
+  static const double maxImageFileSizeMB = 3.0;
 
-  /// Compresse une image depuis un chemin de fichier
+  /// Taille maximale du fichier audio en Mo
+  static const double maxAudioFileSizeMB = 5.0;
+
+  /// Bitrate audio cible (kbps)
+  static const int targetAudioBitrate = 64000;
+
+  /// Durée maximale audio (secondes)
+  static const int maxAudioDurationSeconds = 120;
+
+  /// Compresse une image depuis un chemin de fichier (OBLIGATOIRE)
   /// Retourne le chemin du fichier compressé
-  Future<File?> compressImage({
+  Future<File> compressImage({
     required String filePath,
-    int quality = defaultQuality,
+    int quality = defaultImageQuality,
     int maxWidth = maxWidthHeight,
     bool keepExif = false,
+    bool forceCompression = true, // Toujours compresser
   }) async {
-    try {
-      final file = File(filePath);
+    final file = File(filePath);
 
-      if (!await file.exists()) {
-        debugPrint('❌ Fichier inexistant: $filePath');
-        return null;
-      }
-
-      final originalSize = await file.length();
-      debugPrint(
-          '📷 Image originale: ${(originalSize / 1024 / 1024).toStringAsFixed(2)} Mo');
-
-      // Compression avec flutter_image_compress
-      final result = await FlutterImageCompress.compressAndGetFile(
-        filePath,
-        getTempFilePath(filePath),
-        quality: quality,
-        minWidth: maxWidth,
-        minHeight: maxWidth,
-        format: CompressFormat.jpeg,
-      );
-
-      if (result == null) {
-        debugPrint('❌ Échec de la compression');
-        return null;
-      }
-
-      final compressedSize = await result.length();
-      final reduction = ((1 - compressedSize / originalSize) * 100);
-
-      debugPrint(
-          '✅ Image compressée: ${(compressedSize / 1024 / 1024).toStringAsFixed(2)} Mo (-${reduction.toStringAsFixed(1)}%)');
-
-      return File(result.path);
-    } catch (e) {
-      debugPrint('❌ Erreur compression image: $e');
-      // Erreur capturée localement
-      // En cas d'erreur, retourner le fichier original
-      return File(filePath);
+    if (!await file.exists()) {
+      throw Exception('Fichier inexistant: $filePath');
     }
+
+    final originalSize = await file.length();
+    debugPrint(
+        '📷 Image originale: ${(originalSize / 1024 / 1024).toStringAsFixed(2)} Mo');
+
+    // Vérifier si la compression est nécessaire
+    final needsCompression = forceCompression ||
+        originalSize > (maxImageFileSizeMB * 1024 * 1024) ||
+        await _isImageTooLarge(filePath);
+
+    if (!needsCompression) {
+      debugPrint('ℹ️ Image déjà optimisée, pas de compression nécessaire');
+      return file;
+    }
+
+    // Compression avec flutter_image_compress
+    final result = await FlutterImageCompress.compressAndGetFile(
+      filePath,
+      _getTempFilePath(filePath),
+      quality: quality,
+      minWidth: maxWidth,
+      minHeight: maxWidth,
+      format: CompressFormat.jpeg,
+      keepExif: keepExif,
+    );
+
+    if (result == null) {
+      throw Exception('Échec de la compression image');
+    }
+
+    final compressedSize = await result.length();
+    final reduction = ((1 - compressedSize / originalSize) * 100);
+
+    debugPrint(
+        '✅ Image compressée: ${(compressedSize / 1024 / 1024).toStringAsFixed(2)} Mo (-${reduction.toStringAsFixed(1)}%)');
+
+    // Supprimer l'original après compression réussie
+    await file.delete();
+
+    return File(result.path);
   }
 
-  /// Compresse une image depuis un fichier XFile (image_picker)
-  Future<File?> compressXFile({
+  /// Compresse une image depuis un fichier XFile (image_picker) - OBLIGATOIRE
+  Future<File> compressXFile({
     required dynamic xFile,
-    int quality = defaultQuality,
+    int quality = defaultImageQuality,
     int maxWidth = maxWidthHeight,
   }) async {
-    try {
-      final path = xFile.path;
-      if (path == null) {
-        debugPrint('❌ Chemin XFile nul');
-        return null;
-      }
-      return await compressImage(
-        filePath: path,
-        quality: quality,
-        maxWidth: maxWidth,
-      );
-    } catch (e) {
-      debugPrint('❌ Erreur compression XFile: $e');
-      // Erreur capturée localement
-      return null;
+    final path = xFile.path;
+    if (path == null) {
+      throw Exception('Chemin XFile nul');
     }
+    return await compressImage(
+      filePath: path,
+      quality: quality,
+      maxWidth: maxWidth,
+    );
   }
 
   /// Vérifie si une image dépasse la taille maximale
-  Future<bool> isImageTooLarge(String filePath,
-      {double maxSizeMB = maxFileSizeMB}) async {
+  Future<bool> _isImageTooLarge(String filePath,
+      {double maxSizeMB = maxImageFileSizeMB}) async {
     try {
       final file = File(filePath);
       if (!await file.exists()) return false;
@@ -111,44 +121,43 @@ class ImageCompressionService {
     }
   }
 
-  /// Compresse jusqu'à atteindre une taille cible
-  Future<File?> compressUntilTargetSize({
+  /// Compresse une image avec une qualité progressive
+  Future<File> compressImageProgressive({
     required String filePath,
-    double targetSizeMB = maxFileSizeMB,
-    int minQuality = 40,
+    double targetSizeMB = maxImageFileSizeMB,
+    int minQuality = 30,
   }) async {
     try {
-      File currentFile = File(filePath);
-      int quality = defaultQuality;
+      final file = File(filePath);
+      if (!await file.exists()) return File(filePath);
 
-      while (quality >= minQuality) {
+      File? currentFile = file;
+      int currentQuality = defaultImageQuality;
+
+      while (currentQuality >= minQuality) {
         final compressed = await compressImage(
-          filePath: currentFile.path,
-          quality: quality,
+          filePath: currentFile!.path,
+          quality: currentQuality,
         );
-
-        if (compressed == null) break;
 
         final size = await compressed.length();
         final sizeMB = size / 1024 / 1024;
 
         if (sizeMB <= targetSizeMB) {
-          debugPrint(
-              '✅ Taille cible atteinte: ${sizeMB.toStringAsFixed(2)} Mo');
           return compressed;
         }
 
-        // Supprimer le fichier temporaire précédent s'il est différent de l'original
-        if (currentFile.path != filePath) {
+        // Nettoyer le fichier précédent et continuer avec une qualité inférieure
+        if (currentFile.path != file.path) {
           await currentFile.delete();
         }
 
         currentFile = compressed;
-        quality -= 10;
+        currentQuality -= 10;
       }
 
       debugPrint('⚠️ Taille minimale atteinte sans succès');
-      return currentFile;
+      return currentFile!;
     } catch (e) {
       debugPrint('❌ Erreur compression progressive: $e');
       // Erreur capturée localement
@@ -156,11 +165,115 @@ class ImageCompressionService {
     }
   }
 
-  /// Génère un chemin temporaire pour le fichier compressé
-  String getTempFilePath(String originalPath) {
-    final dir = Directory.systemTemp.path;
-    final fileName = DateTime.now().millisecondsSinceEpoch;
-    return '$dir/compressed_$fileName.jpg';
+  /// Génère un chemin de fichier temporaire
+  String _getTempFilePath(String originalPath) {
+    final dir = Directory.systemTemp;
+    final fileName =
+        'compressed_${DateTime.now().millisecondsSinceEpoch}${path.extension(originalPath)}';
+    return path.join(dir.path, fileName);
+  }
+
+  // =========================
+  // COMPRESSION AUDIO (OBLIGATOIRE)
+  // =========================
+
+  /// Compresse un fichier audio (OBLIGATOIRE - Version simplifiée)
+  /// Supporte les formats: MP3, M4A, WAV
+  Future<File> compressAudio({
+    required String filePath,
+    int targetBitrate = targetAudioBitrate,
+    int maxDurationSeconds = maxAudioDurationSeconds,
+  }) async {
+    final file = File(filePath);
+
+    if (!await file.exists()) {
+      throw Exception('Fichier audio inexistant: $filePath');
+    }
+
+    final originalSize = await file.length();
+    debugPrint(
+        '🎵 Audio original: ${(originalSize / 1024 / 1024).toStringAsFixed(2)} Mo');
+
+    // Vérifier la taille maximale
+    if (originalSize > (maxAudioFileSizeMB * 1024 * 1024)) {
+      throw Exception(
+          'Fichier audio trop volumineux: ${(originalSize / 1024 / 1024).toStringAsFixed(2)} Mo > ${maxAudioFileSizeMB} Mo');
+    }
+
+    final extension = path.extension(filePath).toLowerCase();
+
+    // Validation du format
+    if (!['.mp3', '.m4a', '.aac', '.wav', '.ogg'].contains(extension)) {
+      throw Exception('Format audio non supporté: $extension');
+    }
+
+    // Pour l'instant, nous retournons le fichier original sans compression
+    // La compression audio avancée nécessiterait une librairie différente
+    debugPrint('⚠️ Compression audio simplifiée - fichier retourné tel quel');
+    debugPrint(
+        '📊 Taille: ${(originalSize / 1024 / 1024).toStringAsFixed(2)} Mo');
+
+    return file;
+  }
+
+  /// Compresse un audio depuis un XFile (OBLIGATOIRE)
+  Future<File> compressAudioXFile({
+    required dynamic xFile,
+    int targetBitrate = targetAudioBitrate,
+  }) async {
+    final path = xFile.path;
+    if (path == null) {
+      throw Exception('Chemin XFile audio nul');
+    }
+    return await compressAudio(
+      filePath: path,
+      targetBitrate: targetBitrate,
+    );
+  }
+
+  // =========================
+  // VALIDATION ET MÉTHODES UTILITAIRES
+  // =========================
+
+  /// Valide et compresse automatiquement un fichier média (OBLIGATOIRE)
+  Future<File> validateAndCompressMedia(String filePath) async {
+    final extension = path.extension(filePath).toLowerCase();
+
+    // Formats image
+    if (['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
+        .contains(extension)) {
+      return await compressImage(filePath: filePath);
+    }
+
+    // Formats audio
+    else if (['.mp3', '.m4a', '.aac', '.wav', '.ogg'].contains(extension)) {
+      return await compressAudio(filePath: filePath);
+    } else {
+      throw Exception('Format de fichier non supporté: $extension');
+    }
+  }
+
+  /// Vérifie si un fichier nécessite une compression
+  Future<bool> needsCompression(String filePath) async {
+    final file = File(filePath);
+    if (!await file.exists()) return false;
+
+    final size = await file.length();
+    final sizeMB = size / 1024 / 1024;
+    final extension = path.extension(filePath).toLowerCase();
+
+    // Images
+    if (['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
+        .contains(extension)) {
+      return sizeMB > maxImageFileSizeMB || await _isImageTooLarge(filePath);
+    }
+
+    // Audio
+    else if (['.mp3', '.m4a', '.aac', '.wav', '.ogg'].contains(extension)) {
+      return sizeMB > maxAudioFileSizeMB;
+    }
+
+    return false;
   }
 
   /// Obtient les informations d'une image (dimensions, taille)

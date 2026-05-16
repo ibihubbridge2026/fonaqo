@@ -123,7 +123,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         title: 'Notifications',
         detailTitleWidget: Text(
           'Notifications',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+          style: TextStyle(
+              fontSize: 16, fontWeight: FontWeight.w900, color: Colors.black),
         ),
       ),
       body: RefreshIndicator(
@@ -162,7 +163,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         padding: EdgeInsets.symmetric(vertical: 40),
         child: Center(
           child: Text('Aucune notification',
-              style: TextStyle(color: Colors.grey, fontSize: 15)),
+              style: TextStyle(color: Colors.black, fontSize: 15)),
         ),
       );
     }

@@ -34,7 +34,7 @@ class _CountrySelectorState extends State<CountrySelector> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.withOpacity( 0.3)),
+          border: Border.all(color: Colors.grey.withOpacity(0.3)),
         ),
         child: Row(
           children: [
@@ -58,7 +58,7 @@ class _CountrySelectorState extends State<CountrySelector> {
                     _selectedCountry.dialCode,
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey[600],
+                      color: Colors.black,
                     ),
                   ),
                 ],
@@ -66,7 +66,7 @@ class _CountrySelectorState extends State<CountrySelector> {
             ),
             Icon(
               Icons.keyboard_arrow_down,
-              color: Colors.grey[600],
+              color: Colors.black,
             ),
           ],
         ),
@@ -128,7 +128,7 @@ class _CountrySelectorState extends State<CountrySelector> {
                       country.dialCode,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey[600],
+                        color: Colors.black,
                       ),
                     ),
                     onTap: () {
@@ -139,7 +139,7 @@ class _CountrySelectorState extends State<CountrySelector> {
                       Navigator.of(context).pop();
                     },
                     selected: _selectedCountry.code == country.code,
-                    selectedTileColor: Colors.orange.withOpacity( 0.1),
+                    selectedTileColor: Colors.orange.withOpacity(0.1),
                   );
                 },
               ),

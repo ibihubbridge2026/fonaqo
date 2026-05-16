@@ -299,7 +299,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
                 ),
                 subtitle: const Text(
                   'Empreinte / FaceID',
-                  style: TextStyle(color: Colors.grey),
+                  style: TextStyle(color: Colors.black),
                 ),
                 secondary: const Icon(
                   Icons.fingerprint,
@@ -515,7 +515,7 @@ class ProfileParamItem extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(icon, color: Colors.black87),
+            Icon(icon, color: Colors.black),
             const SizedBox(width: 15),
             Expanded(
               child: Column(
@@ -525,17 +525,17 @@ class ProfileParamItem extends StatelessWidget {
                     title,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: Colors.black,
                     ),
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    style: const TextStyle(color: Colors.black, fontSize: 12),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.black),
           ],
         ),
       ),

@@ -152,7 +152,9 @@ class _MissionsScreenState extends State<MissionsScreen> {
                     children: [
                       const Text("Mes Missions",
                           style: TextStyle(
-                              fontSize: 24, fontWeight: FontWeight.w900)),
+                              fontSize: 24,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.black)),
                       const SizedBox(height: 16),
                       const MissionsPromoQueueCard(),
                       const SizedBox(height: 14),
@@ -375,7 +377,9 @@ class MissionCard extends StatelessWidget {
                 children: [
                   Text(title,
                       style: const TextStyle(
-                          fontWeight: FontWeight.w900, fontSize: 16)),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                          color: Colors.black)),
                   const SizedBox(height: 2),
                   Text("$type • $time",
                       style: const TextStyle(color: Colors.grey, fontSize: 12)),

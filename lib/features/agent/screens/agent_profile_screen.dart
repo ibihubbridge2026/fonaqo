@@ -3,6 +3,7 @@ import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import '../repository/agent_repository.dart';
 import '../providers/agent_provider.dart';
 import 'package:provider/provider.dart';
+import '../../../core/routes/app_routes.dart';
 
 class AgentProfileScreen extends StatefulWidget {
   const AgentProfileScreen({super.key});
@@ -61,7 +62,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity( 0.03),
+                    color: Colors.black.withOpacity(0.03),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -123,84 +124,9 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                     ),
                   ),
 
-                  // NOTATION
-                  const SizedBox(height: 12),
-                  if (_isLoadingRatings)
-                    const CircularProgressIndicator()
-                  else if (_ratings != null)
-                    Row(
-                      children: [
-                        RatingBarIndicator(
-                          rating:
-                              (_ratings!['average_rating'] ?? 0.0).toDouble(),
-                          itemBuilder: (context, index) => const Icon(
-                            Icons.star,
-                            color: Color(0xFFFFD400),
-                          ),
-                          itemCount: 5,
-                          itemSize: 16,
-                          direction: Axis.horizontal,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          '${(_ratings!['average_rating'] ?? 0.0).toStringAsFixed(1)}',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '(${_ratings!['total_ratings'] ?? 0} avis)',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    )
-                  else
-                    const Text(
-                      'Pas encore d\'avis',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
-                    ),
-
-                  const SizedBox(height: 18),
-
-                  // NOTE
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.star,
-                        color: Color(0xFFFFD400),
-                        size: 22,
-                      ),
-                      const SizedBox(width: 6),
-                      const Text(
-                        '4.8',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '(128 avis)',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-
                   const SizedBox(height: 24),
 
-                  // STATS
+                  // STATS - 2 COLONNES AVEC BARRE JAUNE
                   Row(
                     children: [
                       Expanded(
@@ -210,20 +136,20 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                           Icons.work_outline,
                         ),
                       ),
+                      Container(
+                        width: 2,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFD400),
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildStatCard(
                           '98%',
                           'Réussite',
                           Icons.trending_up,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatCard(
-                          '2 ans',
-                          'Ancienneté',
-                          Icons.schedule,
                         ),
                       ),
                     ],
@@ -278,41 +204,6 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
             ),
 
             const SizedBox(height: 18),
-
-            // STATISTIQUES MISSIONS
-            _buildSectionCard(
-              title: 'Statistiques',
-              children: [
-                Consumer<AgentProvider>(
-                  builder: (context, agentProvider, child) {
-                    return Column(
-                      children: [
-                        _buildStatsTile(
-                          Icons.check_circle,
-                          'Missions terminées',
-                          '${agentProvider.stats['completed_missions'] ?? 0}',
-                          Colors.green,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStatsTile(
-                          Icons.star,
-                          'Note moyenne',
-                          '${(_ratings!['average_rating'] ?? 0.0).toStringAsFixed(1)}/5.0',
-                          const Color(0xFFFFD400),
-                        ),
-                        const SizedBox(height: 12),
-                        _buildStatsTile(
-                          Icons.trending_up,
-                          'Taux de réussite',
-                          '${agentProvider.stats['success_rate'] ?? 95}%',
-                          Colors.blue,
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
-            ),
 
             const SizedBox(height: 24),
 
@@ -419,7 +310,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity( 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -445,8 +336,9 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
   Widget _buildTile(
     IconData icon,
     String title,
-    String subtitle,
-  ) {
+    String subtitle, {
+    VoidCallback? onTap,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
       child: Row(
@@ -581,7 +473,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         CircleAvatar(
-          backgroundColor: const Color(0xFFFFD400).withOpacity( 0.2),
+          backgroundColor: const Color(0xFFFFD400).withOpacity(0.2),
           child: Text(
             user[0],
             style: const TextStyle(

@@ -195,7 +195,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
 
           Text(
             _mission!.title,
-            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900),
+            style: const TextStyle(
+                fontSize: 26, fontWeight: FontWeight.w900, color: Colors.black),
           ),
           const SizedBox(height: 12),
           Text(

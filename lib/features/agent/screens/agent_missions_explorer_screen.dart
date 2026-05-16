@@ -96,9 +96,7 @@ class _AgentMissionsExplorerScreenState
                   margin: const EdgeInsets.only(right: 10),
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFFFFD400)
-                        : Colors.white,
+                    color: isSelected ? const Color(0xFFFFD400) : Colors.white,
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(
                       color: isSelected
@@ -110,8 +108,7 @@ class _AgentMissionsExplorerScreenState
                   child: Text(
                     filters[index],
                     style: TextStyle(
-                      color:
-                          isSelected ? Colors.black : Colors.grey.shade700,
+                      color: isSelected ? Colors.black : Colors.grey.shade700,
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
                     ),
@@ -124,58 +121,143 @@ class _AgentMissionsExplorerScreenState
 
         const SizedBox(height: 18),
 
-        // MAP PLACEHOLDER
+        // CARTE INTERACTIVE
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Container(
-            height: 160,
+            height: 200,
             width: double.infinity,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(22),
-              gradient: LinearGradient(
-                colors: [
-                  Colors.yellow.shade100,
-                  Colors.orange.shade50,
-                ],
-              ),
-            ),
-            child: Stack(
-              children: [
-                Center(
-                  child: Icon(
-                    Icons.map_outlined,
-                    size: 80,
-                    color: Colors.orange.shade300,
-                  ),
-                ),
-
-                Positioned(
-                  top: 20,
-                  right: 20,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.my_location, size: 16),
-                        SizedBox(width: 6),
-                        Text(
-                          'Carte',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
               ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: Stack(
+                children: [
+                  // Carte de base avec style Google Maps
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.blue.shade50,
+                          Colors.green.shade50,
+                        ],
+                      ),
+                    ),
+                    child: const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.map,
+                            size: 60,
+                            color: Colors.blueGrey,
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Carte des missions',
+                            style: TextStyle(
+                              color: Colors.blueGrey,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            '3 missions à proximité',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  // Points de missions simulés
+                  Positioned(
+                    top: 40,
+                    left: 60,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 80,
+                    right: 80,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.orange,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 60,
+                    left: 100,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+                  // Bouton de localisation
+                  Positioned(
+                    top: 20,
+                    right: 20,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.my_location, size: 16),
+                          SizedBox(width: 6),
+                          Text(
+                            'Carte',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -239,10 +321,8 @@ class _AgentMissionsExplorerScreenState
                     padding: const EdgeInsets.only(bottom: 14),
                     child: MissionCard(
                       title: mission.title ?? 'Mission',
-                      location:
-                          mission.address ?? 'Adresse non disponible',
-                      client:
-                          mission.clientName ?? 'Client inconnu',
+                      location: mission.address ?? 'Adresse non disponible',
+                      client: mission.clientName ?? 'Client inconnu',
                       amount:
                           '${mission.price?.toStringAsFixed(0) ?? '0'} FCFA',
                       distance: '500 m',
@@ -273,18 +353,16 @@ class _AgentMissionsExplorerScreenState
               color: Colors.white,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Column(
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
+                const Icon(
                   Icons.offline_bolt,
                   size: 64,
                   color: Colors.grey,
                 ),
-
-                SizedBox(height: 16),
-
-                Text(
+                const SizedBox(height: 16),
+                const Text(
                   'Vous êtes hors ligne',
                   style: TextStyle(
                     fontSize: 20,
@@ -292,16 +370,43 @@ class _AgentMissionsExplorerScreenState
                     color: Colors.black,
                   ),
                 ),
-
-                SizedBox(height: 8),
-
-                Text(
+                const SizedBox(height: 8),
+                const Text(
                   'Passez en ligne pour voir les missions',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.grey,
                   ),
                   textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                Consumer<AgentProvider>(
+                  builder: (context, agentProvider, child) {
+                    return ElevatedButton(
+                      onPressed: () {
+                        // Passer en ligne
+                        agentProvider.toggleOnlineStatus();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFFD400),
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Passer en ligne',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

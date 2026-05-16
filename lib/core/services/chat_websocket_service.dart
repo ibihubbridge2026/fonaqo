@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -70,15 +71,27 @@ class ChatWebSocketService extends ChangeNotifier {
 
   bool _isConnected = false;
   bool _isTyping = false;
+  bool _isReconnecting = false;
 
   String? _currentMissionId;
   String? _currentUsername;
   String? _lastError;
 
+  // Auto-reconnect configuration
+  static const int _maxReconnectAttempts = 5;
+  static const Duration _reconnectDelay = Duration(seconds: 3);
+  static const Duration _maxReconnectDelay = Duration(seconds: 30);
+  
+  int _reconnectAttempts = 0;
+  Timer? _reconnectTimer;
+  Timer? _heartbeatTimer;
+
   /// Getters
   List<ChatWebSocketMessage> get messages => List.unmodifiable(_messages);
 
   bool get isConnected => _isConnected;
+  
+  bool get isReconnecting => _isReconnecting;
 
   bool get isTyping => _isTyping;
 
@@ -160,11 +173,15 @@ class ChatWebSocketService extends ChangeNotifier {
       _subscription = _channel!.stream.listen(
         _handleMessage,
         onError: _handleError,
-        onDone: _handleDisconnect,
+        onDone: _handleDisconnectWithReconnect,
         cancelOnError: false,
       );
 
       _isConnected = true;
+      _reconnectAttempts = 0; // Reset reconnect attempts on successful connection
+      
+      // Start heartbeat
+      _startHeartbeat();
 
       notifyListeners();
 
@@ -231,14 +248,22 @@ class ChatWebSocketService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Déconnexion WebSocket
-  void _handleDisconnect() {
-    _logger.i('WebSocket déconnecté.');
-
+  /// Déconnexion WebSocket avec auto-reconnect
+  void _handleDisconnectWithReconnect() {
+    _logger.i('WebSocket déconnecté, tentative de reconnexion...');
+    
     _isConnected = false;
     _isTyping = false;
-
+    
+    // Annuler le heartbeat
+    _heartbeatTimer?.cancel();
+    
     notifyListeners();
+    
+    // Programmer la reconnexion si ce n'est pas une déconnexion manuelle
+    if (_currentMissionId != null && !_isReconnecting) {
+      _scheduleReconnect();
+    }
   }
 
   /// Envoyer message
@@ -290,10 +315,10 @@ class ChatWebSocketService extends ChangeNotifier {
   /// Déconnexion manuelle
   Future<void> disconnect() async {
     try {
-      await _subscription?.cancel();
+      _subscription?.cancel();
       _subscription = null;
 
-      await _channel?.sink.close();
+      _channel?.sink.close();
       _channel = null;
     } catch (e) {
       _logger.e('Erreur fermeture WebSocket : $e');
@@ -302,6 +327,11 @@ class ChatWebSocketService extends ChangeNotifier {
     _isConnected = false;
     _isTyping = false;
     _currentMissionId = null;
+
+    // Annuler les timers
+    _heartbeatTimer?.cancel();
+    _reconnectTimer?.cancel();
+    _isReconnecting = false;
 
     notifyListeners();
 
@@ -327,26 +357,138 @@ class ChatWebSocketService extends ChangeNotifier {
     if (_currentUsername != null && _currentUsername!.isNotEmpty) {
       return _currentUsername!;
     }
-
     return '';
   }
 
-  /// Définir username
-  void setCurrentUsername(String username) {
-    _currentUsername = username;
+  // =========================
+  // AUTO-RECONNECT & HEARTBEAT
+  // =========================
+
+  /// Démarrer le heartbeat pour maintenir la connexion active
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (_isConnected && _channel != null) {
+        try {
+          _sendHeartbeat();
+        } catch (e) {
+          _logger.e('Erreur heartbeat: $e');
+          _handleHeartbeatFailure();
+        }
+      }
+    });
+  }
+
+  /// Envoyer un message heartbeat
+  void _sendHeartbeat() {
+    final heartbeat = {
+      'type': 'heartbeat',
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    
+    _channel!.sink.add(jsonEncode(heartbeat));
+    _logger.d('Heartbeat envoyé');
+  }
+
+  /// Gérer l'échec du heartbeat
+  void _handleHeartbeatFailure() {
+    _logger.w('Heartbeat échoué, tentative de reconnexion...');
+    _scheduleReconnect();
+  }
+
+  /// Programmer la reconnexion
+  void _scheduleReconnect() {
+    if (_reconnectAttempts >= _maxReconnectAttempts) {
+      _logger.e('Nombre maximum de tentatives de reconnexion atteint');
+      _lastError = 'Impossible de se reconnecter après $_maxReconnectAttempts tentatives';
+      notifyListeners();
+      return;
+    }
+
+    _isReconnecting = true;
+    _reconnectAttempts++;
+    
+    // Calculer le délai avec backoff exponentiel
+    final delay = Duration(
+      seconds: min(
+        _reconnectDelay.inSeconds * (1 << (_reconnectAttempts - 1)),
+        _maxReconnectDelay.inSeconds,
+      ),
+    );
+
+    _logger.i('Tentative de reconnexion $_reconnectAttempts/$_maxReconnectAttempts dans ${delay.inSeconds}s');
+    
+    _reconnectTimer = Timer(delay, () {
+      _attemptReconnect();
+    });
+    
+    notifyListeners();
+  }
+
+  /// Tenter de se reconnecter
+  Future<void> _attemptReconnect() async {
+    if (_currentMissionId == null) {
+      _logger.w('Aucune mission à reconnecter');
+      return;
+    }
+
+    try {
+      _logger.i('Tentative de reconnexion à la mission $_currentMissionId...');
+      await connect(_currentMissionId!);
+      _isReconnecting = false;
+      _logger.i('Reconnexion réussie');
+    } catch (e) {
+      _logger.e('Échec de la reconnexion: $e');
+      _isReconnecting = false;
+      
+      // Programmer une nouvelle tentative
+      _scheduleReconnect();
+    }
+    
+    notifyListeners();
+  }
+
+  /// Connexion automatique dès l'acceptation de mission
+  Future<void> connectOnMissionAcceptance(String missionId) async {
+    _logger.i('Connexion automatique au chat pour la mission $missionId');
+    
+    // Se connecter immédiatement
+    await connect(missionId);
+    
+    // Envoyer un message système
+    final systemMessage = {
+      'type': 'system',
+      'content': 'Chat connecté automatiquement - Mission acceptée',
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    
+    if (_isConnected && _channel != null) {
+      _channel!.sink.add(jsonEncode(systemMessage));
+    }
+  }
+
+  /// Forcer la reconnexion manuelle
+  Future<void> forceReconnect() async {
+    _logger.i('Forcer la reconnexion manuelle...');
+    
+    _reconnectAttempts = 0;
+    _reconnectTimer?.cancel();
+    _isReconnecting = false;
+    
+    if (_currentMissionId != null) {
+      await _attemptReconnect();
+    }
   }
 
   @override
   void dispose() {
+    _heartbeatTimer?.cancel();
+    _reconnectTimer?.cancel();
     _subscription?.cancel();
-
-    try {
-      _channel?.sink.close();
-    } catch (_) {}
-
+    _channel?.sink.close();
     _messageController.close();
     _typingController.close();
-
+    
     super.dispose();
   }
 }

@@ -31,11 +31,27 @@ class AiSearchProvider extends ChangeNotifier {
       );
 
       if (response is Map<String, dynamic>) {
-        _analysisResult = response['analysis'] ?? 'Analyse terminée.';
+        // Gérer la réponse du backend
+        if (response['status'] == 'success') {
+          final responseData = response['response'];
+          _analysisResult = responseData['suggestion'] ?? 'Analyse terminée.';
 
-        final agentsJson = response['agents'] as List<dynamic>? ?? [];
-        _suggestedAgents =
-            agentsJson.map((json) => AgentModel.fromJson(json)).toList();
+          // Extraire les agents des résultats
+          final results = responseData['results'] as List<dynamic>? ?? [];
+          _suggestedAgents = results.map((json) {
+            return AgentModel(
+              id: json['id'].toString(),
+              name: json['fullName'],
+              avatarUrl: json['avatarUrl'] ?? '',
+              rating: (json['rating'] as num).toDouble(),
+              specialty: (json['specialties'] as List<dynamic>).join(', '),
+              completedMissions: json['completedMissions'] as int,
+              estimatedPrice: 'À déterminer',
+            );
+          }).toList();
+        } else {
+          throw Exception(response['error'] ?? 'Erreur inconnue');
+        }
       }
     } catch (e) {
       _error = "L'analyse IA a échoué. Veuillez réessayer.";

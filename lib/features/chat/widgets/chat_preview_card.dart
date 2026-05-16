@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../screens/chat_list_screen.dart';
 
@@ -22,7 +23,7 @@ class ChatPreviewCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity( 0.05),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -42,8 +43,37 @@ class ChatPreviewCard extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: 28,
-                      backgroundImage: AssetImage(chat.userAvatar),
                       backgroundColor: Colors.grey[300],
+                      child: ClipOval(
+                        child: CachedNetworkImage(
+                          imageUrl: chat.userAvatar,
+                          width: 56,
+                          height: 56,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(
+                            width: 56,
+                            height: 56,
+                            color: Colors.grey[300],
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.grey),
+                              ),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => Container(
+                            width: 56,
+                            height: 56,
+                            color: Colors.grey[300],
+                            child: Icon(
+                              Icons.person,
+                              size: 28,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                     if (chat.isOnline) ...[
                       Positioned(
@@ -63,7 +93,7 @@ class ChatPreviewCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(width: 12),
-                
+
                 // Contenu conversation
                 Expanded(
                   child: Column(
@@ -86,7 +116,8 @@ class ChatPreviewCard extends StatelessWidget {
                           if (chat.isSupport) ...[
                             const SizedBox(width: 8),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFE6B800),
                                 borderRadius: BorderRadius.circular(8),
@@ -116,14 +147,15 @@ class ChatPreviewCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 // Badge messages non lus + heure
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     if (chat.unreadCount > 0) ...[
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFFD400),
                           borderRadius: BorderRadius.circular(10),

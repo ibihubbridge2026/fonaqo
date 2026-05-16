@@ -66,12 +66,16 @@ class _HomeContentState extends State<HomeContent> {
       _dashLoading = true;
       _dashError = null;
     });
-    try {
-      final missions = await _missionRepo.fetchMissionsList();
 
-      // Pour l'instant, nous n'utilisons pas la localisation
-      // TODO: Ajouter la localisation à UserModel et utiliser les coordonnées utilisateur
-      final agents = await _missionRepo.fetchAgentSuggestions();
+    try {
+      // Chargement parallèle pour optimiser la vitesse
+      final futures = await Future.wait([
+        _missionRepo.fetchMissionsList(),
+        _missionRepo.fetchAgentSuggestions(),
+      ]);
+
+      final missions = futures[0] as List<MissionModel>;
+      final agents = futures[1] as List<Map<String, dynamic>>;
 
       if (!mounted) return;
       setState(() {
@@ -232,8 +236,10 @@ class WelcomeHeader extends StatelessWidget {
             children: [
               Text(
                 'Bonjour, $greet !',
-                style:
-                    const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.black),
               ),
               const Text(
                 'Où pouvons-nous vous aider aujourd’hui ?',
@@ -396,7 +402,11 @@ class SectionTitleStrip extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Colors.black,
+            ),
           ),
           if (showSeeAll)
             TextButton(
@@ -660,7 +670,7 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
     final rows = widget.agents;
     if (rows.isEmpty) {
       return const SizedBox(
-        height: 90, // Reduced from 100 for better flexibility
+        height: 105, // Augmenté de 90 à 105
         child: Center(
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 24),
@@ -689,7 +699,7 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
     }
 
     return SizedBox(
-      height: 180, // Reduced from 200 for better flexibility
+      height: 200, // Augmenté de 180 à 200
       child: ListView.builder(
         controller: _scrollController,
         scrollDirection: Axis.horizontal,
@@ -854,7 +864,7 @@ class OngoingMissionStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     if (missions.isEmpty) {
       return const SizedBox(
-        height: 70, // Reduced from 72 for better flexibility
+        height: 85, // Augmenté de 70 à 85
         child: Center(
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 24),
@@ -885,7 +895,7 @@ class OngoingMissionStrip extends StatelessWidget {
 
     // Si plusieurs missions, afficher en horizontal
     return SizedBox(
-      height: 80, // Reduced from 85 for better flexibility
+      height: 95, // Augmenté de 80 à 95
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),

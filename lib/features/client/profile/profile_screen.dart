@@ -25,7 +25,10 @@ class ProfileScreen extends StatelessWidget {
               children: [
                 const Text(
                   "Paramètres",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black),
                 ),
                 const SizedBox(height: 15),
                 ProfileParamItem(
@@ -154,7 +157,7 @@ class ProfileParamItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = isLogout ? Colors.red : Colors.black87;
+    final color = isLogout ? Colors.red : Colors.black;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(15),
@@ -182,12 +185,12 @@ class ProfileParamItem extends StatelessWidget {
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    style: const TextStyle(color: Colors.black, fontSize: 12),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.black),
           ],
         ),
       ),
@@ -207,7 +210,7 @@ class ProfileHeader extends StatelessWidget {
       return const Center(
         child: Text(
           'Chargement du profil...',
-          style: TextStyle(fontSize: 16, color: Colors.grey),
+          style: TextStyle(fontSize: 16, color: Colors.black),
         ),
       );
     }
@@ -308,7 +311,8 @@ class ProfileHeader extends StatelessWidget {
             value,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
           ),
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+          Text(label,
+              style: const TextStyle(color: Colors.black, fontSize: 11)),
         ],
       ),
     );

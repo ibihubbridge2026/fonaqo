@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../widgets/mission_card.dart';
 import '../widgets/agent_stat_card.dart';
 import '../widgets/shimmer_loading_card.dart';
 import '../providers/agent_provider.dart';
+import 'agent_boost_screen.dart';
+import 'agent_chat_screen.dart';
+import 'agent_mission_history_screen.dart';
+import 'agent_missions_explorer_screen.dart';
+import 'agent_notifications_screen.dart';
+import 'agent_settings_screen.dart';
+import 'agent_wallet_screen.dart';
 
 class AgentDashboardScreen extends StatefulWidget {
   const AgentDashboardScreen({super.key});
@@ -48,6 +56,51 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
               children: [
                 const SizedBox(height: 30),
 
+                // ================= BARRE DE RECHERCHE =================
+                Container(
+                  width: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search, color: Colors.grey, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          decoration: InputDecoration(
+                            hintText: 'Rechercher des missions...',
+                            hintStyle: TextStyle(color: Colors.grey[400]),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFD400),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.tune,
+                            color: Colors.black, size: 16),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
                 // ================= WALLET CARD =================
                 Consumer<AgentProvider>(
                   builder: (context, agentProvider, child) {
@@ -59,9 +112,10 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withAlpha(3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                            color: Colors.black.withOpacity(.08),
+                            blurRadius: 15,
+                            offset: const Offset(0, 6),
+                            spreadRadius: 1,
                           ),
                         ],
                       ),
@@ -127,6 +181,102 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
                             ),
                     );
                   },
+                ),
+
+                const SizedBox(height: 20),
+
+                // ================= SECTION IMAGE LIGHT =================
+                Container(
+                  width: double.infinity,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7CC),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.03),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text(
+                                'Boostez vos missions',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Augmentez votre visibilité',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const AgentBoostScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Text(
+                                    'Découvrir',
+                                    style: TextStyle(
+                                      color: Color(0xFFFFD400),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 2,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD400).withOpacity(0.3),
+                            borderRadius: const BorderRadius.only(
+                              topRight: Radius.circular(16),
+                              bottomRight: Radius.circular(16),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.rocket_launch,
+                            size: 40,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
 
                 const SizedBox(height: 30),
@@ -243,156 +393,332 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
 
                 const SizedBox(height: 30),
 
-                // ================= STATISTIQUES JOURNALIÈRES =================
-                Consumer<AgentProvider>(
-                  builder: (context, agentProvider, child) {
-                    return agentProvider.isLoading
-                        ? const StatsShimmer()
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Aujourd\'hui',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: kText,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: AgentStatCard(
-                                      title:
-                                          '${agentProvider.stats['missions_completed_today'] ?? 0}',
-                                      subtitle: 'Missions',
-                                      icon: Icons.work_outline,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: AgentStatCard(
-                                      title:
-                                          '${agentProvider.stats['earnings_today'] ?? 0} XOF',
-                                      subtitle: 'Gains',
-                                      icon: Icons.trending_up,
-                                      iconColor: Colors.green,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: AgentStatCard(
-                                      title:
-                                          '${agentProvider.stats['rating_today'] ?? 0.0}',
-                                      subtitle: 'Note',
-                                      icon: Icons.star,
-                                      iconColor: Colors.orange,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: AgentStatCard(
-                                      title:
-                                          '${agentProvider.stats['active_time_today'] ?? 0}h',
-                                      subtitle: 'Temps actif',
-                                      icon: Icons.access_time,
-                                      iconColor: Colors.blue,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          );
-                  },
-                ),
+                // 2. BALANCE CARD
+                _buildBalanceCard(),
 
-                const SizedBox(height: 18),
+                const SizedBox(height: 20),
 
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      _timelineTile(
-                        time: '10:00',
-                        title: 'File d’attente - SBEE',
-                      ),
-                      const Divider(height: 30),
-                      _timelineTile(
-                        time: '12:00',
-                        title: 'Livraison document - Calavi',
-                      ),
-                    ],
-                  ),
-                ),
+                // 3. QUICK ACTIONS
+                _buildQuickActions(),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: 30),
 
-                // ================= TIMELINE PRÉVISIONNEL =================
-                const Text(
-                  'Prochaines missions',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: kText,
-                  ),
-                ),
+                // 4. MISSIONS
+                _buildCurrentMissions(),
 
-                const SizedBox(height: 16),
-
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity( 0.03),
-                        blurRadius: 10,
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      _timelineTile(
-                        time: '10:00',
-                        title: 'File d\'attente - SBEE',
-                      ),
-                      const Divider(height: 30),
-                      _timelineTile(
-                        time: '12:00',
-                        title: 'Livraison document - Calavi',
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 40),
+                const SizedBox(height: 30),
               ],
             ),
           ),
         ),
       ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AgentSettingsScreen(),
+            ),
+          );
+        },
+        backgroundColor: const Color(0xFFFFD400),
+        child: const Icon(Icons.settings, color: Colors.black),
+      ),
+    );
+  }
+
+  // ================= WIDGET BUILDERS =================
+
+  // 2. BALANCE CARD
+  Widget _buildBalanceCard() {
+    return Container(
+      padding: const EdgeInsets.all(25),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFEFEF6), Color(0xFFFFF5C9)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(color: const Color(0xFFFFE78B)),
+        boxShadow: [
+          BoxShadow(
+              color: const Color(0xFFFFCC00).withOpacity(0.15),
+              blurRadius: 30,
+              offset: const Offset(0, 15))
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Solde disponible",
+                  style: GoogleFonts.poppins(
+                      color: Colors.grey[700], fontSize: 14)),
+              const SizedBox(height: 5),
+              RichText(
+                text: TextSpan(
+                  style: GoogleFonts.poppins(
+                      color: Colors.black,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800),
+                  children: [
+                    const TextSpan(text: "245 600 "),
+                    TextSpan(
+                        text: "FCFA",
+                        style: GoogleFonts.poppins(
+                            fontSize: 16, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AgentWalletScreen(),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFCC00),
+              foregroundColor: Colors.black,
+              elevation: 5,
+              shadowColor: const Color(0xFFFFCC00).withOpacity(0.5),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15)),
+            ),
+            child: Text("Retirer",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+          )
+        ],
+      ),
+    );
+  }
+
+  // 3. QUICK ACTIONS
+  Widget _buildQuickActions() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _actionItem("Recharger", Icons.account_balance_wallet_outlined,
+            const Color(0xFFFFF5D8), const Color(0xFFFFB800)),
+        _actionItem("Transactions", Icons.swap_horiz_rounded,
+            const Color(0xFFEDF4FF), const Color(0xFF3B82F6)),
+        _actionItem("Boost", Icons.rocket_launch_outlined,
+            const Color(0xFFECFFF1), const Color(0xFF22C55E)),
+        _actionItem("PDF", Icons.description_outlined, const Color(0xFFF5EEFF),
+            const Color(0xFF8B5CF6)),
+      ],
+    );
+  }
+
+  Widget _actionItem(String label, IconData icon, Color bg, Color color) {
+    return GestureDetector(
+      onTap: () {
+        // Navigation selon le label
+        switch (label) {
+          case "Recharger":
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AgentWalletScreen(),
+              ),
+            );
+            break;
+          case "Transactions":
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AgentWalletScreen(),
+              ),
+            );
+            break;
+          case "Boost":
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AgentBoostScreen(),
+              ),
+            );
+            break;
+          case "PDF":
+            // Action pour générer PDF (déjà implémenté dans wallet)
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AgentWalletScreen(),
+              ),
+            );
+            break;
+        }
+      },
+      child: Column(
+        children: [
+          Container(
+            width: 65,
+            height: 65,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5))
+              ],
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(height: 8),
+          Text(label,
+              style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[800])),
+        ],
+      ),
+    );
+  }
+
+  // 4. MISSIONS
+  Widget _buildCurrentMissions() {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text("Missions en cours",
+                style: GoogleFonts.poppins(
+                    fontSize: 18, fontWeight: FontWeight.w800)),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AgentMissionHistoryScreen(),
+                  ),
+                );
+              },
+              child: Text("Voir tout",
+                  style: GoogleFonts.poppins(
+                      color: const Color(0xFFFFB800),
+                      fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 15),
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AgentMissionsExplorerScreen(),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10))
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: Image.network("https://i.pravatar.cc/100?img=15",
+                          width: 50, height: 50),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Attente à la BOA",
+                              style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text("Place de l'indépendance",
+                              style: GoogleFonts.poppins(
+                                  color: Colors.grey, fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                          color: const Color(0xFFECFFF1),
+                          borderRadius: BorderRadius.circular(20)),
+                      child: Text("En cours",
+                          style: GoogleFonts.poppins(
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11)),
+                    )
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _buildTimelineStep("Mission acceptée", "08:15", true),
+                _buildTimelineStep("En route", "08:20", true),
+                _buildTimelineStep("Arrivé sur place", "08:35", true),
+                _buildTimelineStep("En attente", "2 pers. avant vous", false),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimelineStep(String title, String time, bool completed) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: completed ? Colors.green : Colors.grey,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            title,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              color: completed ? Colors.black : Colors.grey,
+              fontWeight: completed ? FontWeight.w500 : FontWeight.normal,
+            ),
+          ),
+        ),
+        Text(
+          time,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: Colors.grey,
+          ),
+        ),
+      ],
     );
   }
 
   // ================= TIMELINE TILE =================
-
   Widget _timelineTile({
     required String time,
     required String title,
@@ -400,26 +726,33 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
     return Row(
       children: [
         Container(
-          width: 14,
-          height: 14,
-          decoration: const BoxDecoration(
-            color: kPrimary,
-            shape: BoxShape.circle,
+          width: 60,
+          padding: const EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: 6,
+          ),
+          decoration: BoxDecoration(
+            color: kPrimary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            time,
+            style: const TextStyle(
+              color: kPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
           ),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 16),
         Expanded(
           child: Text(
             title,
             style: const TextStyle(
+              fontSize: 15,
               fontWeight: FontWeight.w600,
+              color: kText,
             ),
-          ),
-        ),
-        Text(
-          time,
-          style: const TextStyle(
-            color: kSubtitle,
           ),
         ),
       ],

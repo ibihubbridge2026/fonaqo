@@ -35,6 +35,8 @@ class PhoneInputCard extends StatelessWidget {
             child: TextField(
               controller: controller,
               keyboardType: TextInputType.phone,
+              autofocus: false,
+              focusNode: FocusNode(),
               decoration: const InputDecoration(
                 hintText: 'Numéro de téléphone',
                 border: InputBorder.none,

@@ -15,7 +15,14 @@ import '../../../core/services/audio_service.dart';
 import '../repository/agent_repository.dart';
 
 class AgentChatScreen extends StatefulWidget {
-  const AgentChatScreen({super.key});
+  final String? conversationId;
+  final String? userName;
+
+  const AgentChatScreen({
+    super.key,
+    this.conversationId,
+    this.userName,
+  });
 
   @override
   State<AgentChatScreen> createState() => _AgentChatScreenState();

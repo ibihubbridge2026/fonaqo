@@ -186,6 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
+                      color: Colors.black,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -222,6 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w900,
+                      color: Colors.black,
                     ),
                   ),
 
@@ -231,6 +233,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: TextField(
                       controller: _password,
                       obscureText: !_isPasswordVisible,
+                      autofocus: false,
+                      focusNode: FocusNode(),
                       decoration: InputDecoration(
                         hintText: '••••••••',
                         border: InputBorder.none,

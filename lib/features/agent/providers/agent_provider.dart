@@ -48,14 +48,13 @@ class AgentProvider extends ChangeNotifier {
       }
 
       // Appels parallèles pour optimiser le temps de chargement
+      // CHARGEMENT GLOBAL PAR DÉFAUT : toutes les missions PENDING sans restriction géographique
       final results = await Future.wait(
         [
           _agentRepository.getAgentBalance(),
           _agentRepository.getAgentStats(),
-          _agentRepository.getAvailableMissions(
-            latitude: position?.latitude,
-            longitude: position?.longitude,
-          ),
+          _agentRepository
+              .getAllPendingMissions(), // Chargement global par défaut
         ],
         eagerError: false, // Continue même si une requête échoue
       );
@@ -311,5 +310,126 @@ class AgentProvider extends ChangeNotifier {
   void _clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  // =========================
+  // FILTRES MANUELS DES MISSIONS
+  // =========================
+
+  /// Applique un filtre géographique manuel sur les missions
+  Future<void> applyGeographicFilter({
+    double? latitude,
+    double? longitude,
+    int? radius,
+  }) async {
+    try {
+      _setLoading(true);
+      _logger.d('🔍 Application du filtre géographique manuel...');
+
+      final filteredMissions = await _agentRepository.getAvailableMissions(
+        latitude: latitude,
+        longitude: longitude,
+        radius: radius,
+      );
+
+      _availableMissions = filteredMissions;
+      _logger.d(
+          'Filtre géographique appliqué: ${filteredMissions.length} missions trouvées');
+      _clearError();
+    } catch (e, st) {
+      _logger.e('Erreur applyGeographicFilter', error: e, stackTrace: st);
+      _setError('Erreur lors de l\'application du filtre: ${e.toString()}');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Applique un filtre par recherche textuelle
+  void applyTextFilter(String searchText) {
+    if (searchText.isEmpty) {
+      // Si le texte est vide, recharger toutes les missions PENDING
+      _loadAllPendingMissions();
+      return;
+    }
+
+    _logger.d('🔍 Application du filtre textuelle: "$searchText"');
+
+    final filteredMissions = _availableMissions.where((mission) {
+      final title = mission.title?.toLowerCase() ?? '';
+      final description = mission.description?.toLowerCase() ?? '';
+      final category = mission.category?.toLowerCase() ?? '';
+      final query = searchText.toLowerCase();
+
+      return title.contains(query) ||
+          description.contains(query) ||
+          category.contains(query);
+    }).toList();
+
+    _availableMissions = filteredMissions;
+    _logger.d(
+        'Filtre textuelle appliqué: ${filteredMissions.length} missions trouvées');
+    notifyListeners();
+  }
+
+  /// Applique un filtre par catégorie
+  void applyCategoryFilter(String category) {
+    if (category.isEmpty || category == 'Toutes') {
+      _loadAllPendingMissions();
+      return;
+    }
+
+    _logger.d('🔍 Application du filtre par catégorie: "$category"');
+
+    final filteredMissions = _availableMissions.where((mission) {
+      final missionCategory = mission.category?.toLowerCase() ?? '';
+      return missionCategory == category.toLowerCase();
+    }).toList();
+
+    _availableMissions = filteredMissions;
+    _logger.d(
+        'Filtre par catégorie appliqué: ${filteredMissions.length} missions trouvées');
+    notifyListeners();
+  }
+
+  /// Applique un filtre par statut de mission
+  void applyStatusFilter(String status) {
+    if (status.isEmpty || status == 'Toutes') {
+      _loadAllPendingMissions();
+      return;
+    }
+
+    _logger.d('🔍 Application du filtre par statut: "$status"');
+
+    final filteredMissions = _availableMissions.where((mission) {
+      return mission.status == status;
+    }).toList();
+
+    _availableMissions = filteredMissions;
+    _logger.d(
+        'Filtre par statut appliqué: ${filteredMissions.length} missions trouvées');
+    notifyListeners();
+  }
+
+  /// Réinitialise tous les filtres et recharge toutes les missions PENDING
+  Future<void> resetFilters() async {
+    _logger.d('🔄 Réinitialisation des filtres...');
+    await _loadAllPendingMissions();
+  }
+
+  /// Charge toutes les missions PENDING (méthode utilitaire)
+  Future<void> _loadAllPendingMissions() async {
+    try {
+      _setLoading(true);
+      final allMissions = await _agentRepository.getAllPendingMissions();
+      _availableMissions = allMissions;
+      _logger
+          .d('Toutes les missions PENDING rechargées: ${allMissions.length}');
+      _clearError();
+    } catch (e, st) {
+      _logger.e('Erreur _loadAllPendingMissions', error: e, stackTrace: st);
+      _setError('Erreur lors du rechargement des missions: ${e.toString()}');
+    } finally {
+      _setLoading(false);
+    }
   }
 }
