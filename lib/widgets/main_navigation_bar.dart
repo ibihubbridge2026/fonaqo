@@ -61,8 +61,8 @@ class MainNavigationBar extends StatelessWidget {
             child: _NavItem(
               index: 3,
               currentIndex: currentIndex,
-              icon: Icons.event_rounded,
-              label: 'Événements',
+              icon: Icons.construction_rounded,
+              label: 'Artisans',
               onTap: onTap,
             ),
           ),
@@ -70,8 +70,8 @@ class MainNavigationBar extends StatelessWidget {
             child: _NavItem(
               index: 4,
               currentIndex: currentIndex,
-              icon: Icons.person_rounded,
-              label: 'Profil',
+              icon: Icons.settings_outlined,
+              label: 'Paramètres',
               onTap: onTap,
             ),
           ),

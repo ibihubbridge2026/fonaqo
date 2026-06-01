@@ -26,12 +26,12 @@ import 'features/auth/forgot_password_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/register_screen.dart';
 
-import 'features/onboarding/getting_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 
 import 'features/client/screens/agent_profile_screen.dart' as agents;
 
 import 'widgets/main_wrapper.dart';
+import 'widgets/auth_guard.dart';
 
 import 'features/chat/chat_screen.dart';
 import 'features/chat/screens/chat_list_screen.dart';
@@ -257,43 +257,17 @@ class FonacoApp extends StatelessWidget {
           create: (_) => AgentProvider(),
         ),
       ],
-      child: Consumer2<AuthProvider, ThemeProvider>(
-        builder: (context, authProvider, themeProvider, child) {
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'FONACO',
             navigatorKey: navigatorKey,
             theme: themeProvider.themeData,
-            initialRoute: _getInitialRoute(),
+            home: AuthGuard(
+              isFirstTime: isFirstTime,
+            ),
             routes: {
-              AppRoutes.splash: (context) => GettingScreen(
-                    onAuthChecked: () async {
-                      await SplashConfig.removeSplash();
-
-                      final prefs = await SharedPreferences.getInstance();
-
-                      await prefs.setBool(
-                        'isFirstTime',
-                        false,
-                      );
-
-                      await authProvider.checkAuth();
-
-                      if (!context.mounted) return;
-
-                      if (authProvider.isAuthenticated) {
-                        Navigator.pushReplacementNamed(
-                          context,
-                          AppRoutes.mainShell,
-                        );
-                      } else {
-                        Navigator.pushReplacementNamed(
-                          context,
-                          AppRoutes.login,
-                        );
-                      }
-                    },
-                  ),
               AppRoutes.login: (context) => const LoginScreen(),
               AppRoutes.register: (context) => const RegisterScreen(),
               AppRoutes.forgotPassword: (context) =>
@@ -345,17 +319,5 @@ class FonacoApp extends StatelessWidget {
         },
       ),
     );
-  }
-
-  String _getInitialRoute() {
-    if (isFirstTime) {
-      return AppRoutes.splash;
-    }
-
-    if (isLoggedIn) {
-      return AppRoutes.mainShell;
-    }
-
-    return AppRoutes.login;
   }
 }

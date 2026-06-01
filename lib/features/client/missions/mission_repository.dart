@@ -112,9 +112,14 @@ class MissionRepository {
   Future<List<MissionModel>> fetchMissionsList({
     double? latitude,
     double? longitude,
+    int page = 1,
+    int pageSize = 10,
   }) async {
     try {
-      final Map<String, dynamic> query = {};
+      final Map<String, dynamic> query = {
+        'page': page.toString(),
+        'page_size': pageSize.toString(),
+      };
       if (latitude != null && longitude != null) {
         query['lat'] = latitude.toString();
         query['lng'] = longitude.toString();
@@ -122,7 +127,7 @@ class MissionRepository {
 
       final response = await _baseClient.get(
         'missions/',
-        queryParameters: query.isEmpty ? null : query,
+        queryParameters: query,
       );
 
       if (response.statusCode != 200) {

@@ -147,16 +147,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     width: 70,
                     color: Colors.black,
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'FONACO',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black,
-                      letterSpacing: 2,
-                    ),
-                  ),
+                  const SizedBox(height: 4),
                 ],
               ),
             ),
@@ -332,7 +323,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             Navigator.pop(context);
                           },
                           child: const Text(
-                            "Connexion",
+                            "Connectez vous",
                             style: TextStyle(
                               color: Color(0xFFFFD700),
                               fontWeight: FontWeight.bold,

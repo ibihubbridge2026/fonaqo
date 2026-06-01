@@ -7,7 +7,7 @@ import '../features/client/home/home_screen.dart';
 import '../features/client/missions/missions_screen.dart';
 import '../features/client/profile/profile_screen.dart';
 import '../features/client/agents_screen.dart';
-import '../features/events/events_screen.dart';
+import '../features/client/artisans_screen.dart';
 import '../features/agent/agent_home_screen.dart';
 import '../features/agent/screens/agent_missions_explorer_screen.dart';
 import '../features/agent/screens/agent_wallet_screen.dart';
@@ -61,7 +61,7 @@ class _MainWrapperState extends State<MainWrapper> {
     const HomeScreen(),
     MissionsScreen(showCreateMissionListenable: _showCreateMission),
     const AgentsScreen(),
-    const EventsScreen(),
+    const ArtisansScreen(),
     const ProfileScreen(),
   ];
 

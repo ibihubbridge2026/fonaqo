@@ -17,6 +17,13 @@ class AgentHomeScreen extends StatefulWidget {
 class _AgentHomeScreenState extends State<AgentHomeScreen> {
   bool _isRefreshing = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Lazy loading: delay data loading until after first frame
+    Future.microtask(() => _refreshData());
+  }
+
   Future<void> _refreshData() async {
     setState(() {
       _isRefreshing = true;

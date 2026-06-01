@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
 /// Logger dédié au mapping JSON des missions.
@@ -22,6 +23,31 @@ enum MissionStatus {
 
   /// Conserve la compatibilité avec les appels existants `status.name`.
   String get name => apiName;
+
+  /// Retourne la couleur de badge pour ce statut.
+  Color get badgeColor {
+    switch (this) {
+      case MissionStatus.COMPLETED:
+        return Colors.green;
+      case MissionStatus.CANCELLED:
+        return Colors.red;
+      case MissionStatus.DISPUTED:
+        return Colors.orange;
+      case MissionStatus.PENDING:
+      case MissionStatus.ACCEPTED:
+      case MissionStatus.ON_THE_WAY:
+      case MissionStatus.ARRIVED:
+      case MissionStatus.IN_PROGRESS:
+        return Colors.blue;
+      case MissionStatus.UNKNOWN:
+        return Colors.grey;
+    }
+  }
+
+  /// Retourne la couleur de fond du badge (version douce avec opacité 0.2).
+  Color get badgeBackgroundColor {
+    return badgeColor.withOpacity(0.2);
+  }
 }
 
 /// Modèle de mission pour l'application FONACO

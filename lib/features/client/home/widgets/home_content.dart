@@ -9,6 +9,10 @@ import 'package:provider/provider.dart';
 
 import 'package:fonaco/features/client/missions/mission_repository.dart';
 
+/// Constante pour la couleur des liens "Voir tous"
+/// Peut être changée en Colors.grey[700] pour un look plus discret
+final Color _seeAllColor = Colors.grey[700]!;
+
 /// Bloc corps de page d'accueil (carrousel, missions API, suggestions agents).
 class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
@@ -40,7 +44,8 @@ class _HomeContentState extends State<HomeContent> {
   void initState() {
     super.initState();
     _heroTimer = Timer.periodic(const Duration(seconds: 4), _onHeroTick);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadDashboard());
+    // Lazy loading: delay data loading until after first frame
+    Future.microtask(() => _loadDashboard());
   }
 
   @override
@@ -99,7 +104,7 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   List<MissionModel> _ongoingMissions() {
-    return _missions
+    final ongoing = _missions
         .where(
           (m) =>
               m.status == MissionStatus.PENDING ||
@@ -108,8 +113,15 @@ class _HomeContentState extends State<HomeContent> {
               m.status == MissionStatus.ARRIVED ||
               m.status == MissionStatus.IN_PROGRESS,
         )
-        .take(8)
         .toList();
+    // Sort by createdAt desc (most recent first)
+    ongoing.sort((a, b) {
+      if (a.createdAt == null && b.createdAt == null) return 0;
+      if (a.createdAt == null) return 1;
+      if (b.createdAt == null) return -1;
+      return b.createdAt!.compareTo(a.createdAt!);
+    });
+    return ongoing.take(8).toList();
   }
 
   List<MissionModel> _historyMissions() {
@@ -138,7 +150,7 @@ class _HomeContentState extends State<HomeContent> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 8),
+        const SizedBox(height: 16),
         const WelcomeHeader(),
         const SizedBox(height: 25),
         HeroCarouselStrip(
@@ -232,9 +244,13 @@ class WelcomeHeader extends StatelessWidget {
             children: [
               Text(
                 'Bonjour, $greet !',
-                style:
-                    const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
               ),
+              const SizedBox(height: 8),
               const Text(
                 'Où pouvons-nous vous aider aujourd’hui ?',
                 style: TextStyle(color: Colors.black87, fontSize: 14),
@@ -396,17 +412,33 @@ class SectionTitleStrip extends StatelessWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black,
+            ),
           ),
           if (showSeeAll)
             TextButton(
               onPressed: onSeeAllPressed,
-              child: const Text(
-                'Voir tous',
-                style: TextStyle(
-                  color: Color(0xFF715D00),
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Voir tous',
+                    style: TextStyle(
+                      color: _seeAllColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right,
+                    color: _seeAllColor,
+                    size: 16,
+                  ),
+                ],
               ),
             ),
         ],
@@ -541,61 +573,74 @@ class ReportLitigeCardPanel extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF1A1C1C),
-          borderRadius: BorderRadius.circular(20),
+          color: Colors.red.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [],
         ),
-        child: Column(
+        child: Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFFD400),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.gpp_maybe_rounded,
-                    color: Colors.black,
-                  ),
-                ),
-                const SizedBox(width: 15),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Signaler un problème',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      Text(
-                        'Un souci ? Nous intervenons.',
-                        style: TextStyle(color: Colors.white60, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => Navigator.pushNamed(context, AppRoutes.litige),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFD400),
-                foregroundColor: Colors.black,
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                elevation: 0,
+            // Colonne 1: Icône bouclier
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.black.withOpacity(0.1)),
               ),
-              child: const Text(
-                'OUVRIR UN LITIGE',
-                style: TextStyle(fontWeight: FontWeight.w900),
+              child: const Icon(
+                Icons.shield_outlined,
+                color: Colors.red,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Colonne 2: Textes
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Signaler un problème',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Un souci ? Nous intervenons.',
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Colonne 3: Bouton action
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TextButton(
+                onPressed: () => Navigator.pushNamed(context, AppRoutes.litige),
+                style: TextButton.styleFrom(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text(
+                  'Ouvrir',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
               ),
             ),
           ],
@@ -744,19 +789,19 @@ class AgentCard extends StatelessWidget {
             alignment: Alignment.bottomRight,
             children: [
               CircleAvatar(
-                radius: 40,
+                radius: 32,
                 backgroundColor: Colors.grey[200],
                 child: ClipOval(
                   child: Image.asset(
                     imagePath,
-                    width: 80,
-                    height: 80,
+                    width: 64,
+                    height: 64,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) {
                       return const Icon(
                         Icons.person,
                         color: Colors.black54,
-                        size: 40,
+                        size: 32,
                       );
                     },
                   ),
@@ -769,33 +814,35 @@ class AgentCard extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 padding: const EdgeInsets.all(2),
-                child: const Icon(Icons.verified, color: Colors.blue, size: 20),
+                child: const Icon(Icons.verified, color: Colors.blue, size: 16),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Text(
             name,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: Colors.black,
+            ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 4),
-          Text(
-            role,
-            style: const TextStyle(color: Colors.grey, fontSize: 11),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           // Petit bouton profil
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: const Color(0xFFFFD400),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: const Text(
-              'Voir Profil',
-              style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+              'Consultez le Profil',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
             ),
           ),
         ],
@@ -879,6 +926,7 @@ class OngoingMissionStrip extends StatelessWidget {
           agentName: mission.agentName ?? '—',
           statusLabel: mission.formattedStatus,
           isFullWidth: true,
+          missionStatus: mission.status,
         ),
       );
     }
@@ -897,6 +945,7 @@ class OngoingMissionStrip extends StatelessWidget {
               agentName: m.agentName ?? '—',
               statusLabel: m.formattedStatus,
               isFullWidth: false,
+              missionStatus: m.status,
             ),
         ],
       ),
@@ -911,6 +960,7 @@ class OngoingMissionCard extends StatelessWidget {
   final String agentName;
   final String statusLabel;
   final bool isFullWidth;
+  final MissionStatus? missionStatus;
 
   const OngoingMissionCard({
     super.key,
@@ -919,6 +969,7 @@ class OngoingMissionCard extends StatelessWidget {
     required this.agentName,
     required this.statusLabel,
     this.isFullWidth = false,
+    this.missionStatus,
   });
 
   @override
@@ -936,21 +987,24 @@ class OngoingMissionCard extends StatelessWidget {
         width: isFullWidth ? double.infinity : 260,
         margin:
             isFullWidth ? EdgeInsets.zero : const EdgeInsets.only(right: 15),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: Colors.black.withOpacity(0.05)),
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.account_balance_rounded, size: 20),
+            const Icon(
+              Icons.assignment_outlined,
+              color: Colors.black54,
+              size: 24,
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -964,37 +1018,44 @@ class OngoingMissionCard extends StatelessWidget {
                       title,
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                        fontSize: 14,
+                        color: Colors.black,
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Flexible(
-                    child: Text(
-                      'Agent: $agentName',
-                      style: const TextStyle(color: Colors.grey, fontSize: 11),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Agent: $agentName',
+                        style:
+                            const TextStyle(color: Colors.grey, fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: missionStatus?.badgeBackgroundColor ??
+                              Colors.grey.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          statusLabel,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: missionStatus?.badgeColor ?? Colors.grey,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFD400).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                statusLabel,
-                style: const TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.brown,
-                ),
               ),
             ),
           ],
@@ -1041,6 +1102,7 @@ class QuickHistoryEntries extends StatelessWidget {
               priceLabel: '${m.price.toStringAsFixed(0)} FCFA',
               status: m.formattedStatus,
               agentName: m.agentName ?? 'Agent assigné',
+              missionStatus: m.status,
             ),
           ),
       ],
@@ -1048,13 +1110,14 @@ class QuickHistoryEntries extends StatelessWidget {
   }
 }
 
-/// Ligne d’historique compacte.
+/// Ligne d'historique compacte - Pixel Perfect structure.
 class HistoryEntryRow extends StatelessWidget {
   final String title;
   final String dateLine;
   final String priceLabel;
   final String? status;
   final String? agentName;
+  final MissionStatus? missionStatus;
 
   const HistoryEntryRow({
     super.key,
@@ -1063,6 +1126,7 @@ class HistoryEntryRow extends StatelessWidget {
     required this.priceLabel,
     this.status,
     this.agentName,
+    this.missionStatus,
   });
 
   @override
@@ -1074,70 +1138,74 @@ class HistoryEntryRow extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Ligne 1: Titre avec overflow
           Row(
             children: [
-              const CircleAvatar(
-                backgroundColor: Color(0xFFF3F3F3),
-                child: Icon(Icons.history, color: Colors.grey, size: 18),
+              const Icon(
+                Icons.history,
+                color: Colors.black54,
+                size: 20,
               ),
               const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+              Expanded(
+                flex: 9,
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: Colors.black,
                   ),
-                  if (agentName != null)
-                    Text(
-                      agentName!,
-                      style: const TextStyle(color: Colors.grey, fontSize: 11),
-                    ),
-                  Row(
-                    children: [
-                      Text(
-                        dateLine,
-                        style:
-                            const TextStyle(color: Colors.grey, fontSize: 11),
-                      ),
-                      if (status != null) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.green[100],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            status!,
-                            style: TextStyle(
-                              color: Colors.green[800],
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          const SizedBox(height: 6),
+          // Ligne 2: Montant et Statut
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(priceLabel,
-                  style: const TextStyle(fontWeight: FontWeight.w900)),
-              const Icon(Icons.chevron_right, color: Colors.grey, size: 16),
+              Text(
+                priceLabel,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.black,
+                ),
+              ),
+              if (status != null)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: missionStatus?.badgeBackgroundColor ??
+                        Colors.grey.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    status!,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: missionStatus?.badgeColor ?? Colors.grey,
+                    ),
+                  ),
+                ),
             ],
+          ),
+          const SizedBox(height: 4),
+          // Ligne 3: Agent et Date
+          Text(
+            '${agentName ?? 'Agent'} • $dateLine',
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 11,
+            ),
           ),
         ],
       ),

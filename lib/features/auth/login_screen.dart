@@ -63,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (success && mounted) {
-      // Demander la localisation après une connexion réussie
+      // Demander la localisation après une connexion réussie (silencieux)
       await _requestLocationAfterLogin();
 
       // Vérifier si l'utilisateur a un numéro de téléphone
@@ -96,53 +96,12 @@ class _LoginScreenState extends State<LoginScreen> {
       if (permissionStatus == LocationPermissionStatus.granted) {
         // La permission est accordée, obtenir la position actuelle
         await locationService.getCurrentLocation();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Localisation activée avec succès !'),
-              backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
+        // Pas de snackbar - transition silencieuse
       } else {
-        // La permission est refusée, afficher un message explicatif
-        String message =
-            'La localisation est nécessaire pour vous proposer des missions proches de vous.';
-
-        if (permissionStatus == LocationPermissionStatus.deniedForever) {
-          message +=
-              ' Veuillez l\'activer dans les paramètres de votre appareil.';
-        }
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(message),
-              backgroundColor: Colors.orange,
-              duration: const Duration(seconds: 5),
-              action: permissionStatus == LocationPermissionStatus.deniedForever
-                  ? SnackBarAction(
-                      label: 'Paramètres',
-                      textColor: Colors.white,
-                      onPressed: () => locationService.openAppSettings(),
-                    )
-                  : null,
-            ),
-          );
-        }
+        // La permission est refusée - pas de message pour transition fluide
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Erreur lors de l\'activation de la localisation: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      // Erreur silencieuse de localisation - ne pas bloquer la transition
     }
   }
 
@@ -185,16 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: Colors.black,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'FONACO',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black,
-                      letterSpacing: 2,
-                    ),
-                  ),
+                  const SizedBox(height: 4),
                 ],
               ),
             ),
@@ -322,7 +272,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
 
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 16),
 
                   Consumer<AuthProvider>(
                     builder: (context, authProvider, child) {
@@ -347,7 +297,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       width: 22,
                                       height: 22,
                                       child: CircularProgressIndicator(
-                                        color: Color(0xFFFFD400),
+                                        color: Colors.black,
                                         strokeWidth: 2,
                                       ),
                                     )
@@ -391,7 +341,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
                   Row(
                     children: [

@@ -77,9 +77,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         onChatPressed = null;
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
-
-  static const Color _accent = Color(0xFFFFD400);
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 12);
 
   @override
   Widget build(BuildContext context) {
@@ -88,9 +86,82 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0.5,
       centerTitle: true,
       automaticallyImplyLeading: false,
+      toolbarHeight: kToolbarHeight + 12,
       leading: _buildLeading(context),
       title: _buildTitle(context),
       actions: _buildActions(context),
+    );
+  }
+
+  void _showAISearchModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(20),
+              child: Text(
+                'Recherche IA',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: TextField(
+                autofocus: true,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText:
+                      'Décrivez votre besoin (ex: Je cherche un agent pour une course urgente à Ganvié)',
+                  labelStyle: const TextStyle(fontSize: 12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: const Color(0xFFFFD400),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Générer des suggestions',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
     );
   }
 
@@ -115,10 +186,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ? NetworkImage(imageUrl) as ImageProvider
                       : const AssetImage('assets/images/avatar/user.png'),
                   backgroundColor: Colors.grey[200],
-                  child: avatarUrl == null
-                      ? const Icon(Icons.person,
-                          color: Colors.black54, size: 20)
-                      : null,
                 );
               },
             ),
@@ -146,13 +213,20 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       case CustomAppBarVariant.mainShellHome:
         // Demande: enlever l’icône centrée du header.
         // On conserve un wordmark texte propre et stable (sans asset central).
-        return const Text(
-          'FONAQO',
-          style: TextStyle(
-            color: _accent,
-            fontWeight: FontWeight.w900,
-            fontSize: 18,
-            letterSpacing: 0.5,
+        return GestureDetector(
+          onTap: () => _showAISearchModal(context),
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.black.withOpacity(0.1)),
+            ),
+            child: const Icon(
+              Icons.search_rounded,
+              color: Colors.black,
+              size: 24,
+            ),
           ),
         );
 
@@ -188,20 +262,72 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         final bell = onNotificationsPressed ??
             () => Navigator.pushNamed(context, AppRoutes.notifications);
         return [
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              color: Colors.black54,
-            ),
-            onPressed: bell,
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.notifications_none_rounded,
+                  color: Colors.black,
+                  size: 28,
+                ),
+                onPressed: bell,
+              ),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Text(
+                    '3',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.chat_bubble_outline_rounded,
-              color: Colors.black54,
-            ),
-            onPressed: chat,
+          const SizedBox(width: 12),
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: const Icon(
+                  Icons.forum_outlined,
+                  color: Colors.black,
+                  size: 28,
+                ),
+                onPressed: chat,
+              ),
+              Positioned(
+                top: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Text(
+                    '5',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
+          const SizedBox(width: 12),
         ];
 
       case CustomAppBarVariant.mainShellSection:

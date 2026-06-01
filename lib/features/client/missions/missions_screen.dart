@@ -57,22 +57,32 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Future<void> _loadMoreMissions() async {
-    if (_isLoadingMore) return;
+    if (_isLoadingMore || !_hasMore) return;
 
     setState(() {
       _isLoadingMore = true;
     });
 
-    // Simulate API call delay
-    await Future.delayed(const Duration(seconds: 1));
+    try {
+      final newMissions = await _repo.fetchMissionsList(
+        page: _currentPage + 1,
+        pageSize: 10,
+      );
 
-    // In real implementation, call MissionRepository with page parameter
-    // For now, just simulate loading
-    setState(() {
-      _currentPage++;
-      _isLoadingMore = false;
-      // _hasMore would be updated based on API response
-    });
+      if (!mounted) return;
+
+      setState(() {
+        _currentPage++;
+        _missions.addAll(newMissions);
+        _isLoadingMore = false;
+        _hasMore = newMissions.length >= 10;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingMore = false;
+      });
+    }
   }
 
   void _onCreateModeChanged() {
@@ -109,13 +119,19 @@ class _MissionsScreenState extends State<MissionsScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _currentPage = 1;
+      _hasMore = true;
     });
     try {
-      final missions = await _repo.fetchMissionsList();
+      final missions = await _repo.fetchMissionsList(
+        page: 1,
+        pageSize: 10,
+      );
       if (!mounted) return;
       setState(() {
         _missions = missions;
         _loading = false;
+        _hasMore = missions.length >= 10;
       });
     } catch (e) {
       if (!mounted) return;
@@ -186,7 +202,9 @@ class _MissionsScreenState extends State<MissionsScreen> {
                     children: [
                       const Text("Mes Missions",
                           style: TextStyle(
-                              fontSize: 24, fontWeight: FontWeight.w900)),
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black)),
                       const SizedBox(height: 16),
                       const MissionsPromoQueueCard(),
                       const SizedBox(height: 14),
@@ -283,10 +301,12 @@ class _MissionsScreenState extends State<MissionsScreen> {
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 15),
                         child: MissionCard(
                           title: mission.title,
-                          type: mission.category ?? 'Mission',
+                          type: mission.category ?? 'Service',
                           status: mission.statusDisplay,
                           time: mission.timeAgo,
+                          price: mission.price,
                           heroTag: 'mission_${mission.id}',
+                          missionStatus: mission.status,
                           onTap: () => Navigator.pushNamed(
                             context,
                             AppRoutes.missionDetail,
@@ -379,8 +399,10 @@ class MissionCard extends StatelessWidget {
   final String type;
   final String status;
   final String time;
+  final double? price;
   final VoidCallback? onTap;
   final String? heroTag;
+  final MissionStatus? missionStatus;
 
   const MissionCard(
       {super.key,
@@ -388,50 +410,84 @@ class MissionCard extends StatelessWidget {
       required this.type,
       required this.status,
       required this.time,
+      this.price,
       this.onTap,
-      this.heroTag});
+      this.heroTag,
+      this.missionStatus});
 
   @override
   Widget build(BuildContext context) {
     final cardContent = InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(25),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
         margin: const EdgeInsets.only(bottom: 15),
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(25),
+          borderRadius: BorderRadius.circular(12),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
           ],
         ),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFD400).withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.assignment_outlined,
-                  color: Color(0xFFFFD400)),
+            // Colonne Gauche: Icône de mission
+            const Icon(
+              Icons.assignment_outlined,
+              color: Colors.black54,
+              size: 24,
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
+            // Colonne Droite: Toutes les informations
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w900, fontSize: 16)),
-                  const SizedBox(height: 2),
-                  Text("$type • $time",
-                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  // Titre (2 lignes max avec ellipsis)
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: Colors.black,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  // Ligne 2: Type | Montant
+                  Text(
+                    '$type | ${price != null ? '${price!.toInt()} FCFA' : ''}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                      color: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Ligne 3: Date relative et Statut
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        time,
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 11,
+                        ),
+                      ),
+                      _StatusBadge(
+                          status: status, missionStatus: missionStatus),
+                    ],
+                  ),
                 ],
               ),
             ),
-            _StatusBadge(status: status),
           ],
         ),
       ),
@@ -453,24 +509,14 @@ class MissionCard extends StatelessWidget {
 
 class _StatusBadge extends StatelessWidget {
   final String status;
-  const _StatusBadge({required this.status});
+  final MissionStatus? missionStatus;
+  const _StatusBadge({required this.status, this.missionStatus});
 
   @override
   Widget build(BuildContext context) {
-    final s = status.toLowerCase();
-    final isPending = s.contains('attente') || s.contains('pending');
-    final isCancelled = s.contains('annulée') || s.contains('cancelled');
-
-    Color bg = Colors.green[50]!;
-    Color fg = Colors.green[800]!;
-
-    if (isPending) {
-      bg = Colors.orange[50]!;
-      fg = Colors.orange[800]!;
-    } else if (isCancelled) {
-      bg = Colors.red[50]!;
-      fg = Colors.red[800]!;
-    }
+    // Use dynamic colors from MissionStatus if available
+    Color bg = missionStatus?.badgeBackgroundColor ?? Colors.green[50]!;
+    Color fg = missionStatus?.badgeColor ?? Colors.green[800]!;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -478,7 +524,7 @@ class _StatusBadge extends StatelessWidget {
           BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
       child: Text(
         status.toUpperCase(),
-        style: TextStyle(color: fg, fontWeight: FontWeight.w900, fontSize: 10),
+        style: TextStyle(color: fg, fontWeight: FontWeight.bold, fontSize: 10),
       ),
     );
   }
@@ -499,9 +545,12 @@ class MissionsPromoQueueCard extends StatelessWidget {
         children: [
           const Expanded(
             child: Text(
-              "Faites la queue à\nvotre place",
+              "Déléguez vos tâches\net vivez autrement",
               style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w900, height: 1.1),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  height: 1.1,
+                  color: Colors.black),
             ),
           ),
           const SizedBox(width: 12),
@@ -510,7 +559,7 @@ class MissionsPromoQueueCard extends StatelessWidget {
             height: 52,
             decoration: const BoxDecoration(
                 color: Colors.black, shape: BoxShape.circle),
-            child: const Icon(Icons.hourglass_bottom, color: Color(0xFFFFD400)),
+            child: const Icon(Icons.hourglass_bottom, color: Colors.white),
           ),
         ],
       ),
