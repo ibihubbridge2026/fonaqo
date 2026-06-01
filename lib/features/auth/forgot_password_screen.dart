@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/providers/auth_provider.dart';
@@ -10,13 +11,11 @@ class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() =>
-      _ForgotPasswordScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  final TextEditingController _emailController =
-      TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -75,6 +74,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Set status bar style for better visibility on yellow/white background
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
@@ -131,7 +139,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     "Mot de passe oublié",
                     style: TextStyle(
                       fontSize: 28,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -150,10 +159,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
                   // EMAIL FIELD
                   const Text(
-                    'EMAIL',
+                    'Adresse Email',
                     style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
                     ),
                   ),
 
@@ -166,6 +176,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       decoration: const InputDecoration(
                         hintText: 'nom@exemple.com',
                         border: InputBorder.none,
+                        filled: false,
+                        fillColor: Colors.transparent,
                         prefixIcon: Icon(Icons.mail_outline),
                       ),
                     ),
@@ -224,15 +236,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed:
-                          _isLoading ? null : _handleForgotPassword,
+                      onPressed: _isLoading ? null : _handleForgotPassword,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.black,
                         foregroundColor: const Color(0xFFFFD400),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                       child: _isLoading
@@ -259,8 +269,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   // BACK TO LOGIN
                   Center(
                     child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
                           "Rééssayez  ?",
@@ -279,8 +288,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           child: const Text(
                             "Connexion",
                             style: TextStyle(
-                              color: Color(0xFF715D00),
-                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFFFD700),
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ),

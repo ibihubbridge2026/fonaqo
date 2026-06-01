@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 
@@ -44,6 +45,22 @@ class _LoginScreenState extends State<LoginScreen> {
       'phone_number': identifier,
       'password': password,
     });
+
+    if (!success && mounted) {
+      // Show error in SnackBar instead of static text
+      final errorMessage = authProvider.errorMessage ?? 'Échec de la connexion';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMessage),
+          backgroundColor: Colors.black87,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        ),
+      );
+    }
 
     if (success && mounted) {
       // Demander la localisation après une connexion réussie
@@ -131,6 +148,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Set status bar style for better visibility on yellow/white background
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
@@ -181,12 +207,23 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    "Bon retour 👋",
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  Row(
+                    children: [
+                      const Text(
+                        "Bon retour",
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        Icons.waving_hand_outlined,
+                        color: Colors.black,
+                        size: 28,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -198,6 +235,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
 
                   const SizedBox(height: 30),
+
+                  const Text(
+                    'Numéro de téléphone',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
 
                   // PHONE INPUT
                   PhoneInputCard(
@@ -218,10 +266,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 18),
 
                   const Text(
-                    'MOT DE PASSE',
+                    'Mot de passe',
                     style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
                     ),
                   ),
 
@@ -235,6 +284,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         hintText: '••••••••',
                         border: InputBorder.none,
                         focusedBorder: InputBorder.none,
+                        filled: false,
+                        fillColor: Colors.transparent,
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(
@@ -264,7 +315,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: const Text(
                         "Mot de passe oublié ?",
                         style: TextStyle(
-                          color: Color(0xFFD4AF37),
+                          color: Color(0xFFFFD700),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -309,24 +360,38 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ),
                             ),
                           ),
-                          if (authProvider.errorMessage != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 12),
-                              child: Text(
-                                authProvider.errorMessage!,
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
                         ],
                       );
                     },
                   ),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 12),
+
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        "Pas encore de compte ?",
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pushNamed(
+                            context,
+                            AppRoutes.register,
+                          );
+                        },
+                        child: const Text(
+                          "S'inscrire",
+                          style: TextStyle(
+                            color: Color(0xFFFFD700),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
 
                   Row(
                     children: [
@@ -392,32 +457,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        "Pas encore de compte ?",
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pushNamed(
-                            context,
-                            AppRoutes.register,
-                          );
-                        },
-                        child: const Text(
-                          "S'inscrire",
-                          style: TextStyle(
-                            color: Color(0xFFD4AF37),
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
                 ],
               ),

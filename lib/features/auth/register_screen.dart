@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:fonaco/features/client/profile/widgets/country_selector.dart';
+import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/models/country_model.dart';
 import '../../core/services/location_service.dart';
-import '../../core/services/feedback_service.dart';
 import '../auth/widgets/phone_input_card.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -25,7 +24,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _isLoading = false;
   bool _isObscure = true;
-  String? _errorMessage;
   String _selectedRole = 'client';
   Country _selectedCountry = Country.defaultCountry;
 
@@ -49,7 +47,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
-        _errorMessage = null;
       });
 
       try {
@@ -81,9 +78,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
           // Demander la localisation après une inscription réussie
           await _requestLocationAfterRegistration();
           Navigator.pushReplacementNamed(context, AppRoutes.mainShell);
+        } else if (mounted && authProvider.errorMessage != null) {
+          // Show error in SnackBar
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(authProvider.errorMessage!),
+              backgroundColor: Colors.black87,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+          );
         }
       } catch (e) {
-        setState(() => _errorMessage = _cleanError(e.toString()));
+        if (mounted) {
+          final errorMessage = _cleanError(e.toString());
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.black87,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            ),
+          );
+        }
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -92,6 +115,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Set status bar style for better visibility on yellow/white background
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
+      ),
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
@@ -140,7 +172,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       "Créer un compte",
                       style: TextStyle(
                         fontSize: 26,
-                        fontWeight: FontWeight.w900,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -151,6 +184,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
 
                     const SizedBox(height: 25),
+
+                    const Text(
+                      'Numéro de téléphone',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
 
                     // SÉLECTEUR DE RÔLE (HORIZONTAL & COMPACT)
                     Row(
@@ -203,6 +247,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 15),
 
+                    const Text(
+                      'Email',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
                     _buildField(
                       controller: _emailController,
                       hint: "Email (Optionnel)",
@@ -210,6 +265,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       type: TextInputType.emailAddress,
                     ),
                     const SizedBox(height: 15),
+
+                    const Text(
+                      'Mot de passe',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
                     _buildField(
                       controller: _passwordController,
                       hint: "Mot de passe",
@@ -218,19 +285,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
 
                     const SizedBox(height: 25),
-
-                    if (_errorMessage != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 15),
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
 
                     // BOUTON PRINCIPAL (NOIR POUR LE CONTRASTE)
                     SizedBox(
@@ -280,7 +334,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           child: const Text(
                             "Connexion",
                             style: TextStyle(
-                              color: Color(0xFFD4AF37),
+                              color: Color(0xFFFFD700),
                               fontWeight: FontWeight.bold,
                             ),
                           ),
