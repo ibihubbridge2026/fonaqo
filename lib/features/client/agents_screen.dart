@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fonaco/features/client/missions/mission_repository.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:logger/logger.dart';
-
 
 class AgentsScreen extends StatefulWidget {
   const AgentsScreen({super.key});
@@ -94,9 +94,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
   List<Map<String, dynamic>> get _filteredAgents {
     switch (_selectedFilter) {
       case 'Vérifiés':
-        return _agents
-            .where((agent) => agent['is_verified'] == true)
-            .toList();
+        return _agents.where((agent) => agent['is_verified'] == true).toList();
 
       case 'À proximité':
         return _agents.where((agent) {
@@ -110,9 +108,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
         }).toList();
 
       case 'Disponibles':
-        return _agents
-            .where((agent) => agent['is_available'] == true)
-            .toList();
+        return _agents.where((agent) => agent['is_available'] == true).toList();
 
       case 'Tous':
       default:
@@ -240,9 +236,8 @@ class _AgentsScreenState extends State<AgentsScreen> {
           position: LatLng(lat, lng),
           infoWindow: InfoWindow(
             title: name.isNotEmpty ? name : 'Agent',
-            snippet: distance != null
-                ? '$specialty • ${distance} km'
-                : specialty,
+            snippet:
+                distance != null ? '$specialty • ${distance} km' : specialty,
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(
             agent['is_verified'] == true
@@ -404,7 +399,6 @@ class _AgentsScreenState extends State<AgentsScreen> {
               },
             ),
           ),
-
           Positioned(
             top: 0,
             left: 0,
@@ -413,7 +407,6 @@ class _AgentsScreenState extends State<AgentsScreen> {
               child: Column(
                 children: [
                   _buildFloatingSearchBar(),
-
                   if (_locating)
                     Padding(
                       padding: const EdgeInsets.symmetric(
@@ -430,7 +423,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity( 0.08),
+                              color: Colors.black.withOpacity(0.08),
                               blurRadius: 14,
                             ),
                           ],
@@ -460,7 +453,6 @@ class _AgentsScreenState extends State<AgentsScreen> {
               ),
             ),
           ),
-
           Positioned(
             right: 16,
             bottom: 220,
@@ -487,7 +479,6 @@ class _AgentsScreenState extends State<AgentsScreen> {
               ),
             ),
           ),
-
           Positioned(
             left: 0,
             right: 0,
@@ -503,7 +494,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity( 0.10),
+                      color: Colors.black.withOpacity(0.10),
                       blurRadius: 18,
                       offset: const Offset(0, -6),
                     ),
@@ -524,12 +515,10 @@ class _AgentsScreenState extends State<AgentsScreen> {
                         ),
                       ),
                     ),
-
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Row(
-                        mainAxisAlignment:
-                            MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text(
                             'Agents proches',
@@ -564,7 +553,6 @@ class _AgentsScreenState extends State<AgentsScreen> {
                         ],
                       ),
                     ),
-
                     Expanded(
                       child: _isLoadingAgents
                           ? const Center(
@@ -617,8 +605,7 @@ class AgentListTile extends StatelessWidget {
 
     final distance = agent['distance_km'];
 
-    final reliability =
-        (agent['reliability_score'] ?? 100).toDouble();
+    final reliability = (agent['reliability_score'] ?? 100).toDouble();
 
     final isVerified = agent['is_verified'] ?? false;
 
@@ -631,7 +618,7 @@ class AgentListTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity( 0.02),
+            color: Colors.black.withOpacity(0.02),
             blurRadius: 10,
           ),
         ],
@@ -644,13 +631,12 @@ class AgentListTile extends StatelessWidget {
               CircleAvatar(
                 radius: 30,
                 backgroundColor: Colors.blue[100],
-                backgroundImage:
-                    avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                backgroundImage: avatarUrl != null
+                    ? CachedNetworkImageProvider(avatarUrl) as ImageProvider
+                    : null,
                 child: avatarUrl == null
                     ? Text(
-                        name.isNotEmpty
-                            ? name[0].toUpperCase()
-                            : 'A',
+                        name.isNotEmpty ? name[0].toUpperCase() : 'A',
                         style: TextStyle(
                           color: Colors.blue[700],
                           fontWeight: FontWeight.bold,
@@ -670,9 +656,7 @@ class AgentListTile extends StatelessWidget {
                 ),
             ],
           ),
-
           const SizedBox(width: 15),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -720,9 +704,7 @@ class AgentListTile extends StatelessWidget {
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
-                        distance != null
-                            ? '$distance km'
-                            : city,
+                        distance != null ? '$distance km' : city,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 12,
@@ -735,7 +717,6 @@ class AgentListTile extends StatelessWidget {
               ],
             ),
           ),
-
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -769,9 +750,7 @@ class AgentListTile extends StatelessWidget {
                   ),
                 ),
               ),
-
               const SizedBox(height: 6),
-
               SizedBox(
                 width: 85,
                 height: 32,
@@ -782,8 +761,7 @@ class AgentListTile extends StatelessWidget {
                       '/chat-detail',
                       arguments: {
                         'chatId': 'chat_${agent['id']}',
-                        'userName':
-                            name.isNotEmpty ? name : 'Agent',
+                        'userName': name.isNotEmpty ? name : 'Agent',
                         'missionId': null,
                       },
                     );
@@ -857,14 +835,11 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
               ),
             ),
           ),
-
           const SizedBox(height: 18),
-
           Expanded(
             child: SingleChildScrollView(
               child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
@@ -880,8 +855,7 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
                       TextButton(
                         onPressed: () {
                           setState(() {
-                            _price =
-                                const RangeValues(2000, 15000);
+                            _price = const RangeValues(2000, 15000);
                             _radiusKm = 10;
                             _minRating = 4.0;
                             _verifiedOnly = true;
@@ -897,9 +871,7 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 18),
-
                   Text(
                     'Prix (${_price.start.toStringAsFixed(0)} - ${_price.end.toStringAsFixed(0)} CFA)',
                     style: const TextStyle(
@@ -907,7 +879,6 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
                       fontSize: 16,
                     ),
                   ),
-
                   RangeSlider(
                     values: _price,
                     min: 0,
@@ -918,9 +889,7 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
                       setState(() => _price = value);
                     },
                   ),
-
                   const SizedBox(height: 10),
-
                   const Text(
                     'Type de mission',
                     style: TextStyle(
@@ -928,9 +897,7 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
                       fontSize: 16,
                     ),
                   ),
-
                   const SizedBox(height: 10),
-
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
@@ -941,9 +908,7 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
                       _typeChip('Livraison'),
                     ],
                   ),
-
                   const SizedBox(height: 18),
-
                   Text(
                     'Rayon (${_radiusKm.toStringAsFixed(0)} km)',
                     style: const TextStyle(
@@ -951,7 +916,6 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
                       fontSize: 16,
                     ),
                   ),
-
                   Slider(
                     value: _radiusKm,
                     min: 1,
@@ -962,9 +926,7 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
                       setState(() => _radiusKm = value);
                     },
                   ),
-
                   const SizedBox(height: 10),
-
                   Text(
                     'Note minimale (${_minRating.toStringAsFixed(1)})',
                     style: const TextStyle(
@@ -972,7 +934,6 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
                       fontSize: 16,
                     ),
                   ),
-
                   Slider(
                     value: _minRating,
                     min: 1,
@@ -983,15 +944,13 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
                       setState(() => _minRating = value);
                     },
                   ),
-
                   const SizedBox(height: 10),
-
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.grey[50],
                       borderRadius: BorderRadius.circular(30),
                       border: Border.all(
-                        color: Colors.black.withOpacity( 0.06),
+                        color: Colors.black.withOpacity(0.06),
                       ),
                     ),
                     child: SwitchListTile(
@@ -1015,7 +974,6 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
               ),
             ),
           ),
-
           SizedBox(
             width: double.infinity,
             height: 55,

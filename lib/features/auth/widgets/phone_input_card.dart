@@ -38,6 +38,7 @@ class PhoneInputCard extends StatelessWidget {
               decoration: const InputDecoration(
                 hintText: 'Numéro de téléphone',
                 border: InputBorder.none,
+                focusedBorder: InputBorder.none,
               ),
             ),
           ),

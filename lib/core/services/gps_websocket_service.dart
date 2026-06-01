@@ -50,7 +50,7 @@ class GpsWebSocketService extends ChangeNotifier {
     await disconnect();
 
     const storage = FlutterSecureStorage();
-    final token = await storage.read(key: 'jwt_token');
+    final token = await storage.read(key: 'jwt_access_token');
     if (token == null || token.isEmpty) {
       _lastError = 'Session expirée (token manquant).';
       notifyListeners();
@@ -131,7 +131,8 @@ class GpsWebSocketService extends ChangeNotifier {
   /// Pousse la position courante toutes les 10 s tant que [shouldSend] est vrai.
   void startAgentLocationTicker(bool Function() shouldSend) {
     _agentLocationTimer?.cancel();
-    _agentLocationTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+    _agentLocationTimer =
+        Timer.periodic(const Duration(seconds: 10), (_) async {
       if (!_connected || !shouldSend()) return;
       try {
         final pos = await Geolocator.getCurrentPosition();

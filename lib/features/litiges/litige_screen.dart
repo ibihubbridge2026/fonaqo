@@ -66,13 +66,18 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
     });
 
     try {
-      // Appel API vers ton backend Django
+      // Appel API vers disputes endpoint
       final response = await _api.dio.post(
-        '/missions/$_selectedMissionId/open_dispute/',
-        data: {'reason': _reason.trim()},
+        '/disputes/',
+        data: {
+          'mission': _selectedMissionId,
+          'title': 'Litige sur mission',
+          'description': _reason.trim(),
+          'priority': 'medium',
+        },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.statusCode == 201) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

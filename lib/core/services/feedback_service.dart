@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:logger/logger.dart';
 
 import '../utils/error_mapper.dart';
 
@@ -8,6 +9,7 @@ enum FeedbackType { success, error, info, warning }
 /// Service centralisé pour afficher des feedbacks utilisateur avec SnackBar
 class FeedbackService {
   static GlobalKey<NavigatorState>? _navigatorKey;
+  static final Logger _logger = Logger();
 
   // Setter pour initialiser la navigatorKey
   static set navigatorKey(GlobalKey<NavigatorState>? key) {
@@ -146,6 +148,8 @@ class FeedbackService {
 
 /// Gestionnaire des notifications au premier plan
 class ForegroundNotificationManager {
+  static final Logger _logger = Logger();
+
   static void handleForegroundMessage(
       RemoteMessage message, BuildContext context) {
     final title = message.notification?.title ?? 'Nouvelle notification';
@@ -156,13 +160,13 @@ class ForegroundNotificationManager {
     FeedbackService.showInfo(context, fullMessage);
 
     // Log pour debug
-    print('🔔 Notification foreground: $title');
+    _logger.i('🔔 Notification foreground: $title');
   }
 
   static void handleNotificationTap(
       RemoteMessage message, BuildContext context) {
     final title = message.notification?.title ?? 'Notification';
-    print('📱 Notification cliquée: $title');
+    _logger.i('📱 Notification cliquée: $title');
 
     // TODO: Naviguer vers l'écran approprié selon les données
     // Exemple: if (message.data['type'] == 'new_message') { ... }

@@ -41,8 +41,26 @@ class _AgentBoostScreenState extends State<AgentBoostScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final agentProvider = Provider.of<AgentProvider>(context, listen: false);
+    final balance = agentProvider.balance;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        leading: const BackButton(color: Colors.black),
+        title: const Text(
+          "Booster mon profil",
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
+        centerTitle: true,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(18),
         child: Column(
@@ -72,9 +90,9 @@ class _AgentBoostScreenState extends State<AgentBoostScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    "2 200 FCFA",
-                    style: TextStyle(
+                  Text(
+                    "${balance.toStringAsFixed(0)} FCFA",
+                    style: const TextStyle(
                       color: Colors.black,
                       fontSize: 30,
                       fontWeight: FontWeight.w900,

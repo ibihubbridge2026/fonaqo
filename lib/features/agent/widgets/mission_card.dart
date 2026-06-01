@@ -9,6 +9,7 @@ class MissionCard extends StatelessWidget {
   final String? distance;
   final bool? urgent;
   final VoidCallback? onTap;
+  final String? heroTag;
 
   const MissionCard({
     super.key,
@@ -20,18 +21,19 @@ class MissionCard extends StatelessWidget {
     this.distance,
     this.urgent,
     this.onTap,
+    this.heroTag,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final cardContent = Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity( 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 10,
           ),
         ],
@@ -42,8 +44,7 @@ class MissionCard extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 24,
-                backgroundColor:
-                    const Color(0xFFFFD400).withOpacity( 0.15),
+                backgroundColor: const Color(0xFFFFD400).withOpacity(0.15),
                 child: const Icon(
                   Icons.work_outline,
                   color: Colors.black,
@@ -172,5 +173,17 @@ class MissionCard extends StatelessWidget {
         ],
       ),
     );
+
+    if (heroTag != null) {
+      return Hero(
+        tag: heroTag!,
+        child: Material(
+          color: Colors.transparent,
+          child: cardContent,
+        ),
+      );
+    }
+
+    return cardContent;
   }
 }

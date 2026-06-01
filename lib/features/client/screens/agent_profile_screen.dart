@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// Écran de profil d'agent (basique pour l'instant)
 class AgentProfileScreen extends StatelessWidget {
@@ -15,7 +16,9 @@ class AgentProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // Récupérer les données de l'agent passées en arguments
     final agentData = agent ?? {};
-    final name = '${agentData['first_name'] ?? ''} ${agentData['last_name'] ?? ''}'.trim();
+    final name =
+        '${agentData['first_name'] ?? ''} ${agentData['last_name'] ?? ''}'
+            .trim();
     final specialty = agentData['specialty'] ?? 'Agent terrain';
     final isVerified = agentData['is_verified'] == true;
     final rating = agentData['rating']?.toString() ?? '4.5';
@@ -46,10 +49,12 @@ class AgentProfileScreen extends StatelessWidget {
                           radius: 40,
                           backgroundColor: Colors.grey[200],
                           backgroundImage: agentData['avatar'] != null
-                              ? NetworkImage(agentData['avatar']) as ImageProvider
+                              ? CachedNetworkImageProvider(agentData['avatar'])
+                                  as ImageProvider
                               : null,
                           child: agentData['avatar'] == null
-                              ? const Icon(Icons.person, size: 40, color: Colors.grey)
+                              ? const Icon(Icons.person,
+                                  size: 40, color: Colors.grey)
                               : null,
                         ),
                         const SizedBox(width: 20),
@@ -89,7 +94,8 @@ class AgentProfileScreen extends StatelessWidget {
                                 children: [
                                   Row(
                                     children: [
-                                      const Icon(Icons.star, color: Colors.amber, size: 16),
+                                      const Icon(Icons.star,
+                                          color: Colors.amber, size: 16),
                                       const SizedBox(width: 4),
                                       Text('$rating/5.0'),
                                     ],
@@ -107,9 +113,9 @@ class AgentProfileScreen extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 20),
-            
+
             // Message temporaire
             Card(
               child: Padding(
@@ -147,9 +153,9 @@ class AgentProfileScreen extends StatelessWidget {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 20),
-            
+
             // Boutons d'action
             Row(
               children: [

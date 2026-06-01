@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:logger/logger.dart';
@@ -75,12 +76,27 @@ class ChatService {
   String? _currentUser;
   bool _isConnected = false;
 
+  // Reconnection and heartbeat
+  Timer? _reconnectTimer;
+  Timer? _heartbeatTimer;
+  int _reconnectAttempts = 0;
+  final List<int> _reconnectDelays = [
+    2,
+    5,
+    10,
+    30
+  ]; // Exponential backoff in seconds
+  final List<Map<String, dynamic>> _messageQueue =
+      []; // Queue for offline messages
+  DateTime? _lastPongTime;
+
   // Getters
   Stream<ChatMessage> get messageStream => _messageController.stream;
   Stream<bool> get connectionStream => _connectionController.stream;
   Stream<String> get typingStream => _typingController.stream;
   bool get isConnected => _isConnected;
   String? get currentMissionId => _currentMissionId;
+  bool get isReconnecting => _reconnectTimer != null;
 
   /// Connexion au WebSocket pour une mission spécifique
   Future<void> connect(String missionId, String userId) async {
@@ -95,13 +111,21 @@ class ChatService {
       _currentMissionId = missionId;
       _currentUser = userId;
 
-      // Construire l'URL WebSocket
+      // Construire l'URL WebSocket avec token JWT
+      const storage = FlutterSecureStorage();
+      final token = await storage.read(key: 'jwt_access_token');
       final baseUrl = BaseClient.apiHostAndPort;
-      final wsUrl = 'ws://$baseUrl/ws/chat/$missionId/';
+      final wsUri = Uri(
+        scheme: 'ws',
+        host: baseUrl.split(':').first,
+        port: int.tryParse(baseUrl.split(':').last) ?? 8000,
+        path: '/ws/chat/$missionId/',
+        queryParameters: token != null ? {'token': token} : null,
+      );
 
-      _logger.i('Connexion WebSocket: $wsUrl');
+      _logger.i('Connexion WebSocket: $wsUri');
 
-      _channel = IOWebSocketChannel.connect(wsUrl);
+      _channel = IOWebSocketChannel.connect(wsUri);
       _isConnected = true;
       _connectionController.add(true);
 
@@ -120,13 +144,86 @@ class ChatService {
         cancelOnError: true,
       );
 
+      // Reset reconnection attempts on successful connection
+      _reconnectAttempts = 0;
+      _lastPongTime = DateTime.now();
+
+      // Start heartbeat (ping every 30 seconds)
+      _startHeartbeat();
+
       _logger.i('Connecté au chat de la mission $missionId');
     } catch (e) {
       _logger.e('Erreur connexion WebSocket: $e');
       _isConnected = false;
       _connectionController.add(false);
+
+      // Trigger reconnection with exponential backoff
+      _scheduleReconnect();
       rethrow;
     }
+  }
+
+  /// Start heartbeat ping/pong mechanism
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (_isConnected && _channel != null) {
+        _sendMessage({'type': 'ping'});
+        _logger.d('Heartbeat ping sent');
+
+        // Check if we received a pong in the last 60 seconds
+        if (_lastPongTime != null &&
+            DateTime.now().difference(_lastPongTime!).inSeconds > 60) {
+          _logger.w('No pong received for 60 seconds, connection may be dead');
+          _handleDisconnection();
+        }
+      }
+    });
+  }
+
+  /// Schedule reconnection with exponential backoff
+  void _scheduleReconnect() {
+    if (_currentMissionId == null || _currentUser == null) {
+      _logger.w('Cannot reconnect: no mission/user context');
+      return;
+    }
+
+    // Cancel existing reconnection timer
+    _reconnectTimer?.cancel();
+
+    // Calculate delay based on attempts
+    final delayIndex = _reconnectAttempts < _reconnectDelays.length
+        ? _reconnectAttempts
+        : _reconnectDelays.length - 1;
+    final delaySeconds = _reconnectDelays[delayIndex];
+
+    _logger.i(
+        'Scheduling reconnection in ${delaySeconds}s (attempt ${_reconnectAttempts + 1})');
+
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () async {
+      _reconnectAttempts++;
+      try {
+        _logger.i('Attempting reconnection...');
+        await connect(_currentMissionId!, _currentUser!);
+
+        // If successful, send queued messages
+        if (_isConnected && _messageQueue.isNotEmpty) {
+          _logger.i('Sending ${_messageQueue.length} queued messages');
+          for (final message in List.from(_messageQueue)) {
+            try {
+              _sendMessage(message);
+              _messageQueue.remove(message);
+            } catch (e) {
+              _logger.e('Failed to send queued message: $e');
+            }
+          }
+        }
+      } catch (e) {
+        _logger.e('Reconnection failed: $e');
+        // Schedule next reconnection attempt
+        _scheduleReconnect();
+      }
+    });
   }
 
   /// Gestion des messages entrants
@@ -144,6 +241,12 @@ class ChatService {
 
         case 'typing':
           _typingController.add(data['user_id'] ?? '');
+          break;
+
+        case 'pong':
+          // Update last pong time for heartbeat
+          _lastPongTime = DateTime.now();
+          _logger.d('Pong received');
           break;
 
         case 'user_status':
@@ -169,6 +272,9 @@ class ChatService {
     _logger.e('Erreur WebSocket: $error');
     _isConnected = false;
     _connectionController.add(false);
+
+    // Trigger reconnection
+    _scheduleReconnect();
   }
 
   /// Gestion de déconnexion
@@ -176,12 +282,36 @@ class ChatService {
     _logger.i('Déconnexion WebSocket');
     _isConnected = false;
     _connectionController.add(false);
+
+    // Trigger reconnection if not intentionally disconnected
+    if (_currentMissionId != null) {
+      _scheduleReconnect();
+    }
   }
 
   /// Envoyer un message (texte, image, ou vocal)
   Future<void> sendMessage(dynamic messageData) async {
     if (!_isConnected || _channel == null) {
-      throw Exception('Non connecté au chat');
+      // Queue message for later if reconnecting
+      if (_currentMissionId != null && _currentUser != null) {
+        _logger.w('Not connected, queuing message');
+        if (messageData is String) {
+          final message = ChatMessage(
+            sender: _currentUser ?? '',
+            text: messageData,
+            timestamp: DateTime.now(),
+          );
+          _messageQueue.add({
+            'type': 'message',
+            ...message.toJson(),
+          });
+        } else if (messageData is Map<String, dynamic>) {
+          _messageQueue.add(messageData);
+        }
+      } else {
+        throw Exception('Non connecté au chat');
+      }
+      return;
     }
 
     if (messageData is String) {
@@ -247,6 +377,13 @@ class ChatService {
   /// Déconnexion du WebSocket
   Future<void> disconnect() async {
     try {
+      // Cancel reconnection and heartbeat timers
+      _reconnectTimer?.cancel();
+      _reconnectTimer = null;
+      _heartbeatTimer?.cancel();
+      _heartbeatTimer = null;
+      _reconnectAttempts = 0;
+
       if (_channel != null) {
         // Envoyer message de déconnexion
         _sendMessage({
@@ -265,6 +402,7 @@ class ChatService {
       _currentMissionId = null;
       _currentUser = null;
       _connectionController.add(false);
+      _messageQueue.clear();
 
       _logger.i('Déconnecté du chat');
     } catch (e) {

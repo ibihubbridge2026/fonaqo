@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../repository/agent_repository.dart';
 import '../providers/agent_provider.dart';
 import 'package:provider/provider.dart';
+import '../../../core/providers/auth_provider.dart';
 
 class AgentProfileScreen extends StatefulWidget {
   const AgentProfileScreen({super.key});
@@ -46,8 +48,24 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Écoute le provider pour reconstruire quand l'utilisateur se charge.
+    final authProvider = Provider.of<AuthProvider>(context);
+    final user = authProvider.currentUser;
+
+    // Garde-fou: tant que l'utilisateur n'est pas chargé, afficher un loader.
+    if (user == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF5F5F5),
+        body: Center(
+          child: CircularProgressIndicator(color: Colors.black),
+        ),
+      );
+    }
+
+    final displayName = user.firstName ?? user.username;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
+      backgroundColor: const Color(0xFFF5F5F5),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -61,7 +79,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity( 0.03),
+                    color: Colors.black.withOpacity(0.03),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -72,11 +90,25 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                   // PHOTO
                   Stack(
                     children: [
-                      const CircleAvatar(
+                      CircleAvatar(
                         radius: 52,
-                        backgroundImage: AssetImage(
-                          'assets/images/avatar.png',
-                        ),
+                        backgroundImage: user.avatarUrl != null
+                            ? CachedNetworkImageProvider(user.avatarUrl!)
+                                as ImageProvider
+                            : null,
+                        backgroundColor: const Color(0xFFFFD400),
+                        child: user.avatarUrl == null
+                            ? Text(
+                                displayName.isNotEmpty
+                                    ? displayName[0].toUpperCase()
+                                    : 'A',
+                                style: const TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                              )
+                            : null,
                       ),
                       Positioned(
                         bottom: 0,
@@ -105,9 +137,9 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
 
                   // NOM & STATUT
                   const SizedBox(height: 16),
-                  const Text(
-                    'Jean Claude Kodjo',
-                    style: TextStyle(
+                  Text(
+                    displayName,
+                    style: const TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
                       color: Colors.black,
@@ -169,64 +201,39 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                       ),
                     ),
 
-                  const SizedBox(height: 18),
-
-                  // NOTE
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.star,
-                        color: Color(0xFFFFD400),
-                        size: 22,
-                      ),
-                      const SizedBox(width: 6),
-                      const Text(
-                        '4.8',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 18,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '(128 avis)',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-
                   const SizedBox(height: 24),
 
                   // STATS
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildStatCard(
-                          '152',
-                          'Missions',
-                          Icons.work_outline,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatCard(
-                          '98%',
-                          'Réussite',
-                          Icons.trending_up,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatCard(
-                          '2 ans',
-                          'Ancienneté',
-                          Icons.schedule,
-                        ),
-                      ),
-                    ],
+                  Consumer<AgentProvider>(
+                    builder: (context, agentProvider, child) {
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: _buildStatCard(
+                              '${agentProvider.stats['completed_missions'] ?? 0}',
+                              'Missions',
+                              Icons.work_outline,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildStatCard(
+                              '${agentProvider.stats['success_rate'] ?? 95}%',
+                              'Réussite',
+                              Icons.trending_up,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _buildStatCard(
+                              _calculateSeniority(),
+                              'Ancienneté',
+                              Icons.schedule,
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ],
               ),
@@ -241,17 +248,17 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                 _buildTile(
                   Icons.phone_outlined,
                   'Téléphone',
-                  '+229 97 00 00 00',
+                  user.phoneNumber ?? '+229 00 00 00 00',
                 ),
                 _buildTile(
                   Icons.mail_outline,
                   'Email',
-                  'agent@fonaco.com',
+                  user.email,
                 ),
                 _buildTile(
                   Icons.location_on_outlined,
                   'Ville',
-                  'Cotonou, Bénin',
+                  user.agentProfile?.location ?? 'Cotonou, Bénin',
                 ),
               ],
             ),
@@ -263,16 +270,22 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               title: 'Documents vérifiés',
               children: [
                 _buildVerificationTile(
-                  'Carte d’identité',
-                  true,
+                  'Carte d\'identité',
+                  user.agentProfile?.certifications
+                          ?.contains('identity_card') ??
+                      false,
                 ),
                 _buildVerificationTile(
                   'Permis de conduire',
-                  true,
+                  user.agentProfile?.certifications
+                          ?.contains('driving_license') ??
+                      false,
                 ),
                 _buildVerificationTile(
                   'Casier judiciaire',
-                  false,
+                  user.agentProfile?.certifications
+                          ?.contains('criminal_record') ??
+                      false,
                 ),
               ],
             ),
@@ -397,8 +410,8 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
           const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(
-              color: Colors.grey.shade600,
+            style: const TextStyle(
+              color: Colors.black54,
               fontSize: 12,
             ),
           ),
@@ -419,7 +432,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity( 0.03),
+            color: Colors.black.withOpacity(0.03),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -433,6 +446,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w900,
+              color: Colors.black,
             ),
           ),
           const SizedBox(height: 18),
@@ -470,8 +484,8 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
+                  style: const TextStyle(
+                    color: Colors.black54,
                     fontSize: 13,
                   ),
                 ),
@@ -549,9 +563,9 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
               children: [
                 Text(
                   label,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 12,
-                    color: Colors.grey.shade600,
+                    color: Colors.black54,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -581,7 +595,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         CircleAvatar(
-          backgroundColor: const Color(0xFFFFD400).withOpacity( 0.2),
+          backgroundColor: const Color(0xFFFFD400).withOpacity(0.2),
           child: Text(
             user[0],
             style: const TextStyle(
@@ -629,5 +643,24 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
         ),
       ],
     );
+  }
+
+  String _calculateSeniority() {
+    final user = Provider.of<AuthProvider>(context, listen: false).currentUser;
+    if (user?.createdAt == null) return '0 an';
+
+    final now = DateTime.now();
+    final createdAt = user!.createdAt!;
+    final years = now.year - createdAt.year;
+    final months = now.month - createdAt.month;
+
+    if (years >= 1) {
+      return '$years an${years > 1 ? 's' : ''}';
+    } else if (months >= 1) {
+      return '$months mois';
+    } else {
+      final days = now.difference(createdAt).inDays;
+      return '$days jour${days > 1 ? 's' : ''}';
+    }
   }
 }

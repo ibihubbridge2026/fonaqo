@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/agent_provider.dart';
 import '../repository/agent_repository.dart';
 import '../../../core/models/mission_model.dart';
 import 'agent_active_mission_screen.dart';
 
 class AgentMissionDetailScreen extends StatefulWidget {
-  const AgentMissionDetailScreen({super.key});
+  final MissionModel? mission;
+
+  const AgentMissionDetailScreen({super.key, this.mission});
 
   @override
   State<AgentMissionDetailScreen> createState() =>
@@ -62,23 +66,24 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
                       ),
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF6D8),
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: const Text(
-                      "Urgent",
-                      style: TextStyle(
-                        color: Color(0xFFC79A00),
-                        fontWeight: FontWeight.bold,
+                  if (widget.mission?.isUrgent == true)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF6D8),
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: const Text(
+                        "Urgent",
+                        style: TextStyle(
+                          color: Color(0xFFC79A00),
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -108,28 +113,36 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
                           CircleAvatar(
                             radius: 30,
                             backgroundColor: const Color(0xFFFFD54F),
-                            child: const Icon(
-                              Icons.person,
-                              color: Colors.black,
-                              size: 30,
-                            ),
+                            backgroundImage: widget.mission?.avatarUrl != null
+                                ? CachedNetworkImageProvider(
+                                    widget.mission!.avatarUrl!) as ImageProvider
+                                : null,
+                            child: widget.mission?.avatarUrl == null
+                                ? const Icon(
+                                    Icons.person,
+                                    color: Colors.black,
+                                    size: 30,
+                                  )
+                                : null,
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
+                              children: [
                                 Text(
-                                  "Jean Koffi",
-                                  style: TextStyle(
+                                  widget.mission?.clientName ?? 'Client',
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                SizedBox(height: 4),
+                                const SizedBox(height: 4),
                                 Text(
-                                  "Client vérifié • 4.9 ⭐",
-                                  style: TextStyle(
+                                  widget.mission?.isVerified == true
+                                      ? "Client vérifié${widget.mission?.clientRating != null ? ' • ${widget.mission!.clientRating!.toStringAsFixed(1)} ⭐' : ''}"
+                                      : "Client non vérifié",
+                                  style: const TextStyle(
                                     color: Colors.grey,
                                     fontSize: 13,
                                   ),
@@ -169,31 +182,25 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
                     _buildInfoCard(
                       icon: Icons.inventory_2_outlined,
                       title: "Type de mission",
-                      value: "Livraison de colis",
+                      value: widget.mission?.category ?? 'Livraison',
                     ),
 
                     const SizedBox(height: 14),
 
                     _buildInfoCard(
                       icon: Icons.location_on_outlined,
-                      title: "Point de départ",
-                      value: "Cocody Angré 8ème tranche",
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    _buildInfoCard(
-                      icon: Icons.flag_outlined,
                       title: "Destination",
-                      value: "Plateau Avenue Chardy",
+                      value: widget.mission?.address ?? 'Non spécifié',
                     ),
 
                     const SizedBox(height: 14),
 
                     _buildInfoCard(
                       icon: Icons.access_time,
-                      title: "Durée estimée",
-                      value: "25 minutes",
+                      title: "Créée le",
+                      value: widget.mission?.createdAt != null
+                          ? '${widget.mission!.createdAt!.day}/${widget.mission!.createdAt!.month}/${widget.mission!.createdAt!.year}'
+                          : 'Non spécifié',
                     ),
 
                     const SizedBox(height: 22),
@@ -216,9 +223,10 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(22),
                       ),
-                      child: const Text(
-                        "Le client souhaite faire livrer un colis fragile contenant des documents importants. Merci de manipuler avec précaution et de confirmer la livraison via QR code.",
-                        style: TextStyle(
+                      child: Text(
+                        widget.mission?.description ??
+                            'Aucune description disponible',
+                        style: const TextStyle(
                           height: 1.6,
                           color: Color(0xFF555555),
                           fontSize: 15,
@@ -242,18 +250,18 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: Column(
-                        children: const [
-                          Text(
+                        children: [
+                          const Text(
                             "Gain estimé",
                             style: TextStyle(
                               color: Colors.black87,
                               fontSize: 15,
                             ),
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           Text(
-                            "8 500 FCFA",
-                            style: TextStyle(
+                            "${widget.mission?.price.toStringAsFixed(0) ?? '0'} FCFA",
+                            style: const TextStyle(
                               fontSize: 34,
                               fontWeight: FontWeight.w900,
                               color: Colors.black,
@@ -389,14 +397,24 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
 
   /// Accepte la mission et navigue vers l'écran de mission active
   Future<void> _acceptMission() async {
+    HapticFeedback.lightImpact();
+    if (widget.mission == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erreur: Aucune mission sélectionnée'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isAccepting = true;
     });
 
     try {
-      // Récupérer l'ID de la mission (passé en argument ou depuis les params)
-      final missionId =
-          'mission_id_placeholder'; // TODO: Récupérer depuis les arguments
+      // Utiliser l'ID de la mission passée en paramètre
+      final missionId = widget.mission!.id;
 
       // Utiliser le provider pour accepter et mettre à jour l'état
       await context
@@ -417,7 +435,8 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const AgentActiveMissionScreen(),
+            builder: (context) =>
+                AgentActiveMissionScreen(mission: widget.mission!),
           ),
         );
       }

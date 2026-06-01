@@ -484,8 +484,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       decoration: InputDecoration(
         hintText: hint,
         prefixIcon: Icon(icon, size: 20, color: Colors.grey[600]),
-        filled: true,
-        fillColor: Colors.grey[50],
+        filled: false,
+        fillColor: Colors.transparent,
         contentPadding: const EdgeInsets.symmetric(vertical: 18),
         suffixIcon: isPass
             ? IconButton(
@@ -498,11 +498,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
             : null,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderSide: BorderSide(color: Colors.grey[200]!),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey[200]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[300]!),
         ),
       ),
     );

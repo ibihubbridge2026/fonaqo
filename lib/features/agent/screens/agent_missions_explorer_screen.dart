@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../providers/agent_provider.dart';
 import '../widgets/mission_card.dart';
+import 'agent_mission_detail_screen.dart';
 
 class AgentMissionsExplorerScreen extends StatefulWidget {
   const AgentMissionsExplorerScreen({super.key});
@@ -15,6 +16,10 @@ class AgentMissionsExplorerScreen extends StatefulWidget {
 class _AgentMissionsExplorerScreenState
     extends State<AgentMissionsExplorerScreen> {
   int _selectedFilter = 0;
+  final ScrollController _scrollController = ScrollController();
+  bool _isLoadingMore = false;
+  int _currentPage = 1;
+  bool _hasMore = true;
 
   final List<String> filters = [
     'Toutes',
@@ -24,23 +29,62 @@ class _AgentMissionsExplorerScreenState
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_scrollListener);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      if (!_isLoadingMore && _hasMore) {
+        _loadMoreMissions();
+      }
+    }
+  }
+
+  Future<void> _refreshMissions() async {
+    final agentProvider = Provider.of<AgentProvider>(context, listen: false);
+    await agentProvider.fetchAvailableMissions();
+    setState(() {
+      _currentPage = 1;
+      _hasMore = true;
+    });
+  }
+
+  Future<void> _loadMoreMissions() async {
+    if (_isLoadingMore) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    // Simulate API call delay
+    await Future.delayed(const Duration(seconds: 1));
+
+    // In real implementation, call AgentProvider to load more missions
+    // For now, just simulate loading
+    setState(() {
+      _currentPage++;
+      _isLoadingMore = false;
+      // _hasMore would be updated based on API response
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
-      body: Consumer<AgentProvider>(
-        builder: (context, agentProvider, child) {
-          // Si agent hors ligne
-          if (!agentProvider.isOnline) {
-            return Stack(
-              children: [
-                _buildContent(context),
-                _buildOfflineOverlay(),
-              ],
-            );
-          }
-
-          return _buildContent(context);
-        },
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: SafeArea(
+        // Accès libre: l'agent peut consulter les missions même hors ligne.
+        // Le blocage éventuel se fait au moment d'accepter une mission précise.
+        child: _buildContent(context),
       ),
     );
   }
@@ -96,9 +140,7 @@ class _AgentMissionsExplorerScreenState
                   margin: const EdgeInsets.only(right: 10),
                   padding: const EdgeInsets.symmetric(horizontal: 18),
                   decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFFFFD400)
-                        : Colors.white,
+                    color: isSelected ? const Color(0xFFFFD400) : Colors.white,
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(
                       color: isSelected
@@ -110,8 +152,7 @@ class _AgentMissionsExplorerScreenState
                   child: Text(
                     filters[index],
                     style: TextStyle(
-                      color:
-                          isSelected ? Colors.black : Colors.grey.shade700,
+                      color: isSelected ? Colors.black : Colors.grey.shade700,
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
                     ),
@@ -148,7 +189,6 @@ class _AgentMissionsExplorerScreenState
                     color: Colors.orange.shade300,
                   ),
                 ),
-
                 Positioned(
                   top: 20,
                   right: 20,
@@ -197,117 +237,100 @@ class _AgentMissionsExplorerScreenState
               final missions = agentProvider.availableMissions;
 
               if (missions.isEmpty) {
-                return const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.work_outline,
-                        size: 64,
-                        color: Colors.grey,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Aucune mission disponible',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
+                return RefreshIndicator(
+                  onRefresh: _refreshMissions,
+                  color: const Color(0xFFFFD400),
+                  backgroundColor: Colors.white,
+                  child: ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      SizedBox(height: 80),
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.work_outline,
+                              size: 64,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Aucune mission disponible',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              'Activez votre statut en ligne pour voir les missions',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 14,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        'Activez votre statut en ligne pour voir les missions',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontSize: 14,
-                        ),
-                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
                 );
               }
 
-              return ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: missions.length,
-                itemBuilder: (context, index) {
-                  final mission = missions[index];
+              return RefreshIndicator(
+                onRefresh: _refreshMissions,
+                color: const Color(0xFFFFD400),
+                backgroundColor: Colors.white,
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: missions.length + (_isLoadingMore ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == missions.length) {
+                      return const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: Color(0xFFFFD400),
+                          ),
+                        ),
+                      );
+                    }
 
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: MissionCard(
-                      title: mission.title ?? 'Mission',
-                      location:
-                          mission.address ?? 'Adresse non disponible',
-                      client:
-                          mission.clientName ?? 'Client inconnu',
-                      amount:
-                          '${mission.price?.toStringAsFixed(0) ?? '0'} FCFA',
-                      distance: '500 m',
-                      urgent: mission.isUrgent ?? false,
-                      onTap: () {
-                        // TODO: Navigation détail mission
-                      },
-                    ),
-                  );
-                },
+                    final mission = missions[index];
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: MissionCard(
+                        title: mission.title ?? 'Mission',
+                        location: mission.address ?? 'Adresse non disponible',
+                        client: mission.clientName ?? 'Client inconnu',
+                        amount:
+                            '${mission.price?.toStringAsFixed(0) ?? '0'} FCFA',
+                        distance: '500 m',
+                        urgent: mission.isUrgent ?? false,
+                        heroTag: 'mission_${mission.id}',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  AgentMissionDetailScreen(mission: mission),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
               );
             },
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildOfflineOverlay() {
-    return Positioned.fill(
-      child: Container(
-        color: Colors.black.withOpacity(0.7),
-        child: Center(
-          child: Container(
-            margin: const EdgeInsets.all(40),
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.offline_bolt,
-                  size: 64,
-                  color: Colors.grey,
-                ),
-
-                SizedBox(height: 16),
-
-                Text(
-                  'Vous êtes hors ligne',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
-
-                SizedBox(height: 8),
-
-                Text(
-                  'Passez en ligne pour voir les missions',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

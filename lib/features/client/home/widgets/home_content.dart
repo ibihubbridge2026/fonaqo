@@ -237,7 +237,7 @@ class WelcomeHeader extends StatelessWidget {
               ),
               const Text(
                 'Où pouvons-nous vous aider aujourd’hui ?',
-                style: TextStyle(color: Colors.grey, fontSize: 14),
+                style: TextStyle(color: Colors.black87, fontSize: 14),
               ),
             ],
           ),
@@ -298,7 +298,7 @@ class HeroCarouselSlide extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        color: Colors.grey[200],
+        color: Colors.grey[100],
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -309,10 +309,10 @@ class HeroCarouselSlide extends StatelessWidget {
             fit: BoxFit.cover,
             errorBuilder: (_, __, ___) {
               return Container(
-                color: Colors.grey[300],
+                color: Colors.grey[200],
                 child: const Icon(
                   Icons.broken_image,
-                  color: Colors.grey,
+                  color: Colors.black54,
                   size: 40,
                 ),
               );

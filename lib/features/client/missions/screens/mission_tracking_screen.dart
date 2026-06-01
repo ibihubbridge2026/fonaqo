@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
@@ -8,7 +10,6 @@ import 'package:fonaco/features/client/missions/mission_repository.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-
 
 /// Suivi GPS live + barre de statut (ACCEPTED → IN_PROGRESS → COMPLETED).
 class MissionTrackingScreen extends StatefulWidget {
@@ -167,6 +168,27 @@ class _MissionTrackingScreenState extends State<MissionTrackingScreen> {
           _mission?.title ?? 'Mission',
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
         ),
+        detailTrailingActions: [
+          IconButton(
+            icon: const Icon(Icons.call, color: Colors.black),
+            onPressed: () async {
+              HapticFeedback.lightImpact();
+              // TODO: Replace with actual agent phone number from mission model
+              final phoneNumber = '+22900000000'; // Placeholder
+              final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+              if (await canLaunchUrl(phoneUri)) {
+                await launchUrl(phoneUri);
+              } else {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Impossible de lancer l\'appel')),
+                  );
+                }
+              }
+            },
+          ),
+        ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -294,7 +316,7 @@ class _MissionTrackingScreenState extends State<MissionTrackingScreen> {
                 m.address ?? m.description,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                style: TextStyle(color: Colors.black87, fontSize: 13),
               ),
               if (auth.isAgent) ...[
                 const SizedBox(height: 12),
@@ -333,7 +355,7 @@ class _MissionTrackingScreenState extends State<MissionTrackingScreen> {
                     _gps.isConnected
                         ? 'Position de l’agent mise à jour en direct.'
                         : 'Connexion au flux GPS…',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    style: TextStyle(fontSize: 12, color: Colors.black87),
                   ),
                 ),
               ],
@@ -365,28 +387,101 @@ class _StatusProgressBar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(
               3,
-              (i) => Text(
-                labels[i],
+              (i) => AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 300),
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
-                  color: i <= currentStep ? Colors.black : Colors.grey,
+                  color: i <= currentStep ? Colors.black : Colors.black54,
                 ),
+                child: Text(labels[i]),
               ),
             ),
           ),
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
+            child: AnimatedLinearProgressIndicator(
               value: progress.clamp(0.0, 1.0),
               minHeight: 8,
               backgroundColor: Colors.grey[200],
-              color: const Color(0xFFFFD400),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                currentStep == 2
+                    ? const Color(0xFF4CAF50)
+                    : const Color(0xFFFFD400),
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class AnimatedLinearProgressIndicator extends LinearProgressIndicator {
+  const AnimatedLinearProgressIndicator({
+    super.key,
+    super.value,
+    super.minHeight,
+    super.backgroundColor,
+    super.valueColor,
+  });
+
+  @override
+  State<AnimatedLinearProgressIndicator> createState() =>
+      _AnimatedLinearProgressIndicatorState();
+}
+
+class _AnimatedLinearProgressIndicatorState
+    extends State<AnimatedLinearProgressIndicator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _animation = Tween<double>(
+      begin: 0.0,
+      end: widget.value ?? 0.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(AnimatedLinearProgressIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      _animation = Tween<double>(
+        begin: oldWidget.value ?? 0.0,
+        end: widget.value ?? 0.0,
+      ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return LinearProgressIndicator(
+          value: _animation.value,
+          minHeight: widget.minHeight,
+          backgroundColor: widget.backgroundColor,
+          valueColor: widget.valueColor,
+        );
+      },
     );
   }
 }

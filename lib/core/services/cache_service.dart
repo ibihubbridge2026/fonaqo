@@ -1,5 +1,6 @@
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 
 /// Service de gestion du cache offline avec Hive
 /// Permet de stocker localement les données pour une consultation hors ligne
@@ -21,6 +22,7 @@ class CacheService {
   static const String _userLocationKey = 'user_location';
 
   bool _isInitialized = false;
+  final Logger _logger = Logger();
 
   /// Initialisation de Hive et ouverture des boxes
   Future<void> init() async {
@@ -40,9 +42,9 @@ class CacheService {
       await Hive.openBox(_cacheBoxName);
 
       _isInitialized = true;
-      debugPrint('✅ CacheService initialisé avec succès');
+      _logger.i('✅ CacheService initialisé avec succès');
     } catch (e) {
-      debugPrint('❌ Erreur initialisation CacheService: $e');
+      _logger.e('❌ Erreur initialisation CacheService: $e');
       rethrow;
     }
   }
@@ -58,32 +60,37 @@ class CacheService {
       final box = Hive.box(_missionsBoxName);
       await box.put('available_missions', missions);
       await box.put(_lastSyncKey, DateTime.now().millisecondsSinceEpoch);
-      debugPrint('📦 ${missions.length} missions mises en cache');
+      _logger.i('📦 ${missions.length} missions mises en cache');
     } catch (e) {
-      debugPrint('❌ Erreur cache missions: $e');
+      _logger.e('❌ Erreur cache missions: $e');
     }
   }
 
   /// Récupère les missions depuis le cache
   List<Map<String, dynamic>> getCachedMissions() {
     try {
+      if (!_isInitialized) {
+        _logger.w('⚠️ CacheService non initialisé, retour de liste vide');
+        return [];
+      }
       final box = Hive.box(_missionsBoxName);
       return List<Map<String, dynamic>>.from(
         box.get('available_missions', defaultValue: []),
       );
     } catch (e) {
-      debugPrint('❌ Erreur lecture cache missions: $e');
+      _logger.e('❌ Erreur lecture cache missions: $e');
       return [];
     }
   }
 
   /// Sauvegarde une mission spécifique
-  Future<void> cacheMission(String missionId, Map<String, dynamic> mission) async {
+  Future<void> cacheMission(
+      String missionId, Map<String, dynamic> mission) async {
     try {
       final box = Hive.box(_missionsBoxName);
       await box.put('mission_$missionId', mission);
     } catch (e) {
-      debugPrint('❌ Erreur cache mission unique: $e');
+      _logger.e('❌ Erreur cache mission unique: $e');
     }
   }
 
@@ -93,7 +100,7 @@ class CacheService {
       final box = Hive.box(_missionsBoxName);
       return box.get('mission_$missionId');
     } catch (e) {
-      debugPrint('❌ Erreur lecture cache mission: $e');
+      _logger.e('❌ Erreur lecture cache mission: $e');
       return null;
     }
   }
@@ -105,9 +112,9 @@ class CacheService {
     try {
       final box = Hive.box(_profileBoxName);
       await box.put('user_profile', profile);
-      debugPrint('👤 Profil mis en cache');
+      _logger.i('👤 Profil mis en cache');
     } catch (e) {
-      debugPrint('❌ Erreur cache profil: $e');
+      _logger.e('❌ Erreur cache profil: $e');
     }
   }
 
@@ -117,7 +124,7 @@ class CacheService {
       final box = Hive.box(_profileBoxName);
       return box.get('user_profile');
     } catch (e) {
-      debugPrint('❌ Erreur lecture cache profil: $e');
+      _logger.e('❌ Erreur lecture cache profil: $e');
       return null;
     }
   }
@@ -130,7 +137,7 @@ class CacheService {
       final box = Hive.box(_settingsBoxName);
       await box.put(key, value);
     } catch (e) {
-      debugPrint('❌ Erreur sauvegarde setting: $e');
+      _logger.e('❌ Erreur sauvegarde setting: $e');
     }
   }
 
@@ -140,7 +147,7 @@ class CacheService {
       final box = Hive.box(_settingsBoxName);
       return box.get(key, defaultValue: defaultValue) as T?;
     } catch (e) {
-      debugPrint('❌ Erreur lecture setting: $e');
+      _logger.e('❌ Erreur lecture setting: $e');
       return defaultValue;
     }
   }
@@ -152,9 +159,9 @@ class CacheService {
     try {
       final box = Hive.box(_cacheBoxName);
       await box.put(_fcmTokenKey, token);
-      debugPrint('🔔 Token FCM sauvegardé');
+      _logger.i('🔔 Token FCM sauvegardé');
     } catch (e) {
-      debugPrint('❌ Erreur sauvegarde token FCM: $e');
+      _logger.e('❌ Erreur sauvegarde token FCM: $e');
     }
   }
 
@@ -164,7 +171,7 @@ class CacheService {
       final box = Hive.box(_cacheBoxName);
       return box.get(_fcmTokenKey);
     } catch (e) {
-      debugPrint('❌ Erreur lecture token FCM: $e');
+      _logger.e('❌ Erreur lecture token FCM: $e');
       return null;
     }
   }
@@ -181,7 +188,7 @@ class CacheService {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
     } catch (e) {
-      debugPrint('❌ Erreur sauvegarde localisation: $e');
+      _logger.e('❌ Erreur sauvegarde localisation: $e');
     }
   }
 
@@ -191,7 +198,7 @@ class CacheService {
       final box = Hive.box(_cacheBoxName);
       return box.get(_userLocationKey);
     } catch (e) {
-      debugPrint('❌ Erreur lecture localisation: $e');
+      _logger.e('❌ Erreur lecture localisation: $e');
       return null;
     }
   }
@@ -203,9 +210,9 @@ class CacheService {
     try {
       final box = Hive.box(_cacheBoxName);
       await box.put(_isOnlineKey, isOnline);
-      debugPrint(isOnline ? '🟢 En ligne' : '🔴 Hors ligne');
+      _logger.i(isOnline ? '🟢 En ligne' : '🔴 Hors ligne');
     } catch (e) {
-      debugPrint('❌ Erreur mise à jour statut online: $e');
+      _logger.e('❌ Erreur mise à jour statut online: $e');
     }
   }
 
@@ -215,7 +222,7 @@ class CacheService {
       final box = Hive.box(_cacheBoxName);
       return box.get(_isOnlineKey, defaultValue: true);
     } catch (e) {
-      debugPrint('❌ Erreur lecture statut online: $e');
+      _logger.e('❌ Erreur lecture statut online: $e');
       return null;
     }
   }
@@ -232,7 +239,7 @@ class CacheService {
       }
       return null;
     } catch (e) {
-      debugPrint('❌ Erreur lecture last sync: $e');
+      _logger.e('❌ Erreur lecture last sync: $e');
       return null;
     }
   }
@@ -246,9 +253,9 @@ class CacheService {
       await Hive.box(_profileBoxName).clear();
       await Hive.box(_settingsBoxName).clear();
       await Hive.box(_cacheBoxName).clear();
-      debugPrint('🗑️ Cache entièrement effacé');
+      _logger.i('🗑️ Cache entièrement effacé');
     } catch (e) {
-      debugPrint('❌ Erreur nettoyage cache: $e');
+      _logger.e('❌ Erreur nettoyage cache: $e');
     }
   }
 
@@ -262,10 +269,10 @@ class CacheService {
       if (lastSync != null &&
           now - lastSync.millisecondsSinceEpoch > twentyFourHours) {
         await clearAllCache();
-        debugPrint('🧹 Cache expiré nettoyé automatiquement');
+        _logger.i('🧹 Cache expiré nettoyé automatiquement');
       }
     } catch (e) {
-      debugPrint('❌ Erreur nettoyage cache expiré: $e');
+      _logger.e('❌ Erreur nettoyage cache expiré: $e');
     }
   }
 }

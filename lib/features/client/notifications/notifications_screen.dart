@@ -162,7 +162,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         padding: EdgeInsets.symmetric(vertical: 40),
         child: Center(
           child: Text('Aucune notification',
-              style: TextStyle(color: Colors.grey, fontSize: 15)),
+              style: TextStyle(color: Colors.black87, fontSize: 15)),
         ),
       );
     }
@@ -255,7 +255,7 @@ class _NotifTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    style: const TextStyle(color: Colors.black87, fontSize: 12),
                   ),
                 ],
               ),

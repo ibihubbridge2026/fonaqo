@@ -4,11 +4,13 @@ import '../../../core/providers/auth_provider.dart';
 import '../../../core/models/mission_model.dart';
 import '../repository/agent_repository.dart';
 import '../../../core/services/location_service.dart';
+import '../../../core/services/cache_service.dart';
 
 /// Provider pour gérer l'état de l'interface Agent
 class AgentProvider extends ChangeNotifier {
   final Logger _logger = Logger();
   final AgentRepository _agentRepository = AgentRepository();
+  final CacheService _cacheService = CacheService();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -37,6 +39,13 @@ class AgentProvider extends ChangeNotifier {
     _clearError();
 
     try {
+      // Ensure CacheService is initialized
+      if (!_cacheService.isInitialized) {
+        await _cacheService.init().catchError((e) {
+          _logger
+              .w('⚠️ CacheService init failed, continuing without cache: $e');
+        });
+      }
       // Récupérer la position GPS actuelle
       final locationService = LocationService();
       final position = locationService.currentPosition;
@@ -166,6 +175,40 @@ class AgentProvider extends ChangeNotifier {
     } catch (e, st) {
       _logger.e('Erreur rafraîchissement dashboard', error: e, stackTrace: st);
       _setError('Erreur lors du rafraîchissement: ${e.toString()}');
+    }
+  }
+
+  /// Récupère les missions disponibles avec localisation GPS et met à jour l'état
+  Future<void> fetchAvailableMissions() async {
+    try {
+      final locationService = LocationService();
+      final position = locationService.currentPosition;
+
+      final missions = await _agentRepository.getAvailableMissions(
+        latitude: position?.latitude,
+        longitude: position?.longitude,
+      );
+
+      _availableMissions = missions;
+      _logger
+          .d('Missions disponibles récupérées: ${_availableMissions.length}');
+      notifyListeners();
+    } catch (e, st) {
+      _logger.e('Erreur fetchAvailableMissions', error: e, stackTrace: st);
+      _setError('Erreur lors du chargement des missions: ${e.toString()}');
+    }
+  }
+
+  /// Récupère les statistiques de l'agent et met à jour l'état
+  Future<void> fetchStats() async {
+    try {
+      final statsData = await _agentRepository.getAgentStats();
+      _stats = statsData;
+      _logger.d('Statistiques agent récupérées');
+      notifyListeners();
+    } catch (e, st) {
+      _logger.e('Erreur fetchStats', error: e, stackTrace: st);
+      _setError('Erreur lors du chargement des statistiques: ${e.toString()}');
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
@@ -182,12 +183,13 @@ class ProfileParamItem extends StatelessWidget {
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    style: const TextStyle(color: Colors.black87, fontSize: 12),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
+            const Icon(Icons.arrow_forward_ios,
+                size: 14, color: Colors.black54),
           ],
         ),
       ),
@@ -207,7 +209,7 @@ class ProfileHeader extends StatelessWidget {
       return const Center(
         child: Text(
           'Chargement du profil...',
-          style: TextStyle(fontSize: 16, color: Colors.grey),
+          style: TextStyle(fontSize: 16, color: Colors.black87),
         ),
       );
     }
@@ -223,7 +225,7 @@ class ProfileHeader extends StatelessWidget {
                 key: ValueKey(user.avatarUrl), // Force rebuild when URL changes
                 radius: 52,
                 backgroundImage: user.avatarUrl != null
-                    ? NetworkImage(
+                    ? CachedNetworkImageProvider(
                             "${user.avatarUrl}?t=${DateTime.now().millisecondsSinceEpoch}")
                         as ImageProvider
                     : const AssetImage('assets/images/avatar/user.png'),

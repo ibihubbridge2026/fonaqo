@@ -133,7 +133,7 @@ class ChatWebSocketService extends ChangeNotifier {
     try {
       const storage = FlutterSecureStorage();
 
-      final token = await storage.read(key: 'access_token');
+      final token = await storage.read(key: 'jwt_access_token');
 
       if (token == null || token.isEmpty) {
         throw ChatConnectionException(

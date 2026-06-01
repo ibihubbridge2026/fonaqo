@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import '../../../core/services/chat_service.dart';
 import '../../../core/providers/auth_provider.dart';
@@ -15,7 +18,14 @@ import '../../../core/services/audio_service.dart';
 import '../repository/agent_repository.dart';
 
 class AgentChatScreen extends StatefulWidget {
-  const AgentChatScreen({super.key});
+  final String missionId;
+  final String? otherUserId;
+
+  const AgentChatScreen({
+    super.key,
+    required this.missionId,
+    this.otherUserId,
+  });
 
   @override
   State<AgentChatScreen> createState() => _AgentChatScreenState();
@@ -60,9 +70,9 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
     final authProvider = context.read<AuthProvider>();
     _currentUserId = authProvider.currentUser?.id?.toString();
 
-    // TODO: Récupérer missionId depuis les arguments ou navigation
-    _missionId = 'mission_123'; // Placeholder
-    _otherUserId = 'client_456'; // Placeholder
+    // Utiliser les IDs passés en paramètres
+    _missionId = widget.missionId;
+    _otherUserId = widget.otherUserId;
 
     if (_currentUserId != null && _missionId != null) {
       await _connectToChat();
@@ -238,30 +248,6 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
     return '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
   }
 
-  final List<Map<String, dynamic>> messages = [
-    {
-      "isMe": false,
-      "message": "Bonjour, vous êtes arrivé ?",
-      "time": "08:30",
-    },
-    {
-      "isMe": true,
-      "message": "Oui, je suis sur place.",
-      "time": "08:32",
-    },
-    {
-      "isMe": false,
-      "message": "Voici la preuve d’arrivée.",
-      "time": "08:33",
-      "image": "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a",
-    },
-    {
-      "isMe": true,
-      "message": "Parfait, merci 👌",
-      "time": "08:34",
-    },
-  ];
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -296,9 +282,39 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                 shape: BoxShape.circle,
               ),
             ),
+            if (_chatService.isReconnecting) ...[
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.5,
+                  color: Colors.orange,
+                ),
+              ),
+            ],
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.call, color: Colors.black),
+            onPressed: () async {
+              HapticFeedback.lightImpact();
+              // TODO: Replace with actual phone number from user model
+              final phoneNumber = '+22900000000'; // Placeholder
+              final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+              if (await canLaunchUrl(phoneUri)) {
+                await launchUrl(phoneUri);
+              } else {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Impossible de lancer l\'appel')),
+                  );
+                }
+              }
+            },
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.black),
             onSelected: (value) {
@@ -436,7 +452,8 @@ class _AgentChatScreenState extends State<AgentChatScreen> {
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(14),
                               image: DecorationImage(
-                                image: NetworkImage(message.image!),
+                                image:
+                                    CachedNetworkImageProvider(message.image!),
                                 fit: BoxFit.cover,
                               ),
                             ),

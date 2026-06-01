@@ -8,7 +8,11 @@ import '../features/client/missions/missions_screen.dart';
 import '../features/client/profile/profile_screen.dart';
 import '../features/client/agents_screen.dart';
 import '../features/events/events_screen.dart';
-import '../features/agent/screens/agent_main_screen.dart';
+import '../features/agent/agent_home_screen.dart';
+import '../features/agent/screens/agent_missions_explorer_screen.dart';
+import '../features/agent/screens/agent_wallet_screen.dart';
+import '../features/agent/screens/agent_profile_screen.dart';
+import '../features/agent/screens/agent_settings_screen.dart';
 import '../features/agent/widgets/agent_bottom_nav.dart';
 import '../features/agent/widgets/agent_header.dart';
 import 'custom_app_bar.dart';
@@ -61,13 +65,14 @@ class _MainWrapperState extends State<MainWrapper> {
     const ProfileScreen(),
   ];
 
-  /// Pages pour les agents
+  /// Pages pour les agents (alignées avec AgentBottomNav: 5 onglets)
+  /// Les notifications sont accessibles via l'icône cloche du header.
   late final List<Widget> _agentPages = [
-    const AgentMainScreen(),
-    const AgentMainScreen(), // Missions - temporairement même page
-    const AgentMainScreen(), // Notifications - temporairement même page
-    const AgentMainScreen(), // Wallet - temporairement même page
-    const AgentMainScreen(), // Profile - temporairement même page
+    const AgentHomeScreen(), // Index 0: Accueil
+    const AgentMissionsExplorerScreen(), // Index 1: Missions
+    const AgentWalletScreen(), // Index 2: Portefeuille
+    const AgentProfileScreen(), // Index 3: Profil
+    const AgentSettingsScreen(), // Index 4: Paramètres
   ];
 
   @override

@@ -234,6 +234,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: InputDecoration(
                         hintText: '••••••••',
                         border: InputBorder.none,
+                        focusedBorder: InputBorder.none,
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           icon: Icon(

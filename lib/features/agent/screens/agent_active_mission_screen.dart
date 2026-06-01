@@ -1,8 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/dispute_bottom_sheet.dart';
 import '../widgets/rating_dialog.dart';
 import '../repository/agent_repository.dart';
@@ -10,10 +13,17 @@ import '../providers/agent_provider.dart';
 import '../services/mission_timeline_service.dart';
 import '../../../core/config/api_config.dart';
 import '../../../core/services/location_service.dart';
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/models/mission_model.dart';
 import 'dart:convert';
 
 class AgentActiveMissionScreen extends StatefulWidget {
-  const AgentActiveMissionScreen({super.key});
+  final MissionModel mission;
+
+  const AgentActiveMissionScreen({
+    super.key,
+    required this.mission,
+  });
 
   @override
   State<AgentActiveMissionScreen> createState() =>
@@ -32,10 +42,32 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
   bool _isProcessing = false;
   bool _isDisputed = false;
   int _currentStep = 0;
-  final String _missionId =
-      'mission_id_placeholder'; // TODO: Récupérer depuis les arguments
+  late final String _missionId;
+
+  // GPS WebSocket Resilience
+  Timer? _gpsReconnectTimer;
+  Timer? _gpsHeartbeatTimer;
+  int _gpsReconnectAttempts = 0;
+  final List<int> _gpsReconnectDelays = [
+    2,
+    5,
+    10,
+    30
+  ]; // Exponential backoff in seconds
+  final List<Map<String, dynamic>> _gpsQueue = []; // Queue for offline GPS data
+  DateTime? _lastGpsPongTime;
+  String? _gpsToken;
+  String? _gpsAgentId;
 
   int currentStep = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _missionId = widget.mission.id;
+    _startGpsTracking();
+    _initializeTimeline();
+  }
 
   final List<Map<String, dynamic>> missionSteps = [
     {
@@ -194,6 +226,43 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
                 ),
               ),
 
+            // Bannière de reconnexion GPS si applicable
+            if (_gpsReconnectTimer != null)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Reconnexion GPS en cours...',
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(20),
@@ -218,29 +287,37 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
                         children: [
                           CircleAvatar(
                             radius: 30,
+                            backgroundImage: widget.mission.avatarUrl != null
+                                ? CachedNetworkImageProvider(
+                                    widget.mission.avatarUrl!) as ImageProvider
+                                : null,
                             backgroundColor: const Color(0xFFFFD54F),
-                            child: const Icon(
-                              Icons.person,
-                              color: Colors.black,
-                              size: 30,
-                            ),
+                            child: widget.mission.avatarUrl == null
+                                ? const Icon(
+                                    Icons.person,
+                                    color: Colors.black,
+                                    size: 30,
+                                  )
+                                : null,
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
+                              children: [
                                 Text(
-                                  "Jean Koffi",
-                                  style: TextStyle(
+                                  widget.mission.clientName ?? 'Client',
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
-                                SizedBox(height: 4),
+                                const SizedBox(height: 4),
                                 Text(
-                                  "Client vérifié • Livraison urgente",
-                                  style: TextStyle(
+                                  widget.mission.isUrgent == true
+                                      ? 'Client vérifié • Livraison urgente'
+                                      : 'Client vérifié',
+                                  style: const TextStyle(
                                     color: Colors.grey,
                                     fontSize: 13,
                                   ),
@@ -248,16 +325,36 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
                               ],
                             ),
                           ),
-                          Container(
-                            height: 46,
-                            width: 46,
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(
-                              Icons.call,
-                              color: Colors.green.shade700,
+                          GestureDetector(
+                            onTap: () async {
+                              HapticFeedback.lightImpact();
+                              // TODO: Replace with actual client phone number from mission model
+                              final phoneNumber = '+22900000000'; // Placeholder
+                              final Uri phoneUri =
+                                  Uri(scheme: 'tel', path: phoneNumber);
+                              if (await canLaunchUrl(phoneUri)) {
+                                await launchUrl(phoneUri);
+                              } else {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                        content: Text(
+                                            'Impossible de lancer l\'appel')),
+                                  );
+                                }
+                              }
+                            },
+                            child: Container(
+                              height: 46,
+                              width: 46,
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                Icons.call,
+                                color: Colors.green.shade700,
+                              ),
                             ),
                           ),
                         ],
@@ -307,34 +404,34 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: const [
-                                    Text(
+                                  children: [
+                                    const Text(
                                       "Départ",
                                       style: TextStyle(
                                         color: Colors.grey,
                                         fontSize: 13,
                                       ),
                                     ),
-                                    SizedBox(height: 4),
+                                    const SizedBox(height: 4),
                                     Text(
-                                      "Cocody Angré 8ème tranche",
-                                      style: TextStyle(
+                                      widget.mission.address ?? 'Non spécifié',
+                                      style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 16,
                                       ),
                                     ),
-                                    SizedBox(height: 28),
-                                    Text(
+                                    const SizedBox(height: 28),
+                                    const Text(
                                       "Destination",
                                       style: TextStyle(
                                         color: Colors.grey,
                                         fontSize: 13,
                                       ),
                                     ),
-                                    SizedBox(height: 4),
+                                    const SizedBox(height: 4),
                                     Text(
-                                      "Plateau Avenue Chardy",
-                                      style: TextStyle(
+                                      widget.mission.address ?? 'Non spécifié',
+                                      style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 16,
                                       ),
@@ -349,19 +446,19 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               _buildMiniStat(
-                                "Distance",
-                                "4.8 km",
-                                Icons.route,
-                              ),
-                              _buildMiniStat(
-                                "Temps",
-                                "25 min",
-                                Icons.access_time,
-                              ),
-                              _buildMiniStat(
                                 "Gain",
-                                "8500F",
+                                "${widget.mission.price?.toStringAsFixed(0) ?? '0'} FCFA",
                                 Icons.payments,
+                              ),
+                              _buildMiniStat(
+                                "Catégorie",
+                                widget.mission.category ?? 'Livraison',
+                                Icons.category,
+                              ),
+                              _buildMiniStat(
+                                "Urgence",
+                                widget.mission.isUrgent == true ? "Oui" : "Non",
+                                Icons.priority_high,
                               ),
                             ],
                           ),
@@ -392,71 +489,107 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
                         children: List.generate(
                           missionSteps.length,
                           (index) {
-                            final isCompleted = index < currentStep;
-                            final isCurrent = index == currentStep;
+                            final statusStepIndex =
+                                _getStatusStepIndex(widget.mission.status);
+                            final isCompleted = index < statusStepIndex;
+                            final isCurrent = index == statusStepIndex;
 
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Column(
-                                  children: [
-                                    Container(
-                                      height: 42,
-                                      width: 42,
-                                      decoration: BoxDecoration(
-                                        color: isCompleted || isCurrent
-                                            ? const Color(0xFFFFD54F)
-                                            : Colors.grey.shade200,
-                                        borderRadius: BorderRadius.circular(14),
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Column(
+                                    children: [
+                                      AnimatedContainer(
+                                        duration:
+                                            const Duration(milliseconds: 300),
+                                        curve: Curves.easeInOut,
+                                        height: 42,
+                                        width: 42,
+                                        decoration: BoxDecoration(
+                                          color: isCompleted || isCurrent
+                                              ? const Color(
+                                                  0xFF4CAF50) // Green for completed/active
+                                              : Colors.grey.shade300,
+                                          borderRadius:
+                                              BorderRadius.circular(14),
+                                          boxShadow: isCompleted || isCurrent
+                                              ? [
+                                                  BoxShadow(
+                                                    color:
+                                                        const Color(0xFF4CAF50)
+                                                            .withOpacity(0.3),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ]
+                                              : [],
+                                        ),
+                                        child: Icon(
+                                          isCompleted
+                                              ? Icons.check
+                                              : missionSteps[index]['icon'],
+                                          color: isCompleted || isCurrent
+                                              ? Colors.white
+                                              : Colors.grey.shade500,
+                                          size: 20,
+                                        ),
                                       ),
-                                      child: Icon(
-                                        missionSteps[index]['icon'],
-                                        color: isCompleted || isCurrent
-                                            ? Colors.black
-                                            : Colors.grey,
-                                      ),
-                                    ),
-                                    if (index != missionSteps.length - 1)
-                                      Container(
-                                        width: 2,
-                                        height: 45,
-                                        color: isCompleted
-                                            ? const Color(0xFFFFD54F)
-                                            : Colors.grey.shade300,
-                                      ),
-                                  ],
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Padding(
-                                    padding: const EdgeInsets.only(top: 6),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          missionSteps[index]['title'],
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w800,
-                                            color: isCompleted || isCurrent
-                                                ? Colors.black
-                                                : Colors.grey,
+                                      if (index != missionSteps.length - 1)
+                                        AnimatedContainer(
+                                          duration:
+                                              const Duration(milliseconds: 300),
+                                          curve: Curves.easeInOut,
+                                          width: 2,
+                                          height: 45,
+                                          decoration: BoxDecoration(
+                                            color: isCompleted
+                                                ? const Color(0xFF4CAF50)
+                                                : Colors.grey.shade300,
+                                            borderRadius:
+                                                BorderRadius.circular(1),
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          missionSteps[index]['subtitle'],
-                                          style: TextStyle(
-                                            color: Colors.grey.shade600,
-                                            fontSize: 13,
+                                    ],
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          AnimatedDefaultTextStyle(
+                                            duration: const Duration(
+                                                milliseconds: 300),
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w800,
+                                              color: isCompleted || isCurrent
+                                                  ? Colors.black
+                                                  : Colors.grey.shade500,
+                                            ),
+                                            child: Text(
+                                              missionSteps[index]['title'],
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            missionSteps[index]['subtitle'],
+                                            style: TextStyle(
+                                              color: Colors.grey.shade600,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             );
                           },
                         ),
@@ -641,6 +774,7 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
 
   /// Met à jour l'étape de la mission
   Future<void> _updateMissionStep(String status) async {
+    HapticFeedback.lightImpact();
     setState(() {
       _isProcessing = true;
     });
@@ -702,13 +836,58 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
   }
 
   /// Démarre le tracking GPS
-  void _startGpsTracking() {
+  Future<void> _startGpsTracking() async {
     if (_isGpsTracking) return;
 
     try {
-      // Connecter au WebSocket GPS
-      final wsUrl = 'ws://${ApiConfig.apiHostAndPort}/ws/gps/$_missionId/';
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final token = await authProvider.getToken();
+      final agentId = authProvider.currentUser?.id;
+
+      if (agentId == null || token == null) {
+        print('Erreur: Agent ID ou token non disponible');
+        return;
+      }
+
+      // Store for reconnection
+      _gpsToken = token;
+      _gpsAgentId = agentId;
+
+      // Connecter au WebSocket GPS avec authentification
+      final wsUrl =
+          'ws://${ApiConfig.apiHostAndPort}/ws/gps/$_missionId/?token=$token';
       _gpsWebSocket = WebSocketChannel.connect(Uri.parse(wsUrl));
+
+      // Listen for WebSocket messages (pong, errors, disconnection)
+      _gpsWebSocket?.stream.listen(
+        (message) {
+          try {
+            final data = json.decode(message) as Map<String, dynamic>;
+            if (data['type'] == 'pong') {
+              _lastGpsPongTime = DateTime.now();
+              print('GPS Pong received');
+            }
+          } catch (e) {
+            print('Error parsing GPS WebSocket message: $e');
+          }
+        },
+        onError: (error) {
+          print('GPS WebSocket error: $error');
+          _handleGpsDisconnection();
+        },
+        onDone: () {
+          print('GPS WebSocket disconnected');
+          _handleGpsDisconnection();
+        },
+        cancelOnError: true,
+      );
+
+      // Start heartbeat
+      _startGpsHeartbeat();
+
+      // Reset reconnection attempts on successful connection
+      _gpsReconnectAttempts = 0;
+      _lastGpsPongTime = DateTime.now();
 
       // Démarrer le stream GPS
       _gpsSubscription = Geolocator.getPositionStream(
@@ -719,8 +898,17 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
       ).listen(
         (Position position) {
           if (_gpsWebSocket != null) {
-            // Envoyer les coordonnées toutes les 10 secondes
-            _sendGpsCoordinates(position);
+            _sendGpsCoordinates(position, agentId);
+          } else {
+            // Queue GPS data for later
+            _gpsQueue.add({
+              'latitude': position.latitude,
+              'longitude': position.longitude,
+              'accuracy': position.accuracy,
+              'timestamp': DateTime.now().toIso8601String(),
+              'speed': position.speed,
+              'heading': position.heading,
+            });
           }
         },
         onError: (error) {
@@ -732,20 +920,107 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
         _isGpsTracking = true;
       });
 
-      print('GPS tracking démarré pour mission $_missionId');
+      print(
+          'GPS tracking démarré pour mission $_missionId avec agent $agentId');
     } catch (e) {
       print('Erreur démarrage GPS: $e');
+      _handleGpsDisconnection();
     }
+  }
+
+  /// Start GPS heartbeat ping/pong
+  void _startGpsHeartbeat() {
+    _gpsHeartbeatTimer?.cancel();
+    _gpsHeartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (_gpsWebSocket != null) {
+        _gpsWebSocket?.sink.add(json.encode({'type': 'ping'}));
+        print('GPS Heartbeat ping sent');
+
+        // Check if we received a pong in the last 60 seconds
+        if (_lastGpsPongTime != null &&
+            DateTime.now().difference(_lastGpsPongTime!).inSeconds > 60) {
+          print('No GPS pong received for 60 seconds, connection may be dead');
+          _handleGpsDisconnection();
+        }
+      }
+    });
+  }
+
+  /// Handle GPS WebSocket disconnection and trigger reconnection
+  void _handleGpsDisconnection() {
+    if (_gpsWebSocket != null) {
+      _gpsWebSocket?.sink.close();
+      _gpsWebSocket = null;
+    }
+
+    _isGpsTracking = false;
+
+    // Schedule reconnection with exponential backoff
+    _scheduleGpsReconnect();
+  }
+
+  /// Schedule GPS WebSocket reconnection with exponential backoff
+  void _scheduleGpsReconnect() {
+    if (_gpsToken == null || _gpsAgentId == null) {
+      print('Cannot reconnect GPS: no token/agent context');
+      return;
+    }
+
+    _gpsReconnectTimer?.cancel();
+
+    final delayIndex = _gpsReconnectAttempts < _gpsReconnectDelays.length
+        ? _gpsReconnectAttempts
+        : _gpsReconnectDelays.length - 1;
+    final delaySeconds = _gpsReconnectDelays[delayIndex];
+
+    print(
+        'Scheduling GPS reconnection in ${delaySeconds}s (attempt ${_gpsReconnectAttempts + 1})');
+
+    _gpsReconnectTimer = Timer(Duration(seconds: delaySeconds), () async {
+      _gpsReconnectAttempts++;
+      try {
+        print('Attempting GPS reconnection...');
+        _startGpsTracking();
+
+        // If successful, send queued GPS data
+        if (_isGpsTracking && _gpsQueue.isNotEmpty) {
+          print('Sending ${_gpsQueue.length} queued GPS points');
+          for (final gpsData in List.from(_gpsQueue)) {
+            try {
+              _gpsWebSocket?.sink.add(json.encode({
+                'type': 'gps_update',
+                'mission_id': _missionId,
+                'agent_id': _gpsAgentId,
+                ...gpsData,
+              }));
+              _gpsQueue.remove(gpsData);
+            } catch (e) {
+              print('Failed to send queued GPS data: $e');
+            }
+          }
+        }
+      } catch (e) {
+        print('GPS reconnection failed: $e');
+        _scheduleGpsReconnect();
+      }
+    });
   }
 
   /// Arrête le tracking GPS
   void _stopGpsTracking() {
     if (!_isGpsTracking) return;
 
+    _gpsReconnectTimer?.cancel();
+    _gpsHeartbeatTimer?.cancel();
+    _gpsReconnectTimer = null;
+    _gpsHeartbeatTimer = null;
+    _gpsReconnectAttempts = 0;
+
     _gpsSubscription?.cancel();
     _gpsWebSocket?.sink.close();
     _gpsSubscription = null;
     _gpsWebSocket = null;
+    _gpsQueue.clear();
 
     setState(() {
       _isGpsTracking = false;
@@ -755,13 +1030,13 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
   }
 
   /// Envoie les coordonnées GPS via WebSocket
-  void _sendGpsCoordinates(Position position) {
+  void _sendGpsCoordinates(Position position, String agentId) {
     if (_gpsWebSocket == null) return;
 
     final gpsData = {
       'type': 'gps_update',
       'mission_id': _missionId,
-      'agent_id': 'current_agent_id', // TODO: Récupérer depuis AuthProvider
+      'agent_id': agentId,
       'latitude': position.latitude,
       'longitude': position.longitude,
       'accuracy': position.accuracy,
@@ -785,6 +1060,28 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
       // Mettre à jour l'état de la timeline
       print('Timeline update: $stepData');
     });
+  }
+
+  /// Map mission status to timeline step index
+  int _getStatusStepIndex(MissionStatus status) {
+    switch (status) {
+      case MissionStatus.PENDING:
+        return 0;
+      case MissionStatus.ACCEPTED:
+        return 0;
+      case MissionStatus.ON_THE_WAY:
+        return 1;
+      case MissionStatus.ARRIVED:
+        return 2;
+      case MissionStatus.IN_PROGRESS:
+        return 3;
+      case MissionStatus.COMPLETED:
+        return 4;
+      case MissionStatus.CANCELLED:
+      case MissionStatus.DISPUTED:
+      case MissionStatus.UNKNOWN:
+        return _currentStep; // Keep current step
+    }
   }
 
   /// Affiche le BottomSheet de litige
@@ -928,5 +1225,13 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
         });
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _stopGpsTracking();
+    _gpsReconnectTimer?.cancel();
+    _gpsHeartbeatTimer?.cancel();
+    super.dispose();
   }
 }

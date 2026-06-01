@@ -166,7 +166,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                 'assets/images/hero/img-2.jpg',
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(
-                  color: Colors.grey[200],
+                  color: Colors.grey[100],
                   child:
                       const Icon(Icons.image_not_supported_outlined, size: 48),
                 ),
@@ -200,7 +200,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
           const SizedBox(height: 12),
           Text(
             _mission!.description ?? 'Aucune description fournie.',
-            style: const TextStyle(color: Colors.grey, fontSize: 14),
+            style: const TextStyle(color: Colors.black87, fontSize: 14),
           ),
           const SizedBox(height: 24),
 
@@ -367,7 +367,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
         children: [
           Text(label,
               style: const TextStyle(
-                  color: Colors.grey, fontWeight: FontWeight.w500)),
+                  color: Colors.black87, fontWeight: FontWeight.w500)),
           Expanded(
               child: Text(value,
                   textAlign: TextAlign.end,
@@ -393,7 +393,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
           Text("En attente d'un agent",
               style: TextStyle(fontWeight: FontWeight.bold)),
           Text("Votre mission sera acceptée sous peu.",
-              style: TextStyle(fontSize: 12, color: Colors.grey)),
+              style: TextStyle(fontSize: 12, color: Colors.black87)),
         ],
       ),
     );

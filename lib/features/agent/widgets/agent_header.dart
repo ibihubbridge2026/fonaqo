@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
-import '../../../core/providers/auth_provider.dart';
+import '../../../core/services/cache_service.dart';
+import '../../chat/screens/chat_list_screen.dart';
+import '../screens/agent_notifications_screen.dart';
+import '../providers/agent_provider.dart';
 import 'agent_notification_badge.dart';
 
 class AgentHeader extends StatelessWidget implements PreferredSizeWidget {
@@ -24,74 +27,59 @@ class AgentHeader extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ensure CacheService is initialized
+    if (!CacheService().isInitialized) {
+      CacheService().init().catchError((e) {
+        // Silently fail initialization, app will work without cache
+      });
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF5F7FB),
-        border: Border(bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 1,
+            offset: const Offset(0, 0.5),
+          ),
+        ],
       ),
       child: SafeArea(
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Section gauche: Salutation et nom
-            Expanded(
-              child: Consumer<AuthProvider>(
-                builder: (context, authProvider, child) {
-                  final user = authProvider.currentUser;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "Bonjour",
-                        style: GoogleFonts.poppins(
-                            color: Colors.grey[600], fontSize: 15),
-                      ),
-                      Text(
-                        "${user?.firstName ?? 'Jean'} ${user?.lastName ?? 'Agent'} 👋",
-                        style: GoogleFonts.poppins(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            color: const Color(0xFF111827)),
-                      ),
-                    ],
-                  );
-                },
-              ),
+            // Section gauche: Accès au chat (liste des conversations)
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ChatListScreen(),
+                  ),
+                );
+              },
+              child: _buildIconButton(Icons.chat_bubble_outline),
             ),
 
-            // Section droite: Actions
-            Row(
-              children: [
-                // Switch disponibilité
-                _buildAvailabilitySwitch(),
-                const SizedBox(width: 12),
+            // Section centre: Switch de disponibilité (centré horizontalement)
+            _buildAvailabilitySwitch(),
 
-                // Bouton messages
-                _buildIconButton(Icons.comment_outlined),
-                const SizedBox(width: 12),
-
-                // Bouton notifications avec badge
-                AgentNotificationBadge(
-                  count: 3,
-                  child: _buildIconButton(Icons.notifications_none_outlined),
-                ),
-                const SizedBox(width: 12),
-
-                // Avatar
-                Container(
-                  decoration: BoxDecoration(
-                    border:
-                        Border.all(color: const Color(0xFFFFCC00), width: 2),
-                    borderRadius: BorderRadius.circular(15),
+            // Section droite: Notifications avec badge
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AgentNotificationsScreen(),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(13),
-                    child: Image.network("https://i.pravatar.cc/100?img=12",
-                        width: 45, height: 45),
-                  ),
-                )
-              ],
+                );
+              },
+              child: AgentNotificationBadge(
+                count: 3,
+                child: _buildIconButton(Icons.notifications_none_outlined),
+              ),
             ),
           ],
         ),
@@ -100,15 +88,15 @@ class AgentHeader extends StatelessWidget implements PreferredSizeWidget {
   }
 
   Widget _buildAvailabilitySwitch() {
-    return Consumer<AuthProvider>(
-      builder: (context, authProvider, child) {
-        bool isAvailable = authProvider.isAgent;
+    return Consumer<AgentProvider>(
+      builder: (context, agentProvider, child) {
+        bool isAvailable = agentProvider.isOnline;
 
         return Column(
           children: [
             GestureDetector(
               onTap: () {
-                // TODO: Implémenter le toggle de disponibilité
+                agentProvider.toggleOnlineStatus();
               },
               child: Container(
                 width: 50,

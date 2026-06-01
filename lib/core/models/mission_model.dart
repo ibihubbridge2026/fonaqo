@@ -39,12 +39,15 @@ class MissionModel {
   final String? clientName;
   final String? agentName;
   final String? address;
+  final String? pickupAddress;
+  final String? destinationAddress;
   final String? category;
   final String? avatarUrl;
   final bool isVerified;
   final bool isConfidential;
   final bool isUrgent;
   final List<String>? tags;
+  final double? clientRating;
 
   const MissionModel({
     required this.id,
@@ -59,12 +62,15 @@ class MissionModel {
     this.clientName,
     this.agentName,
     this.address,
+    this.pickupAddress,
+    this.destinationAddress,
     this.category,
     this.avatarUrl,
     this.isVerified = false,
     this.isConfidential = false,
     this.isUrgent = false,
     this.tags,
+    this.clientRating,
   });
 
   /// Crée un MissionModel à partir d'un JSON (réponse API).
@@ -85,12 +91,15 @@ class MissionModel {
         clientName: json['client_name']?.toString(),
         agentName: json['agent_name']?.toString(),
         address: json['address']?.toString(),
+        pickupAddress: json['pickup_address']?.toString(),
+        destinationAddress: json['destination_address']?.toString(),
         category: json['category']?.toString(),
         avatarUrl: json['avatar_url']?.toString(),
         isVerified: _readBool(json['is_verified']),
         isConfidential: _readBool(json['is_confidential']),
         isUrgent: _readBool(json['is_urgent']),
         tags: _readStringList(json['tags']),
+        clientRating: _readDouble(json['client_rating']),
       );
     } catch (e, st) {
       _missionLogger.e(
@@ -191,7 +200,10 @@ class MissionModel {
     String? clientName,
     String? agentName,
     String? address,
+    String? pickupAddress,
+    String? destinationAddress,
     String? category,
+    double? clientRating,
   }) {
     return MissionModel(
       id: id ?? this.id,
@@ -206,7 +218,10 @@ class MissionModel {
       clientName: clientName ?? this.clientName,
       agentName: agentName ?? this.agentName,
       address: address ?? this.address,
+      pickupAddress: pickupAddress ?? this.pickupAddress,
+      destinationAddress: destinationAddress ?? this.destinationAddress,
       category: category ?? this.category,
+      clientRating: clientRating ?? this.clientRating,
     );
   }
 

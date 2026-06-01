@@ -189,3 +189,4 @@ Consultez le fichier `LICENSE` pour plus d’informations.
 # Équipe
 
 Développé avec passion par l’équipe **IBIHUB BRIDGE**.
+

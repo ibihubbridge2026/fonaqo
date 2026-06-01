@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import './providers/agent_provider.dart';
+import '../../core/models/mission_model.dart';
+import './screens/agent_mission_detail_screen.dart';
+import './screens/agent_boost_screen.dart';
+import '../../widgets/main_wrapper.dart';
 
 class AgentHomeScreen extends StatefulWidget {
   const AgentHomeScreen({super.key});
@@ -9,37 +15,59 @@ class AgentHomeScreen extends StatefulWidget {
 }
 
 class _AgentHomeScreenState extends State<AgentHomeScreen> {
-  bool isAvailable = true;
-  int _selectedIndex = 0;
+  bool _isRefreshing = false;
+
+  Future<void> _refreshData() async {
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    final agentProvider = Provider.of<AgentProvider>(context, listen: false);
+
+    try {
+      await Future.wait([
+        agentProvider.fetchWalletDetails(),
+        agentProvider.fetchAvailableMissions(),
+        agentProvider.fetchStats(),
+      ]);
+    } catch (e) {
+      print('Error refreshing data: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment(-0.8, -0.8),
-            radius: 1.2,
-            colors: [Color(0xFFFFF4C4), Colors.transparent],
-          ),
-        ),
-        child: SafeArea(
+      backgroundColor: const Color(0xFFF5F5F5),
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: _refreshData,
+          color: const Color(0xFFFFD400),
+          backgroundColor: Colors.white,
           child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                _buildHeader(),
-                const SizedBox(height: 25),
+                const SizedBox(height: 10),
                 _buildBalanceCard(),
-                const SizedBox(height: 25),
+                const SizedBox(height: 20),
                 _buildQuickActions(),
-                const SizedBox(height: 30),
+                const SizedBox(height: 25),
                 _buildCurrentMissions(),
-                const SizedBox(height: 30),
+                const SizedBox(height: 25),
                 _buildStats(),
-                const SizedBox(height: 30),
+                const SizedBox(height: 25),
+                _buildMissionHistory(),
+                const SizedBox(height: 25),
                 _buildDisputeCard(),
                 const SizedBox(height: 100), // Espace pour la navbar
               ],
@@ -47,110 +75,25 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNavbar(),
-    );
-  }
-
-  // 1. HEADER
-  Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Bonjour", 
-              style: GoogleFonts.poppins(color: Colors.grey[600], fontSize: 15)),
-            Text("Jean Agent 👋", 
-              style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.w800, color: const Color(0xFF111827))),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: () => setState(() => isAvailable = !isAvailable),
-                  child: Container(
-                    width: 50,
-                    height: 26,
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      color: isAvailable ? Colors.green : Colors.grey[400],
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: AnimatedAlign(
-                      duration: const Duration(milliseconds: 200),
-                      alignment: isAvailable ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        width: 20,
-                        height: 20,
-                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(isAvailable ? "Disponible" : "Hors-ligne", 
-                  style: GoogleFonts.poppins(color: isAvailable ? Colors.green : Colors.grey, fontWeight: FontWeight.w600, fontSize: 14)),
-              ],
-            )
-          ],
-        ),
-        Row(
-          children: [
-            _buildIconButton(Icons.comment_outlined),
-            const SizedBox(width: 12),
-            Stack(
-              children: [
-                _buildIconButton(Icons.notifications_none_outlined),
-                Positioned(
-                  right: 12,
-                  top: 12,
-                  child: Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle, border: Border.fromBorderSide(BorderSide(color: Colors.white, width: 2)))),
-                )
-              ],
-            ),
-            const SizedBox(width: 12),
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color(0xFFFFCC00), width: 2),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(13),
-                child: Image.network("https://i.pravatar.cc/100?img=12", width: 45, height: 45),
-              ),
-            )
-          ],
-        )
-      ],
-    );
-  }
-
-  Widget _buildIconButton(IconData icon) {
-    return Container(
-      width: 45,
-      height: 45,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.7),
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
-      ),
-      child: Icon(icon, size: 22),
     );
   }
 
   // 2. BALANCE CARD
   Widget _buildBalanceCard() {
+    final agentProvider = Provider.of<AgentProvider>(context, listen: false);
+    final balance = agentProvider.balance;
+
     return Container(
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFEFEF6), Color(0xFFFFF5C9)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: const Color(0xFFFFE78B)),
-        boxShadow: [BoxShadow(color: const Color(0xFFFFCC00).withOpacity(0.15), blurRadius: 30, offset: const Offset(0, 15))],
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 15,
+              offset: const Offset(0, 5))
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -158,30 +101,45 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Solde disponible", style: GoogleFonts.poppins(color: Colors.grey[700], fontSize: 14)),
+              Text("Solde disponible",
+                  style:
+                      GoogleFonts.poppins(color: Colors.black, fontSize: 14)),
               const SizedBox(height: 5),
               RichText(
                 text: TextSpan(
-                  style: GoogleFonts.poppins(color: Colors.black, fontSize: 32, fontWeight: FontWeight.w800),
+                  style: GoogleFonts.poppins(
+                      color: Colors.black,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800),
                   children: [
-                    const TextSpan(text: "245 600 "),
-                    TextSpan(text: "FCFA", style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600)),
+                    TextSpan(text: "${balance.toStringAsFixed(0)} "),
+                    TextSpan(
+                        text: "FCFA",
+                        style: GoogleFonts.poppins(
+                            fontSize: 16, fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
             ],
           ),
           ElevatedButton(
-            onPressed: () {},
+            onPressed: () {
+              final mainShell = MainShellScope.maybeOf(context);
+              if (mainShell != null) {
+                mainShell.setIndex(2); // Navigate to Wallet screen
+              }
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFFFCC00),
               foregroundColor: Colors.black,
               elevation: 5,
               shadowColor: const Color(0xFFFFCC00).withOpacity(0.5),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15)),
             ),
-            child: Text("Retirer", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+            child: Text("Retirer",
+                style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
           )
         ],
       ),
@@ -193,86 +151,210 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _actionItem("Recharger", Icons.account_balance_wallet_outlined, const Color(0xFFFFF5D8), const Color(0xFFFFB800)),
-        _actionItem("Transactions", Icons.swap_horiz_rounded, const Color(0xFFEDF4FF), const Color(0xFF3B82F6)),
-        _actionItem("Boost", Icons.rocket_launch_outlined, const Color(0xFFECFFF1), const Color(0xFF22C55E)),
-        _actionItem("PDF", Icons.description_outlined, const Color(0xFFF5EEFF), const Color(0xFF8B5CF6)),
+        _actionItem("Recharger", Icons.account_balance_wallet_outlined,
+            const Color(0xFFFFF5D8), const Color(0xFFFFB800), () {
+          final mainShell = MainShellScope.maybeOf(context);
+          if (mainShell != null) {
+            mainShell.setIndex(2); // Navigate to Wallet screen
+          }
+        }),
+        _actionItem("Transactions", Icons.swap_horiz_rounded,
+            const Color(0xFFEDF4FF), const Color(0xFF3B82F6), () {
+          final mainShell = MainShellScope.maybeOf(context);
+          if (mainShell != null) {
+            mainShell
+                .setIndex(2); // Navigate to Wallet (historique transactions)
+          }
+        }),
+        _actionItem("Boost", Icons.rocket_launch_outlined,
+            const Color(0xFFECFFF1), const Color(0xFF22C55E), () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const AgentBoostScreen(),
+            ),
+          );
+        }),
+        _actionItem("PDF", Icons.description_outlined, const Color(0xFFF5EEFF),
+            const Color(0xFF8B5CF6), () {
+          // TODO: Call API /api/v1/wallets/monthly_report/
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Génération du rapport PDF en cours...'),
+              backgroundColor: Colors.black,
+            ),
+          );
+        }),
       ],
     );
   }
 
-  Widget _actionItem(String label, IconData icon, Color bg, Color color) {
-    return Column(
-      children: [
-        Container(
-          width: 65,
-          height: 65,
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5))],
+  Widget _actionItem(
+      String label, IconData icon, Color bg, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 65,
+            height: 65,
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5))
+              ],
+            ),
+            child: Icon(icon, color: color, size: 28),
           ),
-          child: Icon(icon, color: color, size: 28),
-        ),
-        const SizedBox(height: 8),
-        Text(label, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[800])),
-      ],
+          const SizedBox(height: 8),
+          Text(label,
+              style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black)),
+        ],
+      ),
     );
   }
 
   // 4. MISSIONS
   Widget _buildCurrentMissions() {
+    final agentProvider = Provider.of<AgentProvider>(context, listen: false);
+    final missions = agentProvider.availableMissions;
+
     return Column(
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("Missions en cours", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w800)),
-            Text("Voir tout", style: GoogleFonts.poppins(color: const Color(0xFFFFB800), fontWeight: FontWeight.bold)),
+            Text("Missions disponibles",
+                style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black)),
+            GestureDetector(
+              onTap: () {
+                final mainShell = MainShellScope.maybeOf(context);
+                if (mainShell != null) {
+                  mainShell.setIndex(1); // Navigate to Missions screen
+                }
+              },
+              child: Text("Voir tout",
+                  style: GoogleFonts.poppins(
+                      color: const Color(0xFFFFB800),
+                      fontWeight: FontWeight.bold)),
+            ),
           ],
         ),
         const SizedBox(height: 15),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.9),
-            borderRadius: BorderRadius.circular(30),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, 10))],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(15),
-                    child: Image.network("https://i.pravatar.cc/100?img=15", width: 50, height: 50),
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text("Attente à la BOA", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
-                        Text("Place de l'indépendance", style: GoogleFonts.poppins(color: Colors.grey, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: const Color(0xFFECFFF1), borderRadius: BorderRadius.circular(20)),
-                    child: Text("En cours", style: GoogleFonts.poppins(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
-                  )
-                ],
+        if (missions.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10))
+              ],
+            ),
+            child: Center(
+              child: Text(
+                "Aucune mission disponible",
+                style: GoogleFonts.poppins(color: Colors.black),
               ),
-              const SizedBox(height: 20),
-              _buildTimelineStep("Mission acceptée", "08:15", true),
-              _buildTimelineStep("En route", "08:20", true),
-              _buildTimelineStep("Arrivé sur place", "08:35", true),
-              _buildTimelineStep("En attente", "2 pers. avant vous", false),
-            ],
-          ),
-        )
+            ),
+          )
+        else
+          ...missions.take(3).map((mission) => GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          AgentMissionDetailScreen(mission: mission),
+                    ),
+                  );
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5))
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: mission.avatarUrl != null
+                            ? Image.network(mission.avatarUrl!,
+                                width: 50, height: 50, fit: BoxFit.cover)
+                            : Container(
+                                width: 50,
+                                height: 50,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFFFD400),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    (mission.clientName?.isNotEmpty ?? false)
+                                        ? mission.clientName![0].toUpperCase()
+                                        : 'C',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(mission.title,
+                                style: GoogleFonts.poppins(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: Colors.black)),
+                            Text(mission.address ?? 'Non spécifié',
+                                style: GoogleFonts.poppins(
+                                    color: Colors.black54, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                            color: const Color(0xFFECFFF1),
+                            borderRadius: BorderRadius.circular(20)),
+                        child: Text("${mission.price.toStringAsFixed(0)} FCFA",
+                            style: GoogleFonts.poppins(
+                                color: Colors.green,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11)),
+                      )
+                    ],
+                  ),
+                ),
+              )),
       ],
     );
   }
@@ -288,34 +370,63 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
               decoration: BoxDecoration(
                 color: isDone ? Colors.green : Colors.white,
                 shape: BoxShape.circle,
-                border: Border.all(color: isDone ? Colors.green : Colors.grey[300]!, width: 3),
+                border: Border.all(
+                    color: isDone ? Colors.green : Colors.grey[300]!, width: 3),
               ),
             ),
             Container(width: 2, height: 20, color: Colors.grey[200]),
           ],
         ),
         const SizedBox(width: 15),
-        Text(title, style: GoogleFonts.poppins(fontSize: 14, fontWeight: isDone ? FontWeight.w600 : FontWeight.w400)),
+        Text(title,
+            style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: isDone ? FontWeight.w600 : FontWeight.w400,
+                color: Colors.black)),
         const Spacer(),
-        Text(time, style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
+        Text(time,
+            style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey)),
       ],
     );
   }
 
   // 5. STATS
   Widget _buildStats() {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 15,
-      mainAxisSpacing: 15,
-      childAspectRatio: 1.4,
+    final agentProvider = Provider.of<AgentProvider>(context, listen: false);
+    final stats = agentProvider.stats;
+
+    final missionsCount = stats['completed_missions']?.toString() ?? '0';
+    final totalEarnings = stats['total_earnings'] ?? 0.0;
+    final gains = totalEarnings > 0
+        ? '${(totalEarnings / 1000).toStringAsFixed(0)}K'
+        : '0K';
+    final rating = stats['average_rating']?.toStringAsFixed(1) ?? '0.0';
+    final successRate = stats['success_rate']?.toString() ?? '95%';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _statItem("02", "Missions", Icons.assignment_outlined, Colors.blue),
-        _statItem("45K", "Gains", Icons.trending_up, Colors.green),
-        _statItem("4.8", "Note", Icons.star_outline, Colors.orange),
-        _statItem("98%", "Réussite", Icons.bolt_outlined, Colors.purple),
+        Text("Mes Statistiques",
+            style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Colors.black)),
+        const SizedBox(height: 15),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 15,
+          mainAxisSpacing: 15,
+          childAspectRatio: 1.4,
+          children: [
+            _statItem(missionsCount, "Missions", Icons.motorcycle, Colors.blue),
+            _statItem(gains, "Gains", Icons.trending_up, Colors.green),
+            _statItem(rating, "Note", Icons.star_outline, Colors.orange),
+            _statItem(successRate, "Missions en cours",
+                Icons.check_circle_outline, Colors.purple),
+          ],
+        ),
       ],
     );
   }
@@ -326,26 +437,121 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(25),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10)
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: color, size: 24),
           const Spacer(),
-          Text(value, style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w800)),
-          Text(label, style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
+          Text(value,
+              style: GoogleFonts.poppins(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.black)),
+          Text(label,
+              style: GoogleFonts.poppins(color: Colors.black54, fontSize: 12)),
         ],
       ),
     );
   }
 
-  // 6. DISPUTE
+  // 6. MISSION HISTORY
+  Widget _buildMissionHistory() {
+    final agentProvider = Provider.of<AgentProvider>(context, listen: false);
+    final missions = agentProvider.availableMissions;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Historique des Missions",
+            style: GoogleFonts.poppins(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Colors.black)),
+        const SizedBox(height: 15),
+        if (missions.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5))
+              ],
+            ),
+            child: Center(
+              child: Text(
+                "Aucune mission récente",
+                style: GoogleFonts.poppins(color: Colors.black54),
+              ),
+            ),
+          )
+        else
+          ...missions.take(3).map((mission) => Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5))
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFECFFF1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.check_circle,
+                          color: Colors.green, size: 20),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(mission.title,
+                              style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                  color: Colors.black)),
+                          Text(mission.address ?? 'Non spécifié',
+                              style: GoogleFonts.poppins(
+                                  color: Colors.black54, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    Text("${mission.price.toStringAsFixed(0)} FCFA",
+                        style: GoogleFonts.poppins(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12)),
+                  ],
+                ),
+              )),
+      ],
+    );
+  }
+
+  // 7. DISPUTE
   Widget _buildDisputeCard() {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFFFFF5F5), Color(0xFFFFF0F0)]),
+        gradient: const LinearGradient(
+            colors: [Color(0xFFFFF5F5), Color(0xFFFFF0F0)]),
         borderRadius: BorderRadius.circular(30),
         border: Border.all(color: const Color(0xFFFFD0D0)),
       ),
@@ -353,16 +559,24 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
         children: [
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
-            child: const Icon(Icons.shield_outlined, color: Colors.red, size: 30),
+            decoration: BoxDecoration(
+                color: Colors.white, borderRadius: BorderRadius.circular(15)),
+            child:
+                const Icon(Icons.shield_outlined, color: Colors.red, size: 30),
           ),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Ouvrir un litige", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
-                Text("Besoin d'aide ?", style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[700])),
+                Text("Ouvrir un litige",
+                    style: GoogleFonts.poppins(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Colors.black)),
+                Text("Besoin d'aide ?",
+                    style: GoogleFonts.poppins(
+                        fontSize: 12, color: Colors.black54)),
               ],
             ),
           ),
@@ -370,47 +584,11 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
             onPressed: () {},
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
             child: const Text("Ouvrir", style: TextStyle(color: Colors.white)),
           )
-        ],
-      ),
-    );
-  }
-
-  // 7. NAVBAR
-  Widget _buildBottomNavbar() {
-    return Container(
-      margin: const EdgeInsets.all(20),
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 30, offset: const Offset(0, 10))],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _navItem(Icons.home_filled, "Accueil", 0),
-          _navItem(Icons.assignment_outlined, "Missions", 1),
-          _navItem(Icons.account_balance_wallet_outlined, "Wallet", 2),
-          _navItem(Icons.person_outline, "Profil", 3),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItem(IconData icon, String label, int index) {
-    bool isSel = _selectedIndex == index;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedIndex = index),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: isSel ? const Color(0xFFFFB800) : Colors.grey, size: 26),
-          const SizedBox(height: 4),
-          Text(label, style: GoogleFonts.poppins(fontSize: 10, color: isSel ? const Color(0xFFFFB800) : Colors.grey, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
         ],
       ),
     );

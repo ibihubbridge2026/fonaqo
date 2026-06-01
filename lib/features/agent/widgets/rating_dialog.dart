@@ -7,12 +7,16 @@ import '../repository/agent_repository.dart';
 /// Dialogue de notation pour évaluer une mission terminée
 class RatingDialog extends StatefulWidget {
   final String missionId;
+  final String? clientId;
   final Function(int rating, String comment) onRatingSubmitted;
+  final bool isClientRating;
 
   const RatingDialog({
     super.key,
     required this.missionId,
+    this.clientId,
     required this.onRatingSubmitted,
+    this.isClientRating = false,
   });
 
   @override
@@ -214,12 +218,27 @@ class _RatingDialogState extends State<RatingDialog> {
     });
 
     try {
-      final agentProvider = Provider.of<AgentProvider>(context, listen: false);
-      final success = await agentProvider.submitReview(
-        widget.missionId,
-        _rating,
-        _commentController.text.trim(),
-      );
+      final agentRepository = AgentRepository();
+      bool success = false;
+
+      if (widget.isClientRating && widget.clientId != null) {
+        // Noter le client
+        success = await agentRepository.rateClient(
+          missionId: widget.missionId,
+          clientId: widget.clientId!,
+          rating: _rating,
+          comment: _commentController.text.trim(),
+        );
+      } else {
+        // Noter la mission (évaluation de l'agent par le client)
+        final agentProvider =
+            Provider.of<AgentProvider>(context, listen: false);
+        success = await agentProvider.submitReview(
+          widget.missionId,
+          _rating,
+          _commentController.text.trim(),
+        );
+      }
 
       if (success) {
         Navigator.pop(context);
@@ -229,11 +248,10 @@ class _RatingDialogState extends State<RatingDialog> {
             backgroundColor: Colors.green,
           ),
         );
+        await widget.onRatingSubmitted(_rating, _commentController.text.trim());
       } else {
         throw Exception('Échec de la soumission');
       }
-      await widget.onRatingSubmitted(_rating, _commentController.text.trim());
-      Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

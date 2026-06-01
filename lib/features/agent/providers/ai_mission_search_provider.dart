@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import '../../../core/models/mission_model.dart';
 import '../../../core/services/api_service.dart';
 
@@ -31,48 +32,24 @@ class AiMissionSearchProvider extends ChangeNotifier {
       );
 
       if (response is Map<String, dynamic>) {
-        _analysisResult = response['analysis'] ?? 'Analyse terminée.';
+        final responseData = response['response'] as Map<String, dynamic>?;
 
-        final missionsJson = response['missions'] as List<dynamic>? ?? [];
-        _suggestedMissions =
-            missionsJson.map((json) => MissionModel.fromJson(json)).toList();
+        if (responseData != null) {
+          _analysisResult = responseData['suggestion'] ?? 'Analyse terminée.';
+
+          final missionsJson = responseData['results'] as List<dynamic>? ?? [];
+          _suggestedMissions =
+              missionsJson.map((json) => MissionModel.fromJson(json)).toList();
+        }
       }
     } catch (e) {
-      _error = "L'analyse IA a échoué. Veuillez réessayer.";
-      debugPrint("Erreur AiMissionSearchProvider: $e");
-      // Mock pour démo si l'API n'est pas prête
-      _simulateMockResponse(query);
+      _error = "Erreur de connexion. Vérifiez votre réseau internet.";
+      Logger().e("Erreur AiMissionSearchProvider: $e");
+      // Plus de mock - erreur réseau uniquement
     } finally {
       _isLoading = false;
       notifyListeners();
     }
-  }
-
-  /// Simulation de réponse pour démo (à supprimer en prod)
-  void _simulateMockResponse(String query) {
-    _analysisResult =
-        "Je cherche une mission de livraison rapide près de Cocody.";
-    _suggestedMissions = [
-      MissionModel(
-        id: '1',
-        title: 'Livraison Document Urgent',
-        description: '',
-        price: 7500,
-        status: MissionStatus.PENDING,
-        address: 'Cocody, Abidjan',
-        category: 'Livraison',
-        isUrgent: true,
-      ),
-      MissionModel(
-        id: '2',
-        title: 'Course Supermarché',
-        description: '',
-        price: 5000,
-        status: MissionStatus.PENDING,
-        address: 'Plateau, Abidjan',
-        category: 'Courses',
-      ),
-    ];
   }
 
   void clear() {

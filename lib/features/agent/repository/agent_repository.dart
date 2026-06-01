@@ -18,7 +18,7 @@ class AgentRepository {
   /// Récupère le solde de l'agent
   Future<double> getAgentBalance() async {
     try {
-      final response = await _baseClient.get('agent/balance/');
+      final response = await _baseClient.get('wallets/balance/');
 
       if (response.statusCode == 200) {
         final balance = response.data['data']['balance']?.toDouble() ?? 0.0;
@@ -57,13 +57,13 @@ class AgentRepository {
       }
 
       final response = await _baseClient.get(
-        'agent/missions/available/',
+        'missions/available/',
         queryParameters: queryParams.isNotEmpty ? queryParams : null,
       );
 
       if (response.statusCode == 200) {
         final List<dynamic> missionsData =
-            response.data['data']['missions'] ?? [];
+            response.data['data']['results'] ?? [];
         final missions =
             missionsData.map((data) => MissionModel.fromJson(data)).toList();
         _logger.d(
@@ -113,7 +113,7 @@ class AgentRepository {
   Future<bool> updateOnlineStatus(bool isOnline) async {
     try {
       final response = await _baseClient.patch(
-        'agent/status/',
+        'accounts/agent/status/',
         data: {
           'is_online': isOnline,
         },
@@ -136,7 +136,7 @@ class AgentRepository {
   Future<bool> acceptMission(String missionId) async {
     try {
       final response = await _baseClient.post(
-        'agent/missions/$missionId/accept/',
+        'missions/$missionId/accept/',
         data: {
           'status': 'ACCEPTED',
           'accepted_at': DateTime.now().toIso8601String(),
@@ -160,7 +160,7 @@ class AgentRepository {
   Future<bool> startMission(String missionId) async {
     try {
       final response = await _baseClient.post(
-        'agent/missions/$missionId/start/',
+        'missions/$missionId/start_mission/',
         data: {
           'status': 'IN_PROGRESS',
           'started_at': DateTime.now().toIso8601String(),
@@ -360,6 +360,37 @@ class AgentRepository {
     }
   }
 
+  /// Crée un litige via l'API disputes
+  Future<bool> createDispute({
+    required String missionId,
+    required String title,
+    required String description,
+    String priority = 'medium',
+  }) async {
+    try {
+      final response = await _baseClient.post(
+        'disputes/',
+        data: {
+          'mission': missionId,
+          'title': title,
+          'description': description,
+          'priority': priority,
+        },
+      );
+
+      if (response.statusCode == 201) {
+        _logger.d('Litige créé pour mission $missionId: $title');
+        return true;
+      } else {
+        _logger.e('Erreur création litige: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Erreur createDispute: $e');
+      return false;
+    }
+  }
+
   /// Récupère le solde du portefeuille
   Future<double> getWalletBalance() async {
     try {
@@ -403,17 +434,19 @@ class AgentRepository {
   /// Demande un retrait de fonds
   Future<bool> requestWithdrawal(double amount, String provider) async {
     try {
+      // Convertir provider Flutter vers channel backend
+      final channel = provider == 'mtn_momo' ? 'MTN_MOMO' : 'MOOV_FLOOZ';
+
       final response = await _baseClient.post(
         'payments/withdraw/',
         data: {
           'amount': amount,
-          'provider': provider, // 'mtn_momo' ou 'moov_flooz'
-          'currency': 'XOF',
+          'channel': channel,
         },
       );
 
-      if (response.statusCode == 200) {
-        _logger.d('Demande de retrait envoyée: $amount $provider');
+      if (response.statusCode == 201) {
+        _logger.d('Demande de retrait envoyée: $amount $channel');
         return true;
       } else {
         _logger.e('Erreur demande retrait: ${response.statusCode}');
@@ -421,6 +454,65 @@ class AgentRepository {
       }
     } catch (e) {
       _logger.e('Erreur requestWithdrawal: $e');
+      return false;
+    }
+  }
+
+  /// Récupère les notifications de l'utilisateur
+  Future<List<Map<String, dynamic>>> getNotifications() async {
+    try {
+      final response = await _baseClient.get('notifications/');
+
+      if (response.statusCode == 200) {
+        final data = response.data['data'] ?? response.data;
+        if (data is List) {
+          return List<Map<String, dynamic>>.from(data);
+        }
+        return [];
+      } else {
+        _logger.e('Erreur récupération notifications: ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      _logger.e('Erreur getNotifications: $e');
+      return [];
+    }
+  }
+
+  /// Marque une notification comme lue
+  Future<bool> markNotificationAsRead(String notificationId) async {
+    try {
+      final response =
+          await _baseClient.post('notifications/$notificationId/read/');
+
+      if (response.statusCode == 200) {
+        _logger.d('Notification marquée comme lue: $notificationId');
+        return true;
+      } else {
+        _logger.e('Erreur marquage notification: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Erreur markNotificationAsRead: $e');
+      return false;
+    }
+  }
+
+  /// Supprime une notification
+  Future<bool> deleteNotification(String notificationId) async {
+    try {
+      final response =
+          await _baseClient.delete('notifications/$notificationId/');
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        _logger.d('Notification supprimée: $notificationId');
+        return true;
+      } else {
+        _logger.e('Erreur suppression notification: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Erreur deleteNotification: $e');
       return false;
     }
   }
@@ -455,7 +547,7 @@ class AgentRepository {
   /// Récupère les évaluations de l'agent
   Future<Map<String, dynamic>> getAgentRatings() async {
     try {
-      final response = await _baseClient.get('agent/ratings/');
+      final response = await _baseClient.get('missions/statistics/');
 
       if (response.statusCode == 200) {
         final ratings = response.data['data'] ?? {};
@@ -474,7 +566,7 @@ class AgentRepository {
   /// Récupère les statistiques de l'agent
   Future<Map<String, dynamic>> getAgentStats() async {
     try {
-      final response = await _baseClient.get('agent/stats/');
+      final response = await _baseClient.get('missions/statistics/');
 
       if (response.statusCode == 200) {
         final stats = response.data['data'] ?? {};
@@ -540,7 +632,7 @@ class AgentRepository {
   Future<bool> purchaseBoost(String boostType, double amount) async {
     try {
       final response = await _baseClient.post(
-        'agent/purchase-boost/',
+        'boosts/purchase/',
         data: {
           'boost_type': boostType,
           'amount': amount,
@@ -565,13 +657,13 @@ class AgentRepository {
   Future<List<MissionModel>> getAgentMissionHistory({int limit = 20}) async {
     try {
       final response = await _baseClient.get(
-        'agent/missions/history/',
+        'missions/history/',
         queryParameters: {'limit': limit.toString()},
       );
 
       if (response.statusCode == 200) {
         final List<dynamic> missionsData =
-            response.data['data']['missions'] ?? [];
+            response.data['data']['results'] ?? [];
         final missions =
             missionsData.map((data) => MissionModel.fromJson(data)).toList();
         _logger.d('Historique missions récupéré: ${missions.length}');
@@ -583,6 +675,91 @@ class AgentRepository {
     } catch (e) {
       _logger.e('Erreur getAgentMissionHistory: $e');
       return [];
+    }
+  }
+
+  /// Télécharge le rapport mensuel depuis le backend
+  Future<String?> downloadMonthlyReport({
+    int? month,
+    int? year,
+  }) async {
+    try {
+      final Map<String, dynamic> queryParams = {};
+
+      if (month != null) {
+        queryParams['month'] = month.toString();
+      }
+      if (year != null) {
+        queryParams['year'] = year.toString();
+      }
+
+      final response = await _baseClient.get(
+        'wallets/monthly_report/',
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
+      );
+
+      if (response.statusCode == 200) {
+        final reportUrl = response.data['data']['report_url'] as String?;
+        _logger.d('Rapport mensuel téléchargé: $reportUrl');
+        return reportUrl;
+      } else {
+        _logger.e('Erreur téléchargement rapport: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      _logger.e('Erreur downloadMonthlyReport: $e');
+      return null;
+    }
+  }
+
+  /// Note un client pour une mission
+  Future<bool> rateClient({
+    required String missionId,
+    required String clientId,
+    required int rating,
+    String? comment,
+  }) async {
+    try {
+      final response = await _baseClient.post(
+        'missions/$missionId/rate_client/',
+        data: {
+          'client_id': clientId,
+          'rating': rating,
+          'comment': comment,
+          'rated_at': DateTime.now().toIso8601String(),
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        _logger.d('Client noté pour mission $missionId: $rating étoiles');
+        return true;
+      } else {
+        _logger.e('Erreur notation client: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Erreur rateClient: $e');
+      return false;
+    }
+  }
+
+  /// Marque toutes les notifications comme lues
+  Future<bool> markAllNotificationsAsRead() async {
+    try {
+      final response = await _baseClient.post(
+        'notifications/mark_all_read/',
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        _logger.d('Toutes les notifications marquées comme lues');
+        return true;
+      } else {
+        _logger.e('Erreur marquage notifications: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      _logger.e('Erreur markAllNotificationsAsRead: $e');
+      return false;
     }
   }
 }

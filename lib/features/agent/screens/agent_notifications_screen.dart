@@ -18,12 +18,12 @@ class AgentNotificationsScreen extends StatefulWidget {
 class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
   final AgentRepository _agentRepository = AgentRepository();
   final AudioService _audioService = AudioService();
-  
+
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
   bool _isMarkingAll = false;
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
-  
+
   String selectedFilter = "Tout";
 
   final List<String> filters = [
@@ -39,67 +39,61 @@ class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
     _loadNotifications();
     _setupConnectivityListener();
   }
-  
+
   @override
   void dispose() {
     _connectivitySubscription?.cancel();
     super.dispose();
   }
-  
+
   /// Charge les notifications depuis l'API
   Future<void> _loadNotifications() async {
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
-      // TODO: Implémenter getNotifications dans AgentRepository
-      // final notifications = await _agentRepository.getNotifications();
-      
-      // Données de test pour le moment
-      final notifications = [
-        {
-          'id': '1',
-          'icon': Icons.work_outline,
-          'title': 'Nouvelle mission disponible !',
-          'subtitle': 'SBEE Akpakpa à 500m de vous',
-          'time': 'Maintenant',
-          'color': Colors.orange,
-          'is_read': false,
-          'type': 'mission',
-        },
-        {
-          'id': '2',
-          'icon': Icons.check_circle_outline,
-          'title': 'Mission acceptée',
-          'subtitle': 'Attente à la banque BOA',
-          'time': 'Il y a 5 min',
-          'color': Colors.green,
-          'is_read': true,
-          'type': 'mission',
-        },
-        {
-          'id': '3',
-          'icon': Icons.account_balance_wallet_outlined,
-          'title': 'Paiement reçu',
-          'subtitle': 'Vous avez gagné 2 400 FCFA',
-          'time': 'Il y a 1h',
-          'color': Colors.blue,
-          'is_read': true,
-          'type': 'payment',
-        },
-        {
-          'id': '4',
-          'icon': Icons.flash_on_outlined,
-          'title': 'Boost activé',
-          'subtitle': 'Votre boost est actif jusqu\'au 15/06/2024',
-          'time': 'Il y a 2h',
-          'color': Colors.purple,
-          'is_read': false,
-          'type': 'boost',
-        },
-      ];
-      
+      final apiNotifications = await _agentRepository.getNotifications();
+
+      // Transformer les notifications API en format UI
+      final notifications = apiNotifications.map((notif) {
+        final type = notif['title']?.toString().toLowerCase() ?? '';
+        IconData icon;
+        Color color;
+        String notifType;
+
+        if (type.contains('mission') || type.contains('travail')) {
+          icon = Icons.work_outline;
+          color = Colors.orange;
+          notifType = 'mission';
+        } else if (type.contains('paiement') || type.contains('argent')) {
+          icon = Icons.account_balance_wallet_outlined;
+          color = Colors.blue;
+          notifType = 'payment';
+        } else if (type.contains('boost')) {
+          icon = Icons.flash_on_outlined;
+          color = Colors.purple;
+          notifType = 'boost';
+        } else {
+          icon = Icons.notifications;
+          color = Colors.grey;
+          notifType = 'other';
+        }
+
+        return {
+          'id': notif['id']?.toString() ?? '',
+          'icon': icon,
+          'title': notif['title']?.toString() ?? '',
+          'subtitle': notif['body']?.toString() ?? '',
+          'time': notif['time_ago']?.toString() ??
+              notif['created_at']?.toString() ??
+              '',
+          'color': color,
+          'is_read': notif['is_read'] ?? false,
+          'type': notifType,
+        };
+      }).toList();
+
       setState(() {
         _notifications = notifications;
         _isLoading = false;
@@ -116,24 +110,24 @@ class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
       );
     }
   }
-  
+
   /// Configure l'écouteur de connectivité
   void _setupConnectivityListener() {
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((result) {
+    _connectivitySubscription =
+        Connectivity().onConnectivityChanged.listen((result) {
       if (result != ConnectivityResult.none) {
         // Retour de connexion, recharger les notifications
         _loadNotifications();
       }
     });
   }
-  
+
   /// Marque une notification comme lue
   Future<void> _markAsRead(String notificationId) async {
     try {
-      // TODO: Implémenter markNotificationAsRead dans AgentRepository
-      // final success = await _agentRepository.markNotificationAsRead(notificationId);
-      final success = true; // Simulation
-      
+      final success =
+          await _agentRepository.markNotificationAsRead(notificationId);
+
       if (success) {
         setState(() {
           _notifications = _notifications.map((notif) {
@@ -153,19 +147,17 @@ class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
       );
     }
   }
-  
+
   /// Supprime une notification
   Future<void> _deleteNotification(String notificationId) async {
     try {
-      // TODO: Implémenter deleteNotification dans AgentRepository
-      // final success = await _agentRepository.deleteNotification(notificationId);
-      final success = true; // Simulation
-      
+      final success = await _agentRepository.deleteNotification(notificationId);
+
       if (success) {
         setState(() {
           _notifications.removeWhere((notif) => notif['id'] == notificationId);
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Notification supprimée'),
@@ -182,18 +174,18 @@ class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
       );
     }
   }
-  
+
   /// Marque toutes les notifications comme lues
   Future<void> _markAllAsRead() async {
     setState(() {
       _isMarkingAll = true;
     });
-    
+
     try {
       // TODO: Implémenter markAllNotificationsAsRead dans AgentRepository
       // final success = await _agentRepository.markAllNotificationsAsRead();
       final success = true; // Simulation
-      
+
       if (success) {
         setState(() {
           _notifications = _notifications.map((notif) {
@@ -201,7 +193,7 @@ class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
           }).toList();
           _isMarkingAll = false;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Toutes les notifications marquées comme lues'),
@@ -213,7 +205,7 @@ class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
       setState(() {
         _isMarkingAll = false;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erreur marquage: ${e.toString()}'),
@@ -222,18 +214,20 @@ class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
       );
     }
   }
-  
+
   /// Filtre les notifications
   List<Map<String, dynamic>> get _filteredNotifications {
     if (selectedFilter == "Tout") return _notifications;
-    
+
     return _notifications.where((notif) {
       final type = notif['type']?.toString().toLowerCase() ?? '';
       switch (selectedFilter) {
         case "Missions":
           return type.contains('mission') || type.contains('work');
         case "Paiements":
-          return type.contains('paiement') || type.contains('payment') || type.contains('wallet');
+          return type.contains('paiement') ||
+              type.contains('payment') ||
+              type.contains('wallet');
         case "Boost":
           return type.contains('boost') || type.contains('flash');
         default:
@@ -376,9 +370,10 @@ class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
                         itemBuilder: (context, index) {
                           final notification = _filteredNotifications[index];
                           final isRead = notification['is_read'] ?? true;
-                          
+
                           return Dismissible(
-                            key: Key(notification['id']?.toString() ?? index.toString()),
+                            key: Key(notification['id']?.toString() ??
+                                index.toString()),
                             direction: DismissDirection.endToStart,
                             background: Container(
                               margin: const EdgeInsets.only(bottom: 12),
@@ -395,19 +390,23 @@ class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
                               ),
                             ),
                             onDismissed: (direction) {
-                              _deleteNotification(notification['id']?.toString() ?? '');
+                              _deleteNotification(
+                                  notification['id']?.toString() ?? '');
                             },
                             child: GestureDetector(
                               onTap: () {
                                 if (!isRead) {
-                                  _markAsRead(notification['id']?.toString() ?? '');
+                                  _markAsRead(
+                                      notification['id']?.toString() ?? '');
                                 }
                               },
                               child: Container(
                                 margin: const EdgeInsets.only(bottom: 12),
                                 padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: isRead ? Colors.white : const Color(0xFFFFF7CC),
+                                  color: isRead
+                                      ? Colors.white
+                                      : const Color(0xFFFFF7CC),
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
@@ -424,34 +423,45 @@ class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
                                       width: 40,
                                       height: 40,
                                       decoration: BoxDecoration(
-                                        color: (notification['color'] as Color?)?.withOpacity(0.1) ?? Colors.grey.withOpacity(0.1),
+                                        color: (notification['color'] as Color?)
+                                                ?.withOpacity(0.1) ??
+                                            Colors.grey.withOpacity(0.1),
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Icon(
-                                        notification['icon'] as IconData? ?? Icons.notifications,
-                                        color: notification['color'] as Color? ?? Colors.grey,
+                                        notification['icon'] as IconData? ??
+                                            Icons.notifications,
+                                        color:
+                                            notification['color'] as Color? ??
+                                                Colors.grey,
                                         size: 20,
                                       ),
                                     ),
-                                    
+
                                     const SizedBox(width: 16),
-                                    
+
                                     // Contenu
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            notification['title']?.toString() ?? '',
+                                            notification['title']?.toString() ??
+                                                '',
                                             style: TextStyle(
                                               fontSize: 16,
-                                              fontWeight: isRead ? FontWeight.w500 : FontWeight.w700,
+                                              fontWeight: isRead
+                                                  ? FontWeight.w500
+                                                  : FontWeight.w700,
                                               color: Colors.black,
                                             ),
                                           ),
                                           const SizedBox(height: 4),
                                           Text(
-                                            notification['subtitle']?.toString() ?? '',
+                                            notification['subtitle']
+                                                    ?.toString() ??
+                                                '',
                                             style: TextStyle(
                                               fontSize: 14,
                                               color: Colors.grey.shade600,
@@ -460,7 +470,7 @@ class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
                                         ],
                                       ),
                                     ),
-                                    
+
                                     // Point rouge si non lu
                                     if (!isRead)
                                       Container(
@@ -471,9 +481,9 @@ class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
                                           shape: BoxShape.circle,
                                         ),
                                       ),
-                                    
+
                                     const SizedBox(width: 8),
-                                    
+
                                     // Heure
                                     Text(
                                       notification['time']?.toString() ?? '',

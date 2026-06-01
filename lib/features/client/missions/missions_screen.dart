@@ -21,15 +21,20 @@ class MissionsScreen extends StatefulWidget {
 
 class _MissionsScreenState extends State<MissionsScreen> {
   final MissionRepository _repo = MissionRepository();
+  final ScrollController _scrollController = ScrollController();
   List<MissionModel> _missions = [];
   bool _loading = true;
   bool _isFetching = false; // garde-fou réel (concurrence)
+  bool _isLoadingMore = false;
+  int _currentPage = 1;
+  bool _hasMore = true;
   String? _error;
   String _filter = 'all'; // 'all', 'ongoing', 'completed', 'cancelled'
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_scrollListener);
     _loadMissions();
     // Écouter les changements pour rafraîchir la liste quand on quitte le mode création
     widget.showCreateMissionListenable.addListener(_onCreateModeChanged);
@@ -37,8 +42,37 @@ class _MissionsScreenState extends State<MissionsScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     widget.showCreateMissionListenable.removeListener(_onCreateModeChanged);
     super.dispose();
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      if (!_isLoadingMore && _hasMore) {
+        _loadMoreMissions();
+      }
+    }
+  }
+
+  Future<void> _loadMoreMissions() async {
+    if (_isLoadingMore) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    // Simulate API call delay
+    await Future.delayed(const Duration(seconds: 1));
+
+    // In real implementation, call MissionRepository with page parameter
+    // For now, just simulate loading
+    setState(() {
+      _currentPage++;
+      _isLoadingMore = false;
+      // _hasMore would be updated based on API response
+    });
   }
 
   void _onCreateModeChanged() {
@@ -233,6 +267,17 @@ class _MissionsScreenState extends State<MissionsScreen> {
                 SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
+                      if (index == filtered.length) {
+                        return const Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFFFFD400),
+                            ),
+                          ),
+                        );
+                      }
+
                       final mission = filtered[index];
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(20, 0, 20, 15),
@@ -241,6 +286,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
                           type: mission.category ?? 'Mission',
                           status: mission.statusDisplay,
                           time: mission.timeAgo,
+                          heroTag: 'mission_${mission.id}',
                           onTap: () => Navigator.pushNamed(
                             context,
                             AppRoutes.missionDetail,
@@ -249,7 +295,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
                         ),
                       );
                     },
-                    childCount: filtered.length,
+                    childCount: filtered.length + (_isLoadingMore ? 1 : 0),
                   ),
                 ),
 
@@ -270,10 +316,11 @@ class _MissionsScreenState extends State<MissionsScreen> {
       child: Center(
         child: Column(
           children: [
-            Icon(Icons.assignment_late_outlined, size: 48, color: Colors.grey),
+            Icon(Icons.assignment_late_outlined,
+                size: 48, color: Colors.black54),
             SizedBox(height: 12),
             Text('Aucune mission trouvée',
-                style: TextStyle(color: Colors.grey, fontSize: 15)),
+                style: TextStyle(color: Colors.black87, fontSize: 15)),
           ],
         ),
       ),
@@ -333,6 +380,7 @@ class MissionCard extends StatelessWidget {
   final String status;
   final String time;
   final VoidCallback? onTap;
+  final String? heroTag;
 
   const MissionCard(
       {super.key,
@@ -340,11 +388,12 @@ class MissionCard extends StatelessWidget {
       required this.type,
       required this.status,
       required this.time,
-      this.onTap});
+      this.onTap,
+      this.heroTag});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final cardContent = InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(25),
       child: Container(
@@ -387,6 +436,18 @@ class MissionCard extends StatelessWidget {
         ),
       ),
     );
+
+    if (heroTag != null) {
+      return Hero(
+        tag: heroTag!,
+        child: Material(
+          color: Colors.transparent,
+          child: cardContent,
+        ),
+      );
+    }
+
+    return cardContent;
   }
 }
 

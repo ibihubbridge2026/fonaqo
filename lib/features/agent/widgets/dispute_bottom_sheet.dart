@@ -60,10 +60,11 @@ class _DisputeBottomSheetState extends State<DisputeBottomSheet> {
     });
 
     try {
-      final success = await _agentRepository.openDispute(
-        widget.missionId,
-        reason,
-        description,
+      final success = await _agentRepository.createDispute(
+        missionId: widget.missionId,
+        title: reason,
+        description: description,
+        priority: 'medium',
       );
 
       if (success) {

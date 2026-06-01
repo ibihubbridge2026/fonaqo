@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:shimmer/shimmer.dart';
 import 'dart:io';
 import '../providers/agent_provider.dart';
 import '../widgets/wallet_transaction_tile.dart';
@@ -19,201 +21,49 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
   bool _isGeneratingPdf = false;
   final AgentRepository _agentRepository = AgentRepository();
 
+  Future<void> _refreshWalletData() async {
+    final agentProvider = Provider.of<AgentProvider>(context, listen: false);
+    await agentProvider.fetchWalletDetails();
+  }
+
   @override
   void dispose() {
     super.dispose();
   }
 
-  /// Génère le relevé PDF des 30 dernières transactions
-  Future<void> _generatePdfStatement() async {
+  /// Télécharge le rapport mensuel depuis le backend
+  Future<void> _downloadMonthlyReport() async {
     setState(() {
       _isGeneratingPdf = true;
     });
 
     try {
-      final agentProvider = Provider.of<AgentProvider>(context, listen: false);
-      final transactions = agentProvider.transactions;
-      final balance = agentProvider.balance;
-
-      // Prendre les 30 dernières transactions
-      final recentTransactions = transactions.take(30).toList();
-
-      final pdf = pw.Document();
-
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(32),
-          build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                // Header
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          'FONACO',
-                          style: pw.TextStyle(
-                            fontSize: 24,
-                            fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.black,
-                          ),
-                        ),
-                        pw.Text(
-                          'Relevé de Portefeuille',
-                          style: pw.TextStyle(
-                            fontSize: 16,
-                            color: PdfColors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                    pw.Text(
-                      'Date: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
-                      style: pw.TextStyle(
-                        fontSize: 12,
-                        color: PdfColors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-
-                pw.SizedBox(height: 32),
-
-                // Solde actuel
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(16),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.yellow100,
-                    borderRadius: pw.BorderRadius.circular(8),
-                  ),
-                  child: pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Text(
-                        'Solde Actuel',
-                        style: pw.TextStyle(
-                          fontSize: 16,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.Text(
-                        '${balance.toStringAsFixed(2)} XOF',
-                        style: pw.TextStyle(
-                          fontSize: 20,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                pw.SizedBox(height: 24),
-
-                // Transactions
-                pw.Text(
-                  '30 Dernières Transactions',
-                  style: pw.TextStyle(
-                    fontSize: 18,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-
-                pw.SizedBox(height: 16),
-
-                if (recentTransactions.isEmpty)
-                  pw.Center(
-                    child: pw.Text(
-                      'Aucune transaction récente',
-                      style: pw.TextStyle(
-                        fontSize: 14,
-                        color: PdfColors.grey,
-                      ),
-                    ),
-                  )
-                else
-                  pw.TableHelper.fromTextArray(
-                    context: context,
-                    data: [
-                      ['Date', 'Description', 'Montant'],
-                      ...recentTransactions.map((transaction) => [
-                            transaction['date'] ?? '',
-                            transaction['title'] ?? '',
-                            '${transaction['amount'] ?? 0} XOF',
-                          ]),
-                    ],
-                    headerStyle: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.white,
-                    ),
-                    headerDecoration: pw.BoxDecoration(
-                      color: PdfColors.yellow,
-                    ),
-                    cellAlignments: {
-                      0: pw.Alignment.centerLeft,
-                      1: pw.Alignment.centerLeft,
-                      2: pw.Alignment.centerRight,
-                    },
-                    cellStyle: pw.TextStyle(
-                      fontSize: 10,
-                    ),
-                    columnWidths: {
-                      0: const pw.FlexColumnWidth(2),
-                      1: const pw.FlexColumnWidth(3),
-                      2: const pw.FlexColumnWidth(2),
-                    },
-                  ),
-
-                pw.SizedBox(height: 32),
-
-                // Footer
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.center,
-                  children: [
-                    pw.Text(
-                      'Merci d\'utiliser FONACO',
-                      style: pw.TextStyle(
-                        fontSize: 12,
-                        color: PdfColors.grey,
-                      ),
-                    ),
-                    pw.SizedBox(height: 8),
-                    pw.Text(
-                      'Ce document est généré automatiquement',
-                      style: pw.TextStyle(
-                        fontSize: 10,
-                        color: PdfColors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          },
-        ),
+      final reportUrl = await _agentRepository.downloadMonthlyReport(
+        month: DateTime.now().month,
+        year: DateTime.now().year,
       );
 
-      // Sauvegarder et imprimer le PDF
-      await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => pdf.save(),
-        name: 'releé_fonaco_${DateTime.now().millisecondsSinceEpoch}.pdf',
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Relevé PDF généré avec succès!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (reportUrl != null) {
+        // Ouvrir l'URL du rapport
+        // TODO: Implémenter l'ouverture de l'URL dans le navigateur ou téléchargement direct
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Rapport mensuel téléchargé avec succès!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Erreur lors du téléchargement du rapport'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur génération PDF: ${e.toString()}'),
+          content: Text('Erreur téléchargement rapport: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
@@ -231,257 +81,345 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
     return Consumer<AgentProvider>(
       builder: (context, agentProvider, child) {
         return Scaffold(
-          backgroundColor: const Color(0xFFF5F6FA),
+          backgroundColor: const Color(0xFFF5F5F5),
           body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // HEADER
-                  const Text(
-                    'Mon Portefeuille',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Gérez vos revenus et transactions',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-
-                  // SOLDE CARD
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFFFFD400),
-                          const Color(0xFFFFC700),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFFFD400).withOpacity(.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Solde disponible',
-                          style: TextStyle(
-                            color: Colors.black.withOpacity(.7),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${agentProvider.balance.toStringAsFixed(0)} FCFA',
-                          style: const TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.black,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () => _showWithdrawalBottomSheet(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.black,
-                            foregroundColor: const Color(0xFFFFD400),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Retirer mes gains',
+            child: RefreshIndicator(
+              onRefresh: _refreshWalletData,
+              color: const Color(0xFFFFD400),
+              backgroundColor: Colors.white,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: agentProvider.isLoading
+                    ? _buildShimmerLoading()
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // HEADER
+                          const Text(
+                            'Mon Portefeuille',
                             style: TextStyle(
-                              fontWeight: FontWeight.w700,
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.black,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // ACTIONS RAPIDES
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildQuickAction(Icons.add, 'Recharger'),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildQuickAction(Icons.send, 'Transfert'),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child:
-                            _buildQuickAction(Icons.receipt_long, 'Factures'),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 30),
-
-                  // RÉSUMÉ DES REVENUS
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(.03),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Résumé des revenus',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
+                          const SizedBox(height: 8),
+                          Text(
+                            'Gérez vos revenus et transactions',
+                            style: TextStyle(
+                              color: Colors.black54,
+                              fontSize: 16,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 20),
-                        _buildRevenueRow('Missions terminées', '152'),
-                        _buildRevenueRow('Revenus totaux', '1 250 000 FCFA'),
-                        _buildRevenueRow('Commission FONACO', '125 000 FCFA'),
-                        _buildRevenueRow(
-                            'Revenu moyen / mission', '8 200 FCFA'),
-                      ],
-                    ),
-                  ),
+                          const SizedBox(height: 30),
 
-                  const SizedBox(height: 30),
-
-                  // TRANSACTIONS RÉCENTES
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(.03),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Transactions récentes',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                              ),
+                          // SOLDE CARD
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
                             ),
-                            TextButton(
-                              onPressed: () {
-                                // TODO: Navigation vers historique
-                              },
-                              child: const Text('Voir tout'),
-                            ),
-
-                            const SizedBox(height: 8),
-
-                            // Bouton Télécharger relevé
-                            SizedBox(
-                              width: double.infinity,
-                              height: 40,
-                              child: ElevatedButton.icon(
-                                onPressed: _isGeneratingPdf
-                                    ? null
-                                    : _generatePdfStatement,
-                                icon: _isGeneratingPdf
-                                    ? const SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.black,
-                                        ),
-                                      )
-                                    : const Icon(Icons.picture_as_pdf,
-                                        size: 16),
-                                label: Text(
-                                  _isGeneratingPdf
-                                      ? 'Génération...'
-                                      : 'Télécharger mon relevé',
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Solde disponible',
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 12,
+                                    color: Colors.black,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFFD400),
-                                  foregroundColor: Colors.black,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${agentProvider.balance.toStringAsFixed(0)} FCFA',
+                                  style: const TextStyle(
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.black,
                                   ),
                                 ),
-                              ),
+                                const SizedBox(height: 16),
+                                ElevatedButton(
+                                  onPressed: () =>
+                                      _showWithdrawalBottomSheet(context),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.black,
+                                    foregroundColor: const Color(0xFFFFD400),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Retirer mes gains',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 20),
-                        // Transactions dynamiques
-                        ...agentProvider.transactions.map((transaction) {
-                          return WalletTransactionTile(
-                            title: transaction['title'] ?? 'Transaction',
-                            subtitle: transaction['subtitle'] ?? 'Description',
-                            amount: transaction['amount']?.toString() ?? '0',
-                            icon: transaction['icon'] ?? Icons.swap_horiz,
-                            iconColor: transaction['iconColor'] ?? Colors.grey,
-                            amountColor:
-                                transaction['amountColor'] ?? Colors.black,
-                            isIncome: transaction['isIncome'] ?? true,
-                            onTap: () {
-                              // TODO: Détails transaction
-                            },
-                          );
-                        }).toList(),
-                      ],
-                    ),
-                  ),
+                          ),
 
-                  const SizedBox(height: 30),
-                ],
+                          const SizedBox(height: 30),
+
+                          // ACTIONS RAPIDES
+                          Row(
+                            children: [
+                              Expanded(
+                                child:
+                                    _buildQuickAction(Icons.add, 'Recharger'),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child:
+                                    _buildQuickAction(Icons.send, 'Transfert'),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _buildQuickAction(
+                                    Icons.receipt_long, 'Factures'),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          // RÉSUMÉ DES REVENUS
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(22),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(.03),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Résumé des revenus',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                _buildRevenueRow('Missions terminées',
+                                    '${agentProvider.stats['completed_missions'] ?? 0}'),
+                                _buildRevenueRow('Revenus totaux',
+                                    '${(agentProvider.stats['total_earnings'] ?? 0).toStringAsFixed(0)} FCFA'),
+                                _buildRevenueRow('Commission FONACO',
+                                    '${((agentProvider.stats['total_earnings'] ?? 0) * 0.1).toStringAsFixed(0)} FCFA'),
+                                _buildRevenueRow('Revenu moyen / mission',
+                                    '${(agentProvider.stats['completed_missions'] ?? 1) > 0 ? ((agentProvider.stats['total_earnings'] ?? 0) / (agentProvider.stats['completed_missions'] ?? 1)).toStringAsFixed(0) : '0'} FCFA'),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          // TRANSACTIONS RÉCENTES
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(22),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(.03),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Transactions récentes',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w900,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                    TextButton(
+                                      onPressed: () {
+                                        // TODO: Navigation vers historique
+                                      },
+                                      child: const Text('Voir tout'),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 8),
+
+                                // Bouton Télécharger relevé
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 40,
+                                  child: ElevatedButton.icon(
+                                    onPressed: _isGeneratingPdf
+                                        ? null
+                                        : _downloadMonthlyReport,
+                                    icon: _isGeneratingPdf
+                                        ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.black,
+                                            ),
+                                          )
+                                        : const Icon(Icons.picture_as_pdf,
+                                            size: 16),
+                                    label: Text(
+                                      _isGeneratingPdf
+                                          ? 'Téléchargement...'
+                                          : 'Télécharger mon relevé',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFFFD400),
+                                      foregroundColor: Colors.black,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                // Transactions dynamiques
+                                ...agentProvider.transactions
+                                    .map((transaction) {
+                                  return WalletTransactionTile(
+                                    title:
+                                        transaction['title'] ?? 'Transaction',
+                                    subtitle: transaction['subtitle'] ??
+                                        'Description',
+                                    amount: transaction['amount']?.toString() ??
+                                        '0',
+                                    icon:
+                                        transaction['icon'] ?? Icons.swap_horiz,
+                                    iconColor:
+                                        transaction['iconColor'] ?? Colors.grey,
+                                    amountColor: transaction['amountColor'] ??
+                                        Colors.black,
+                                    isIncome: transaction['isIncome'] ?? true,
+                                    onTap: () {
+                                      // TODO: Détails transaction
+                                    },
+                                  );
+                                }).toList(),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
+                        ],
+                      ),
               ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildShimmerLoading() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey[300]!,
+      highlightColor: Colors.grey[100]!,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 200,
+            height: 28,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 250,
+            height: 16,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          const SizedBox(height: 30),
+          Container(
+            width: double.infinity,
+            height: 150,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+            ),
+          ),
+          const SizedBox(height: 30),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Container(
+                  height: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -493,9 +431,9 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
         children: [
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 14,
-              color: Colors.grey.shade600,
+              color: Colors.black54,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -541,8 +479,8 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
           const SizedBox(height: 14),
           Text(
             label,
-            style: TextStyle(
-              color: Colors.grey.shade600,
+            style: const TextStyle(
+              color: Colors.black54,
               fontSize: 13,
             ),
           ),
@@ -559,15 +497,22 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
       builder: (context) => _WithdrawalBottomSheet(
         availableBalance: context.read<AgentProvider>().balance,
         onWithdrawalRequested: (amount, provider) async {
+          Navigator.pop(context);
           final success = await context
               .read<AgentProvider>()
               .requestWithdrawal(amount, provider);
           if (success) {
-            Navigator.pop(context);
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Demande de retrait envoyée avec succès!'),
+                content: Text('Demande de retrait enregistrée avec succès'),
                 backgroundColor: Colors.green,
+              ),
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Erreur lors de la demande de retrait'),
+                backgroundColor: Colors.red,
               ),
             );
           }
@@ -635,6 +580,7 @@ class _WithdrawalBottomSheetState extends State<_WithdrawalBottomSheet> {
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w900,
+              color: Colors.black,
             ),
           ),
 
@@ -642,8 +588,8 @@ class _WithdrawalBottomSheetState extends State<_WithdrawalBottomSheet> {
 
           Text(
             'Solde disponible: ${widget.availableBalance.toStringAsFixed(0)} FCFA',
-            style: TextStyle(
-              color: Colors.grey.shade600,
+            style: const TextStyle(
+              color: Colors.black54,
               fontSize: 16,
             ),
           ),
@@ -661,6 +607,7 @@ class _WithdrawalBottomSheetState extends State<_WithdrawalBottomSheet> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
+                    color: Colors.black,
                   ),
                 ),
 
@@ -691,6 +638,7 @@ class _WithdrawalBottomSheetState extends State<_WithdrawalBottomSheet> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
+                    color: Colors.black,
                   ),
                 ),
 
@@ -839,6 +787,7 @@ class _WithdrawalBottomSheetState extends State<_WithdrawalBottomSheet> {
   }
 
   Future<void> _submitWithdrawal() async {
+    HapticFeedback.lightImpact();
     final amountText = _amountController.text.trim();
 
     if (amountText.isEmpty) {
@@ -890,208 +839,6 @@ class _WithdrawalBottomSheetState extends State<_WithdrawalBottomSheet> {
       if (mounted) {
         setState(() {
           _isProcessing = false;
-        });
-      }
-    }
-  }
-
-  /// Génère le relevé PDF des 30 dernières transactions
-  Future<void> _generatePdfStatement() async {
-    setState(() {
-      _isGeneratingPdf = true;
-    });
-
-    try {
-      final agentProvider = Provider.of<AgentProvider>(context, listen: false);
-      final transactions = agentProvider.transactions;
-      final balance = agentProvider.balance;
-
-      // Prendre les 30 dernières transactions
-      final recentTransactions = transactions.take(30).toList();
-
-      final pdf = pw.Document();
-
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(32),
-          build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                // Header
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  children: [
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          'FONACO',
-                          style: pw.TextStyle(
-                            fontSize: 24,
-                            fontWeight: pw.FontWeight.bold,
-                            color: PdfColors.black,
-                          ),
-                        ),
-                        pw.Text(
-                          'Relevé de Portefeuille',
-                          style: pw.TextStyle(
-                            fontSize: 16,
-                            color: PdfColors.grey,
-                          ),
-                        ),
-                      ],
-                    ),
-                    pw.Text(
-                      'Date: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}',
-                      style: pw.TextStyle(
-                        fontSize: 12,
-                        color: PdfColors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-
-                pw.SizedBox(height: 32),
-
-                // Solde actuel
-                pw.Container(
-                  padding: const pw.EdgeInsets.all(16),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColors.yellow100,
-                    borderRadius: pw.BorderRadius.circular(8),
-                  ),
-                  child: pw.Row(
-                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                    children: [
-                      pw.Text(
-                        'Solde Actuel',
-                        style: pw.TextStyle(
-                          fontSize: 16,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
-                      pw.Text(
-                        '${balance.toStringAsFixed(2)} XOF',
-                        style: pw.TextStyle(
-                          fontSize: 20,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.black,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                pw.SizedBox(height: 24),
-
-                // Transactions
-                pw.Text(
-                  '30 Dernières Transactions',
-                  style: pw.TextStyle(
-                    fontSize: 18,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-
-                pw.SizedBox(height: 16),
-
-                if (recentTransactions.isEmpty)
-                  pw.Center(
-                    child: pw.Text(
-                      'Aucune transaction récente',
-                      style: pw.TextStyle(
-                        fontSize: 14,
-                        color: PdfColors.grey,
-                      ),
-                    ),
-                  )
-                else
-                  pw.TableHelper.fromTextArray(
-                    context: context,
-                    data: [
-                      ['Date', 'Description', 'Montant'],
-                      ...recentTransactions.map((transaction) => [
-                            transaction['date'] ?? '',
-                            transaction['title'] ?? '',
-                            '${transaction['amount'] ?? 0} XOF',
-                          ]),
-                    ],
-                    headerStyle: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.white,
-                    ),
-                    headerDecoration: pw.BoxDecoration(
-                      color: PdfColors.yellow,
-                    ),
-                    cellAlignments: {
-                      0: pw.Alignment.centerLeft,
-                      1: pw.Alignment.centerLeft,
-                      2: pw.Alignment.centerRight,
-                    },
-                    cellStyle: pw.TextStyle(
-                      fontSize: 10,
-                    ),
-                    columnWidths: {
-                      0: const pw.FlexColumnWidth(2),
-                      1: const pw.FlexColumnWidth(3),
-                      2: const pw.FlexColumnWidth(2),
-                    },
-                  ),
-
-                pw.SizedBox(height: 32),
-
-                // Footer
-                pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.center,
-                  children: [
-                    pw.Text(
-                      'Merci d\'utiliser FONACO',
-                      style: pw.TextStyle(
-                        fontSize: 12,
-                        color: PdfColors.grey,
-                      ),
-                    ),
-                    pw.SizedBox(height: 8),
-                    pw.Text(
-                      'Ce document est généré automatiquement',
-                      style: pw.TextStyle(
-                        fontSize: 10,
-                        color: PdfColors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          },
-        ),
-      );
-
-      // Sauvegarder et imprimer le PDF
-      await Printing.layoutPdf(
-        onLayout: (PdfPageFormat format) async => pdf.save(),
-        name: 'releé_fonaco_${DateTime.now().millisecondsSinceEpoch}.pdf',
-      );
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Relevé PDF généré avec succès!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur génération PDF: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isGeneratingPdf = false;
         });
       }
     }

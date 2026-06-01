@@ -19,25 +19,26 @@ class AgentNotificationBadge extends StatelessWidget {
         child,
         if (showBadge && count > 0)
           Positioned(
-            right: 8,
-            top: 8,
+            right: 9,
+            top: 9,
             child: Container(
-              padding: const EdgeInsets.all(4),
+              padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
                 color: Colors.red,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white, width: 2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.white, width: 1),
               ),
               constraints: const BoxConstraints(
-                minWidth: 16,
-                minHeight: 16,
+                minWidth: 14,
+                minHeight: 14,
               ),
               child: Text(
-                count > 99 ? '99+' : count.toString(),
+                count > 9 ? '9+' : count.toString(),
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 10,
+                  fontSize: 8,
                   fontWeight: FontWeight.bold,
+                  height: 1.1,
                 ),
                 textAlign: TextAlign.center,
               ),

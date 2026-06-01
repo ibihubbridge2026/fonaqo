@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import '../models/agent_model.dart';
 import '../../../core/services/api_service.dart';
 
@@ -31,48 +32,24 @@ class AiSearchProvider extends ChangeNotifier {
       );
 
       if (response is Map<String, dynamic>) {
-        _analysisResult = response['analysis'] ?? 'Analyse terminée.';
+        final responseData = response['response'] as Map<String, dynamic>?;
 
-        final agentsJson = response['agents'] as List<dynamic>? ?? [];
-        _suggestedAgents =
-            agentsJson.map((json) => AgentModel.fromJson(json)).toList();
+        if (responseData != null) {
+          _analysisResult = responseData['suggestion'] ?? 'Analyse terminée.';
+
+          final agentsJson = responseData['results'] as List<dynamic>? ?? [];
+          _suggestedAgents =
+              agentsJson.map((json) => AgentModel.fromJson(json)).toList();
+        }
       }
     } catch (e) {
-      _error = "L'analyse IA a échoué. Veuillez réessayer.";
-      print("Erreur AiSearchProvider: $e");
-      // Mock pour démo si l'API n'est pas prête
-      _simulateMockResponse(query);
+      _error = "Erreur de connexion. Vérifiez votre réseau internet.";
+      Logger().e("Erreur AiSearchProvider: $e");
+      // Plus de mock - erreur réseau uniquement
     } finally {
       _isLoading = false;
       notifyListeners();
     }
-  }
-
-  /// Simulation de réponse pour démo (à supprimer en prod)
-  void _simulateMockResponse(String query) {
-    _analysisResult =
-        "Je cherche un agent disponible pour une démarche bancaire.";
-    _suggestedAgents = [
-      AgentModel(
-        id: '1',
-        name: 'Moussa Diop',
-        avatarUrl: '',
-        rating: 4.9,
-        specialty: 'Expert en démarches',
-        completedMissions: 124,
-        estimatedPrice: '5 000 FCFA',
-      ),
-      AgentModel(
-        id: '2',
-        name: 'Awa Ndiaye',
-        avatarUrl: '',
-        rating: 5.0,
-        specialty: 'Banque & Finance',
-        completedMissions: 142,
-        estimatedPrice: '4 500 FCFA',
-        isTopChoice: true,
-      ),
-    ];
   }
 
   void clear() {

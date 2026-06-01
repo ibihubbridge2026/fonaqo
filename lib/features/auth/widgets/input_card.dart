@@ -9,7 +9,7 @@ class InputCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F3F3),
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(5),
         border: Border.all(color: Colors.black.withOpacity(0.06)),
       ),

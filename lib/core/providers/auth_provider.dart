@@ -158,11 +158,8 @@ class AuthProvider extends ChangeNotifier {
         // Gestion spécifique des erreurs 400 (identifiants incorrects)
         String errorMessage = 'Erreur de connexion';
         if (response.statusCode == 400) {
-          // Erreur 400 : afficher le message exact du backend
-          errorMessage = response.data['message'] ??
-              response.data['error'] ??
-              response.data['detail'] ??
-              'Identifiants incorrects';
+          // Erreur 400 : extraire les erreurs par champ depuis response.data
+          errorMessage = _extractApiErrors(response.data);
           _logger.e('🔴 Erreur 400 login: $errorMessage');
         } else if (response.statusCode == 401) {
           errorMessage = 'Identifiants incorrects';
@@ -188,10 +185,7 @@ class AuthProvider extends ChangeNotifier {
       // Gestion spécifique des erreurs Dio
       String errorMessage = 'Erreur de connexion';
       if (e.response?.statusCode == 400) {
-        errorMessage = e.response?.data['message'] ??
-            e.response?.data['error'] ??
-            e.response?.data['detail'] ??
-            'Identifiants incorrects';
+        errorMessage = _extractApiErrors(e.response?.data ?? {});
       } else if (e.response?.statusCode == 401) {
         errorMessage = 'Identifiants incorrects';
       } else if (e.type == DioExceptionType.connectionError) {
@@ -225,13 +219,32 @@ class AuthProvider extends ChangeNotifier {
           await _baseClient.post('accounts/register/', data: userData);
 
       if (response.statusCode != 201 && response.statusCode != 200) {
-        _setError(response.data['message'] ?? 'Erreur d\'inscription');
+        final errorMessage = _extractApiErrors(response.data);
+        _setError(errorMessage);
         return false;
       }
 
       final data = response.data['data'];
       await _saveAuthData(data);
       return true;
+    } on DioException catch (e) {
+      _logger.e(
+          'Erreur REGISTER: ${e.response?.statusCode} - ${e.response?.data}');
+
+      String errorMessage = 'Erreur d\'inscription';
+      if (e.response?.statusCode == 400) {
+        errorMessage = _extractApiErrors(e.response?.data ?? {});
+      } else if (e.type == DioExceptionType.connectionError) {
+        errorMessage =
+            'Serveur indisponible. Vérifiez votre connexion internet.';
+      } else if (e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.connectionTimeout) {
+        errorMessage = 'Délai d\'attente dépassé. Réessayez dans un instant.';
+      }
+
+      _setError(errorMessage);
+      return false;
     } catch (e) {
       _logger.e('Erreur REGISTER: $e');
       _setError('Erreur d\'inscription: ${e.toString()}');
@@ -581,8 +594,37 @@ class AuthProvider extends ChangeNotifier {
       return error.message;
     } else if (error is String) {
       return error;
-    } else {
-      return 'Une erreur est survenue';
     }
+    return 'Erreur inconnue';
+  }
+
+  /// Extrait et formate les erreurs de validation depuis la réponse API
+  String _extractApiErrors(dynamic responseData) {
+    if (responseData is! Map) return 'Erreur de validation';
+
+    // Structure standardisée: { "status": "error", "message": "...", "data": { "field": ["error"] } }
+    final data = responseData['data'];
+    final message = responseData['message'] as String?;
+
+    if (data is Map && data.isNotEmpty) {
+      final errors = <String>[];
+
+      // Extraire les erreurs par champ
+      data.forEach((key, value) {
+        if (value is List && value.isNotEmpty) {
+          final fieldErrors = value.whereType<String>().join(', ');
+          errors.add('$key: $fieldErrors');
+        } else if (value is String) {
+          errors.add('$key: $value');
+        }
+      });
+
+      if (errors.isNotEmpty) {
+        return errors.join('\n');
+      }
+    }
+
+    // Fallback sur le message général
+    return message ?? 'Erreur de validation';
   }
 }
