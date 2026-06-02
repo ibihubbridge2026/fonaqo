@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
@@ -24,11 +23,6 @@ class ProfileScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "Paramètres",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 15),
                 ProfileParamItem(
                   icon: Icons.person_outline,
                   title: "Informations personnelles",
@@ -125,7 +119,7 @@ class ProfileScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 100), // Réserve pour le BottomNav
+          const SizedBox(height: 30),
         ],
       ),
     );
@@ -213,83 +207,62 @@ class ProfileHeader extends StatelessWidget {
         ),
       );
     }
-    return Column(
-      children: [
-        Stack(
-          alignment: Alignment.bottomRight,
-          children: [
-            CircleAvatar(
-              radius: 55,
-              backgroundColor: Color(0xFFFFD400),
-              child: CircleAvatar(
-                key: ValueKey(user.avatarUrl), // Force rebuild when URL changes
-                radius: 52,
-                backgroundImage: user.avatarUrl != null
-                    ? CachedNetworkImageProvider(
-                            "${user.avatarUrl}?t=${DateTime.now().millisecondsSinceEpoch}")
-                        as ImageProvider
-                    : const AssetImage('assets/images/avatar/user.png'),
-                backgroundColor: Colors.grey[200],
-              ),
-            ),
-            InkWell(
-              onTap: () =>
-                  Navigator.pushNamed(context, AppRoutes.profilePersonalInfo),
-              borderRadius: BorderRadius.circular(99),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: const BoxDecoration(
-                  color: Colors.black,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.edit,
-                  color: Color(0xFFFFD400),
-                  size: 18,
-                ),
-              ),
-            ),
-          ],
-        ),
-        // Nom dynamique
-        Text(
-          user.username,
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
-        ),
-        Text(
-          user.role.toUpperCase(),
-          style: const TextStyle(
-            color: Color(0xFF715D00),
-            fontWeight: FontWeight.bold,
-            fontSize: 13,
-          ),
-        ),
-        const SizedBox(height: 25),
-
-        // STATISTIQUES UTILISATEUR
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Row(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        children: [
+          // Avatar et nom
+          Stack(
+            alignment: Alignment.bottomRight,
             children: [
-              Expanded(
-                child: _buildStatCard(
-                  user.agentProfile?.totalMissions.toString() ?? "0",
-                  "Missions créées",
-                  Icons.assignment_turned_in_rounded,
+              CircleAvatar(
+                radius: 55,
+                backgroundColor: const Color(0xFFFFD400),
+                child: CircleAvatar(
+                  key: ValueKey(user.avatarUrl),
+                  radius: 52,
+                  backgroundImage: user.avatarUrl != null
+                      ? NetworkImage(
+                          "${user.avatarUrl}?t=${DateTime.now().millisecondsSinceEpoch}")
+                      : null,
+                  backgroundColor: Colors.grey[200],
+                  child: user.avatarUrl == null
+                      ? const Icon(Icons.person, size: 40, color: Colors.grey)
+                      : null,
                 ),
               ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: _buildStatCard(
-                  "${(user.walletBalance ?? 0.0).toStringAsFixed(0)} FCFA",
-                  "Solde disponible",
-                  Icons.account_balance_wallet_rounded,
+              InkWell(
+                onTap: () =>
+                    Navigator.pushNamed(context, AppRoutes.profilePersonalInfo),
+                borderRadius: BorderRadius.circular(99),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: Colors.black,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.edit,
+                    color: Color(0xFFFFD400),
+                    size: 18,
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 15),
+          // Nom dynamique
+          Text(
+            user.username,
+            style: const TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 25),      
+        ],
+      ),
     );
   }
 

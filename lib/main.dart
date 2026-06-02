@@ -18,6 +18,7 @@ import 'core/services/offline_cache_service.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/wallet_provider.dart';
 import 'core/providers/mission_provider.dart';
+import 'core/providers/notification_provider.dart';
 import 'core/routes/app_routes.dart';
 import 'features/agent/providers/agent_provider.dart';
 import 'core/theme/theme_provider.dart';
@@ -255,6 +256,9 @@ class FonacoApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => AgentProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => NotificationProvider(),
         ),
       ],
       child: Consumer<ThemeProvider>(

@@ -298,7 +298,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
 
                       final mission = filtered[index];
                       return Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 15),
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
                         child: MissionCard(
                           title: mission.title,
                           type: mission.category ?? 'Service',

@@ -271,4 +271,51 @@ class MissionRepository {
       return [];
     }
   }
+
+  /// Agents à proximité (GET /accounts/agents/nearby/).
+  /// Accepte les coordonnées GPS et les filtres optionnels.
+  Future<List<Map<String, dynamic>>> fetchNearbyAgents({
+    required double latitude,
+    required double longitude,
+    double? radiusKm,
+    double? minRating,
+    bool? verifiedOnly,
+    List<String>? missionTypes,
+    int? minPrice,
+    int? maxPrice,
+    int limit = 20,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'latitude': latitude.toString(),
+        'longitude': longitude.toString(),
+      };
+      if (radiusKm != null) queryParams['radius_km'] = radiusKm.toString();
+      if (minRating != null) queryParams['min_rating'] = minRating.toString();
+      if (verifiedOnly != null)
+        queryParams['verified_only'] = verifiedOnly.toString();
+      if (limit != 20) queryParams['limit'] = limit.toString();
+      if (minPrice != null) queryParams['min_price'] = minPrice.toString();
+      if (maxPrice != null) queryParams['max_price'] = maxPrice.toString();
+      if (missionTypes != null && missionTypes.isNotEmpty) {
+        queryParams['mission_types'] = missionTypes.join(',');
+      }
+
+      final response = await _baseClient.get(
+        'accounts/agents/nearby/',
+        queryParameters: queryParams,
+      );
+      if (response.statusCode != 200) return [];
+      final body = response.data;
+      if (body is! Map<String, dynamic>) return [];
+      final data = body['data'];
+      if (data is List<dynamic>) {
+        return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+      return [];
+    } catch (e, st) {
+      _logger.e('fetchNearbyAgents', error: e, stackTrace: st);
+      return [];
+    }
+  }
 }

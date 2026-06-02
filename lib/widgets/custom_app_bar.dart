@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../core/routes/app_routes.dart';
 import '../core/providers/auth_provider.dart';
+import '../core/providers/notification_provider.dart';
+import 'main_wrapper.dart';
 
 /// Variante d'en-tête : logo marque pour l’accueil shell, titre d’onglet, ou pile détail avec retour.
 enum CustomAppBarVariant {
@@ -179,13 +181,22 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                     ? "${avatarUrl}?t=${DateTime.now().millisecondsSinceEpoch}"
                     : null;
 
-                return CircleAvatar(
-                  key: ValueKey(avatarUrl), // Force rebuild when URL changes
-                  radius: 20,
-                  backgroundImage: imageUrl != null
-                      ? NetworkImage(imageUrl) as ImageProvider
-                      : const AssetImage('assets/images/avatar/user.png'),
-                  backgroundColor: Colors.grey[200],
+                return InkWell(
+                  onTap: () {
+                    final shell = MainShellScope.maybeOf(context);
+                    if (shell != null) {
+                      shell.setIndex(4); // Navigate to Profile/Paramètres tab
+                    }
+                  },
+                  borderRadius: BorderRadius.circular(99),
+                  child: CircleAvatar(
+                    key: ValueKey(avatarUrl), // Force rebuild when URL changes
+                    radius: 20,
+                    backgroundImage: imageUrl != null
+                        ? NetworkImage(imageUrl) as ImageProvider
+                        : const AssetImage('assets/images/avatar/user.png'),
+                    backgroundColor: Colors.grey[200],
+                  ),
                 );
               },
             ),
@@ -261,6 +272,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             () => Navigator.pushNamed(context, AppRoutes.chatList);
         final bell = onNotificationsPressed ??
             () => Navigator.pushNamed(context, AppRoutes.notifications);
+
+        final notificationProvider = Provider.of<NotificationProvider>(context);
+
         return [
           Stack(
             clipBehavior: Clip.none,
@@ -273,25 +287,28 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 onPressed: bell,
               ),
-              Positioned(
-                top: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    '3',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+              if (notificationProvider.unreadNotifications > 0)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      notificationProvider.unreadNotifications > 9
+                          ? '9+'
+                          : notificationProvider.unreadNotifications.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(width: 12),
@@ -306,25 +323,28 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 onPressed: chat,
               ),
-              Positioned(
-                top: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Text(
-                    '5',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
+              if (notificationProvider.unreadMessages > 0)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      notificationProvider.unreadMessages > 9
+                          ? '9+'
+                          : notificationProvider.unreadMessages.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
           const SizedBox(width: 12),

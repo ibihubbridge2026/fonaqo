@@ -23,15 +23,6 @@ class _AgentsScreenState extends State<AgentsScreen> {
 
   static const Color _accent = Color(0xFFFFD400);
 
-  String _selectedFilter = 'Tous';
-
-  final List<String> _filterOptions = [
-    'Tous',
-    'Vérifiés',
-    'À proximité',
-    'Disponibles',
-  ];
-
   final CameraPosition _initialCamera = const CameraPosition(
     target: LatLng(5.3363, -4.0260),
     zoom: 12.8,
@@ -52,15 +43,34 @@ class _AgentsScreenState extends State<AgentsScreen> {
     });
   }
 
-  Future<void> _loadAgents() async {
+  Future<void> _loadAgents({
+    double? radiusKm,
+    double? minRating,
+    bool? verifiedOnly,
+    List<String>? missionTypes,
+    int? minPrice,
+    int? maxPrice,
+  }) async {
     if (!mounted) return;
 
     setState(() => _isLoadingAgents = true);
 
     try {
-      final agents = await _missionRepository.fetchAgentSuggestions(
-        latitude: _currentLatLng?.latitude,
-        longitude: _currentLatLng?.longitude,
+      if (_currentLatLng == null) {
+        setState(() => _isLoadingAgents = false);
+        return;
+      }
+
+      final agents = await _missionRepository.fetchNearbyAgents(
+        latitude: _currentLatLng!.latitude,
+        longitude: _currentLatLng!.longitude,
+        radiusKm: radiusKm,
+        minRating: minRating,
+        verifiedOnly: verifiedOnly,
+        missionTypes: missionTypes,
+        minPrice: minPrice,
+        maxPrice: maxPrice,
+        limit: 20,
       );
 
       if (!mounted) return;
@@ -70,11 +80,9 @@ class _AgentsScreenState extends State<AgentsScreen> {
         _isLoadingAgents = false;
       });
 
-      if (_currentLatLng != null) {
-        setState(() {
-          _markers = _buildMarkersAround(_currentLatLng!);
-        });
-      }
+      setState(() {
+        _markers = _buildMarkersAround(_currentLatLng!);
+      });
     } catch (e) {
       if (!mounted) return;
 
@@ -91,30 +99,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
     }
   }
 
-  List<Map<String, dynamic>> get _filteredAgents {
-    switch (_selectedFilter) {
-      case 'Vérifiés':
-        return _agents.where((agent) => agent['is_verified'] == true).toList();
-
-      case 'À proximité':
-        return _agents.where((agent) {
-          final distance = agent['distance_km'];
-
-          if (distance == null) return false;
-
-          final parsed = double.tryParse(distance.toString());
-
-          return parsed != null && parsed < 10;
-        }).toList();
-
-      case 'Disponibles':
-        return _agents.where((agent) => agent['is_available'] == true).toList();
-
-      case 'Tous':
-      default:
-        return _agents;
-    }
-  }
+  List<Map<String, dynamic>> get _filteredAgents => _agents;
 
   Future<void> _initLocation() async {
     if (!mounted) return;
@@ -236,13 +221,12 @@ class _AgentsScreenState extends State<AgentsScreen> {
           position: LatLng(lat, lng),
           infoWindow: InfoWindow(
             title: name.isNotEmpty ? name : 'Agent',
-            snippet:
-                distance != null ? '$specialty • ${distance} km' : specialty,
+            snippet: _formatDistance(distance).isNotEmpty
+                ? '$specialty • ${_formatDistance(distance)}'
+                : specialty,
           ),
           icon: BitmapDescriptor.defaultMarkerWithHue(
-            agent['is_verified'] == true
-                ? BitmapDescriptor.hueYellow
-                : BitmapDescriptor.hueOrange,
+            BitmapDescriptor.hueYellow,
           ),
           onTap: () => _onAgentMarkerTapped(agent),
         ),
@@ -297,6 +281,23 @@ class _AgentsScreenState extends State<AgentsScreen> {
     );
   }
 
+  String _getDynamicTitle() {
+    return 'Agents proches';
+  }
+
+  static String _formatDistance(dynamic distance) {
+    if (distance == null) return '';
+
+    final parsed = double.tryParse(distance.toString());
+    if (parsed == null) return '';
+
+    // Hide distance if > 50km
+    if (parsed > 50) return '';
+
+    // Format to 1 decimal place
+    return '${parsed.toStringAsFixed(1)} km';
+  }
+
   void _showFilterSheet() {
     showModalBottomSheet(
       context: context,
@@ -307,8 +308,19 @@ class _AgentsScreenState extends State<AgentsScreen> {
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
-          child: const SingleChildScrollView(
-            child: _AgentFilterSheet(),
+          child: _AgentFilterSheet(
+            onApply:
+                (radiusKm, minRating, verifiedOnly, types, minPrice, maxPrice) {
+              Navigator.pop(context);
+              _loadAgents(
+                radiusKm: radiusKm,
+                minRating: minRating,
+                verifiedOnly: verifiedOnly,
+                missionTypes: types,
+                minPrice: minPrice,
+                maxPrice: maxPrice,
+              );
+            },
           ),
         );
       },
@@ -327,14 +339,9 @@ class _AgentsScreenState extends State<AgentsScreen> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 15),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Colors.transparent,
                 borderRadius: BorderRadius.circular(30),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 10,
-                  ),
-                ],
+                border: Border.all(color: Colors.black.withOpacity(0.1)),
               ),
               child: const TextField(
                 decoration: InputDecoration(
@@ -520,35 +527,12 @@ class _AgentsScreenState extends State<AgentsScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
-                            'Agents proches',
-                            style: TextStyle(
+                          Text(
+                            _getDynamicTitle(),
+                            style: const TextStyle(
                               fontWeight: FontWeight.w900,
                               fontSize: 16,
                             ),
-                          ),
-                          DropdownButton<String>(
-                            value: _selectedFilter,
-                            underline: const SizedBox(),
-                            items: _filterOptions.map((filter) {
-                              return DropdownMenuItem(
-                                value: filter,
-                                child: Text(filter),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              if (value == null) return;
-
-                              setState(() {
-                                _selectedFilter = value;
-
-                                if (_currentLatLng != null) {
-                                  _markers = _buildMarkersAround(
-                                    _currentLatLng!,
-                                  );
-                                }
-                              });
-                            },
                           ),
                         ],
                       ),
@@ -593,6 +577,19 @@ class AgentListTile extends StatelessWidget {
     super.key,
     required this.agent,
   });
+
+  static String _formatDistance(dynamic distance) {
+    if (distance == null) return '';
+
+    final parsed = double.tryParse(distance.toString());
+    if (parsed == null) return '';
+
+    // Hide distance if > 50km
+    if (parsed > 50) return '';
+
+    // Format to 1 decimal place
+    return '${parsed.toStringAsFixed(1)} km';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -704,7 +701,9 @@ class AgentListTile extends StatelessWidget {
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
-                        distance != null ? '$distance km' : city,
+                        _formatDistance(distance).isNotEmpty
+                            ? _formatDistance(distance)
+                            : city,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 12,
@@ -746,6 +745,7 @@ class AgentListTile extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
+                      color: Colors.black,
                     ),
                   ),
                 ),
@@ -779,6 +779,7 @@ class AgentListTile extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
+                      color: Colors.black,
                     ),
                   ),
                 ),
@@ -792,7 +793,10 @@ class AgentListTile extends StatelessWidget {
 }
 
 class _AgentFilterSheet extends StatefulWidget {
-  const _AgentFilterSheet();
+  final Function(double radiusKm, double minRating, bool verifiedOnly,
+      List<String> types, int minPrice, int maxPrice) onApply;
+
+  const _AgentFilterSheet({required this.onApply});
 
   @override
   State<_AgentFilterSheet> createState() => _AgentFilterSheetState();
@@ -978,7 +982,16 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
             width: double.infinity,
             height: 55,
             child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                widget.onApply(
+                  _radiusKm,
+                  _minRating,
+                  _verifiedOnly,
+                  _types.toList(),
+                  _price.start.toInt(),
+                  _price.end.toInt(),
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _accent,
                 foregroundColor: Colors.black,
