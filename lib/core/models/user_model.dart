@@ -191,6 +191,8 @@ class AgentProfile {
   final bool isAvailable;
   final String? location;
   final List<String> certifications;
+  final List<String>
+      expertiseTags; // Tags d'expertise (#SBEE, #SONEB, #Mairie, etc.)
   final double? hourlyRate;
   final DateTime? lastActive;
   // TODO: Add is_internal field (Boolean, default: False) to filter confidential missions
@@ -204,6 +206,7 @@ class AgentProfile {
     this.isAvailable = false,
     this.location,
     this.certifications = const [],
+    this.expertiseTags = const [],
     this.hourlyRate,
     this.lastActive,
   });
@@ -224,6 +227,10 @@ class AgentProfile {
               ?.map((cert) => cert.toString())
               .toList() ??
           [],
+      expertiseTags: (json['expertise_tags'] as List<dynamic>?)
+              ?.map((tag) => tag.toString())
+              .toList() ??
+          [],
       hourlyRate: (json['hourly_rate'] as num?)?.toDouble(),
       lastActive: json['last_active'] != null
           ? DateTime.parse(json['last_active'].toString())
@@ -241,6 +248,7 @@ class AgentProfile {
       'is_available': isAvailable,
       if (location != null) 'location': location,
       'certifications': certifications,
+      'expertise_tags': expertiseTags,
       if (hourlyRate != null) 'hourly_rate': hourlyRate,
       if (lastActive != null) 'last_active': lastActive!.toIso8601String(),
     };
@@ -255,6 +263,7 @@ class AgentProfile {
     bool? isAvailable,
     String? location,
     List<String>? certifications,
+    List<String>? expertiseTags,
     double? hourlyRate,
     DateTime? lastActive,
   }) {
@@ -266,6 +275,7 @@ class AgentProfile {
       isAvailable: isAvailable ?? this.isAvailable,
       location: location ?? this.location,
       certifications: certifications ?? this.certifications,
+      expertiseTags: expertiseTags ?? this.expertiseTags,
       hourlyRate: hourlyRate ?? this.hourlyRate,
       lastActive: lastActive ?? this.lastActive,
     );

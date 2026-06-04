@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -5,9 +7,12 @@ import 'package:provider/provider.dart';
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
+import 'package:fonaco/core/services/cache_service.dart';
+import 'package:fonaco/core/widgets/skeleton_loading.dart';
 import 'package:fonaco/widgets/main_wrapper.dart';
 import 'mission_repository.dart';
 import 'screens/create_mission_screen.dart';
+import 'widgets/mission_rating_dialog.dart';
 
 class MissionsScreen extends StatefulWidget {
   /// Contrôle si on affiche la liste des missions ou le flux de création.
@@ -22,6 +27,7 @@ class MissionsScreen extends StatefulWidget {
 class _MissionsScreenState extends State<MissionsScreen> {
   final MissionRepository _repo = MissionRepository();
   final ScrollController _scrollController = ScrollController();
+  final CacheService _cacheService = CacheService();
   List<MissionModel> _missions = [];
   bool _loading = true;
   bool _isFetching = false; // garde-fou réel (concurrence)
@@ -35,6 +41,11 @@ class _MissionsScreenState extends State<MissionsScreen> {
   void initState() {
     super.initState();
     _scrollController.addListener(_scrollListener);
+    // Initialiser l'état de chargement avant l'appel API
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     _loadMissions();
     // Écouter les changements pour rafraîchir la liste quand on quitte le mode création
     widget.showCreateMissionListenable.addListener(_onCreateModeChanged);
@@ -94,13 +105,16 @@ class _MissionsScreenState extends State<MissionsScreen> {
   Future<void> _loadMissions() async {
     // SÉCURITÉ : Éviter les fetchs concurrents (et non pas l'état UI initial)
     if (_isFetching) {
+      debugPrint('⚠️ _loadMissions: Déjà en cours, skip');
       return;
     }
     _isFetching = true;
 
     final auth = Provider.of<AuthProvider>(context, listen: false);
+    debugPrint('🔐 Auth check: isAuthenticated=${auth.isAuthenticated}');
+
     if (!auth.isAuthenticated) {
-      print('🔒 Utilisateur non authentifié, skip missions load');
+      debugPrint('🔒 Utilisateur non authentifié, skip missions load');
       if (mounted) {
         setState(() {
           _loading = false;
@@ -122,25 +136,145 @@ class _MissionsScreenState extends State<MissionsScreen> {
       _currentPage = 1;
       _hasMore = true;
     });
+
+    // Initialiser le cache si nécessaire
+    if (!_cacheService.isInitialized) {
+      try {
+        await _cacheService.init();
+      } catch (e) {
+        // Continuer même si le cache échoue
+      }
+    }
+
+    // 1. Charger depuis le cache d'abord (Cache-First)
+    _loadMissionsFromCache();
+
+    // 2. Charger depuis l'API en arrière-plan
+    _loadMissionsFromApi();
+  }
+
+  void _loadMissionsFromCache() {
+    try {
+      final cachedMissionsJson =
+          _cacheService.getCachedJsonResponse('missions_list');
+      if (cachedMissionsJson != null &&
+          _cacheService.isJsonCacheValid('missions_list')) {
+        final cachedData = jsonDecode(cachedMissionsJson);
+        if (cachedData is Map && cachedData['data'] is List) {
+          final missionsList = (cachedData['data'] as List)
+              .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
+              .toList();
+          if (mounted) {
+            setState(() {
+              _missions = missionsList;
+              _loading = false;
+            });
+          }
+          debugPrint(
+              '📦 Missions chargées depuis le cache: ${missionsList.length}');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Erreur lecture cache missions: $e');
+    }
+  }
+
+  Future<void> _loadMissionsFromApi() async {
+    debugPrint('📡 Chargement des missions depuis l\'API...');
+
     try {
       final missions = await _repo.fetchMissionsList(
         page: 1,
         pageSize: 10,
       );
+      debugPrint('✅ Missions reçues: ${missions.length}');
+
+      // Vérifier les missions terminées non notées
+      _checkForUnratedMissions(missions);
+
+      // Mettre à jour le cache
+      try {
+        await _cacheService.cacheJsonResponse(
+            'missions_list',
+            jsonEncode({
+              'data': missions.map((m) => m.toJson()).toList(),
+            }));
+        debugPrint('📦 Missions mises en cache');
+      } catch (e) {
+        debugPrint('⚠️ Erreur mise en cache missions: $e');
+      }
+
       if (!mounted) return;
       setState(() {
         _missions = missions;
         _loading = false;
         _hasMore = missions.length >= 10;
+        _error = null;
       });
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('❌ Erreur chargement missions: $e');
+      debugPrint('📋 Stack trace: $st');
+
       if (!mounted) return;
       setState(() {
-        _error = "Erreur de connexion aux missions";
+        _error = "Erreur de connexion aux missions: ${e.toString()}";
         _loading = false;
+        _missions = [];
       });
     } finally {
       _isFetching = false;
+      debugPrint(
+          '🏁 _loadMissions terminé (loading=$_loading, error=$_error, missions=${_missions.length})');
+    }
+  }
+
+  /// Vérifie les missions terminées non notées et affiche le dialogue de notation
+  void _checkForUnratedMissions(List<MissionModel> missions) {
+    // Récupérer les IDs des missions déjà notées depuis le cache
+    final ratedMissionIds = _cacheService.getRatedMissionIds();
+
+    // Trouver les missions terminées non notées
+    final unratedMissions = missions.where((mission) {
+      return mission.status == MissionStatus.COMPLETED &&
+          mission.clientRating == null &&
+          !ratedMissionIds.contains(mission.id);
+    }).toList();
+
+    // Afficher le dialogue pour la première mission non notée
+    if (unratedMissions.isNotEmpty && mounted) {
+      final missionToRate = unratedMissions.first;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (dialogContext) => MissionRatingDialog(
+              missionId: missionToRate.id,
+              onSubmit: (rating, comment) async {
+                try {
+                  await _repo.rateMission(missionToRate.id, rating, comment);
+                  if (!mounted) return;
+                  // Marquer la mission comme notée dans le cache
+                  await _cacheService.addRatedMission(missionToRate.id);
+                  if (!mounted) return;
+                  // Rafraîchir la liste des missions
+                  _loadMissions();
+                } catch (e) {
+                  debugPrint('❌ Erreur notation mission: $e');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Erreur lors de la notation: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          );
+        }
+      });
     }
   }
 
@@ -180,6 +314,14 @@ class _MissionsScreenState extends State<MissionsScreen> {
           return const Padding(
             padding: EdgeInsets.fromLTRB(12, 4, 12, 8),
             child: CreateMissionScreen(),
+          );
+        }
+
+        // Afficher un indicateur de chargement initial si nécessaire
+        if (_loading && _missions.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: SkeletonLoading.list(itemCount: 3),
           );
         }
 
@@ -260,22 +402,15 @@ class _MissionsScreenState extends State<MissionsScreen> {
               ),
 
               // Sliver pour le contenu des missions
-              if (_loading)
-                const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 40),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                )
-              else if (_error != null)
-                SliverToBoxAdapter(
+              if (_error != null)
+                SliverFillRemaining(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
                     child: _buildErrorState(),
                   ),
                 )
               else if (filtered.isEmpty)
-                SliverToBoxAdapter(
+                SliverFillRemaining(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
                     child: _buildEmptyState(),
@@ -348,13 +483,45 @@ class _MissionsScreenState extends State<MissionsScreen> {
   }
 
   Widget _buildErrorState() {
+    // Check if error is related to authentication
+    final isAuthError = _error?.toLowerCase().contains('connect') == true ||
+        _error?.toLowerCase().contains('auth') == true ||
+        _error?.toLowerCase().contains('session') == true;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(_error!, style: TextStyle(color: Colors.red[700], fontSize: 13)),
-          const SizedBox(height: 8),
-          TextButton(onPressed: _loadMissions, child: const Text('Réessayer')),
+          Icon(
+            isAuthError ? Icons.lock_outline : Icons.error_outline,
+            size: 48,
+            color: Colors.red[700],
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _error!,
+            style: TextStyle(color: Colors.red[700], fontSize: 13),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          if (isAuthError)
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pushReplacementNamed(context, AppRoutes.login);
+              },
+              icon: const Icon(Icons.login),
+              label: const Text('Se connecter'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFD400),
+                foregroundColor: Colors.black,
+              ),
+            )
+          else
+            ElevatedButton(
+              onPressed: _loadMissions,
+              child: const Text('Réessayer'),
+            ),
         ],
       ),
     );
@@ -379,7 +546,7 @@ class _CategoryChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: isActive ? Colors.black : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black.withOpacity(0.06)),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
         ),
         child: Text(
           label,
@@ -428,7 +595,7 @@ class MissionCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),

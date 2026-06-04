@@ -27,7 +27,8 @@ class Step5TrackingView extends StatelessWidget {
             borderRadius: BorderRadius.circular(40),
             border: Border.all(color: Colors.white, width: 8),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20)
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05), blurRadius: 20)
             ],
           ),
           child: ClipRRect(

@@ -25,6 +25,8 @@ dependencies:
   shimmer: ^3.0.0
   google_fonts: ^6.2.1  # Pour la police Poppins
   flutter_svg: ^2.0.10
+
+  
   # =========================
   # AUDIO & VOIX
   # =========================

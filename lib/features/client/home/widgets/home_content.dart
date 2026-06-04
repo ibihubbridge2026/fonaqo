@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
+import 'package:fonaco/core/services/cache_service.dart';
+import 'package:fonaco/core/widgets/skeleton_loading.dart';
 import 'package:fonaco/widgets/main_wrapper.dart';
 import 'package:provider/provider.dart';
 
@@ -25,20 +28,16 @@ class _HomeContentState extends State<HomeContent> {
   final PageController _pageController = PageController();
   Timer? _heroTimer;
   final MissionRepository _missionRepo = MissionRepository();
+  final CacheService _cacheService = CacheService();
 
   List<MissionModel> _missions = [];
   List<Map<String, dynamic>> _suggestedAgents = [];
   bool _dashLoading = true;
   String? _dashError;
 
-  /// Chemins relatifs aux visuels du carrousel héros (boucle automatique sans fin logique index).
-  final List<String> _heroAssets = const [
-    'assets/images/hero/img-1.jpeg',
-    'assets/images/hero/img-2.jpg',
-    'assets/images/hero/img-3.jpg',
-  ];
-
   int _logicalHeroPageIndex = 0;
+  Set<String> _favoriteAgentIds = {};
+  bool _wasAuthenticated = false;
 
   @override
   void initState() {
@@ -46,13 +45,70 @@ class _HomeContentState extends State<HomeContent> {
     _heroTimer = Timer.periodic(const Duration(seconds: 4), _onHeroTick);
     // Lazy loading: delay data loading until after first frame
     Future.microtask(() => _loadDashboard());
+    // Charger les favoris
+    _loadFavoriteAgents();
+
+    // Initialiser l'état d'authentification
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    _wasAuthenticated = auth.isAuthenticated;
+  }
+
+  void _loadFavoriteAgents() {
+    if (!_cacheService.isInitialized) return;
+    try {
+      _cacheService.init().then((_) {
+        if (mounted) {
+          setState(() {
+            _favoriteAgentIds = _cacheService.getFavoriteAgents().toSet();
+          });
+        }
+      });
+    } catch (e) {
+      // Ignorer les erreurs
+    }
+  }
+
+  void _toggleFavoriteAgent(String agentId) {
+    if (!_cacheService.isInitialized) {
+      _cacheService.init().then((_) {
+        _cacheService.toggleFavoriteAgent(agentId);
+        if (mounted) {
+          setState(() {
+            if (_favoriteAgentIds.contains(agentId)) {
+              _favoriteAgentIds.remove(agentId);
+            } else {
+              _favoriteAgentIds.add(agentId);
+            }
+          });
+        }
+      });
+    } else {
+      _cacheService.toggleFavoriteAgent(agentId);
+      setState(() {
+        if (_favoriteAgentIds.contains(agentId)) {
+          _favoriteAgentIds.remove(agentId);
+        } else {
+          _favoriteAgentIds.add(agentId);
+        }
+      });
+    }
   }
 
   @override
   void didUpdateWidget(HomeContent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // Recharger les données lorsque le widget est mis à jour (retour sur la page)
-    _loadDashboard();
+
+    // Vérifier si l'état d'authentification a changé
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final wasAuthenticated = auth.isAuthenticated;
+
+    // Ne recharger que si l'état d'authentification a changé
+    // (connexion/déconnexion) pour éviter les requêtes API en doublon
+    // Le cache et le flux initial gèrent l'affichage normal
+    if (wasAuthenticated != _wasAuthenticated) {
+      _wasAuthenticated = wasAuthenticated;
+      _loadDashboard();
+    }
   }
 
   Future<void> _loadDashboard() async {
@@ -67,10 +123,67 @@ class _HomeContentState extends State<HomeContent> {
       }
       return;
     }
-    setState(() {
-      _dashLoading = true;
-      _dashError = null;
-    });
+
+    // Initialiser le cache si nécessaire
+    if (!_cacheService.isInitialized) {
+      try {
+        await _cacheService.init();
+      } catch (e) {
+        // Continuer même si le cache échoue
+      }
+    }
+
+    // 1. Charger depuis le cache d'abord (Cache-First)
+    _loadFromCache();
+
+    // 2. Charger depuis l'API en arrière-plan
+    _loadFromApi();
+  }
+
+  void _loadFromCache() {
+    try {
+      // Charger les missions depuis le cache
+      final cachedMissionsJson =
+          _cacheService.getCachedJsonResponse('dashboard_missions');
+      if (cachedMissionsJson != null &&
+          _cacheService.isJsonCacheValid('dashboard_missions')) {
+        final cachedData = jsonDecode(cachedMissionsJson);
+        if (cachedData is Map && cachedData['data'] is List) {
+          final missionsList = (cachedData['data'] as List)
+              .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
+              .toList();
+          if (mounted) {
+            setState(() {
+              _missions = missionsList;
+              _dashLoading = false;
+            });
+          }
+        }
+      }
+
+      // Charger les agents depuis le cache
+      final cachedAgentsJson =
+          _cacheService.getCachedJsonResponse('dashboard_agents');
+      if (cachedAgentsJson != null &&
+          _cacheService.isJsonCacheValid('dashboard_agents')) {
+        final cachedData = jsonDecode(cachedAgentsJson);
+        if (cachedData is Map && cachedData['data'] is List) {
+          final agentsList = (cachedData['data'] as List)
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+          if (mounted) {
+            setState(() {
+              _suggestedAgents = agentsList;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // Erreur de cache, continuer avec API
+    }
+  }
+
+  Future<void> _loadFromApi() async {
     try {
       final missions = await _missionRepo.fetchMissionsList();
 
@@ -78,11 +191,28 @@ class _HomeContentState extends State<HomeContent> {
       // TODO: Ajouter la localisation à UserModel et utiliser les coordonnées utilisateur
       final agents = await _missionRepo.fetchAgentSuggestions();
 
+      // Mettre à jour le cache
+      try {
+        await _cacheService.cacheJsonResponse(
+            'dashboard_missions',
+            jsonEncode({
+              'data': missions.map((m) => m.toJson()).toList(),
+            }));
+        await _cacheService.cacheJsonResponse(
+            'dashboard_agents',
+            jsonEncode({
+              'data': agents,
+            }));
+      } catch (e) {
+        // Erreur de cache, ignorer
+      }
+
       if (!mounted) return;
       setState(() {
         _missions = missions;
         _suggestedAgents = agents;
         _dashLoading = false;
+        _dashError = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -153,22 +283,17 @@ class _HomeContentState extends State<HomeContent> {
         const SizedBox(height: 16),
         const WelcomeHeader(),
         const SizedBox(height: 25),
-        HeroCarouselStrip(
-          pageController: _pageController,
-          assetPaths: _heroAssets,
-        ),
-        const SizedBox(height: 25),
+        // Old hero slider commented out - replaced with InfoSlider
+        // HeroCarouselStrip(
+        //   pageController: _pageController,
+        //   assetPaths: _heroAssets,
+        // ),
+        const InfoSlider(),
+        const SizedBox(height: 16),
         PrimaryCreateMissionPanel(
           onPressed: () async {
             if (shell != null) {
-              // Naviguer vers l'onglet missions et attendre un retour avec valeur true
-              shell.setIndex(1);
-              await Future.delayed(const Duration(milliseconds: 100));
-              // La logique de rafraîchissement sera gérée par didUpdateWidget
-              // quand l'utilisateur reviendra sur cet onglet
-            } else {
-              // Fallback si le contenu est utilisé hors shell.
-              Navigator.pushNamed(context, AppRoutes.missionDetail);
+              shell.openCreateMission();
             }
           },
         ),
@@ -178,9 +303,9 @@ class _HomeContentState extends State<HomeContent> {
         ),
         const SizedBox(height: 12),
         if (_dashLoading)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40, vertical: 24),
-            child: Center(child: CircularProgressIndicator()),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: SkeletonLoading.dashboardCard(),
           )
         else ...[
           if (_dashError != null)
@@ -203,7 +328,11 @@ class _HomeContentState extends State<HomeContent> {
         if (_dashLoading)
           const SizedBox(height: 8)
         else
-          AgentSuggestionSlider(agents: _suggestedAgents),
+          AgentSuggestionSlider(
+            agents: _suggestedAgents,
+            favoriteAgentIds: _favoriteAgentIds,
+            onToggleFavorite: _toggleFavoriteAgent,
+          ),
         const SizedBox(height: 25),
         SectionTitleStrip(
           title: 'Historique rapide',
@@ -214,6 +343,11 @@ class _HomeContentState extends State<HomeContent> {
           const SizedBox.shrink()
         else
           QuickHistoryEntries(missions: _historyMissions()),
+        const SizedBox(height: 25),
+        if (_dashLoading)
+          const SizedBox.shrink()
+        else
+          AvailableMissionsPreview(missions: _missions),
         const SizedBox(height: 25),
         const ReportLitigeCardPanel(),
         SizedBox(height: bottomReserve),
@@ -339,7 +473,10 @@ class HeroCarouselSlide extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.7)
+                ],
               ),
             ),
             padding: const EdgeInsets.all(20),
@@ -353,6 +490,218 @@ class HeroCarouselSlide extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Slider d'informations dynamique avec 3 slides
+class InfoSlider extends StatefulWidget {
+  const InfoSlider({super.key});
+
+  @override
+  State<InfoSlider> createState() => _InfoSliderState();
+}
+
+class _InfoSliderState extends State<InfoSlider> {
+  final PageController _pageController = PageController();
+  Timer? _autoScrollTimer;
+  int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 5), _onTick);
+  }
+
+  void _onTick(Timer timer) {
+    if (!_pageController.hasClients) return;
+    _currentIndex = (_currentIndex + 1) % 3;
+    _pageController.animateToPage(
+      _currentIndex,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeInOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _autoScrollTimer?.cancel();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 100,
+      child: PageView.builder(
+        controller: _pageController,
+        onPageChanged: (index) => setState(() => _currentIndex = index),
+        itemCount: 3,
+        itemBuilder: (context, index) {
+          return _InfoSlide(index: index);
+        },
+      ),
+    );
+  }
+}
+
+class _InfoSlide extends StatelessWidget {
+  final int index;
+
+  const _InfoSlide({required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    final slides = [
+      {
+        'icon': Icons.person,
+        'message': 'Un agent sera notifié et pourra accepter votre mission.',
+        'rightIcon': Icons.verified_user_rounded,
+      },
+      {
+        'icon': Icons.search,
+        'message': 'Trackez toutes vos missions en temps réel.',
+        'rightIcon': Icons.check_circle,
+      },
+      {
+        'icon': Icons.support_agent,
+        'message': 'Une assistance disponible 24/7 pour vos besoins.',
+        'rightIcon': Icons.star,
+      },
+    ];
+
+    final slide = slides[index];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.yellow.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFFFD400), width: 1),
+        ),
+        child: Row(
+          children: [
+            // Icône/Avatar à gauche
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                slide['icon'] as IconData,
+                color: const Color(0xFFFFD400),
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Texte central
+            Expanded(
+              child: Text(
+                slide['message'] as String,
+                style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Icône à droite
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD400),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                slide['rightIcon'] as IconData,
+                color: Colors.black,
+                size: 20,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bannière de réassurance pour les missions sur le Dashboard (deprecated - use InfoSlider instead)
+class MissionReassuranceBanner extends StatelessWidget {
+  const MissionReassuranceBanner({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.yellow.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFFFD400), width: 1),
+        ),
+        child: Row(
+          children: [
+            // Image de l'agent avec casquette jaune
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.asset(
+                  'assets/images/avatar/user.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) {
+                    return const Icon(
+                      Icons.person,
+                      color: Colors.grey,
+                      size: 24,
+                    );
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Texte central
+            const Expanded(
+              child: Text(
+                'Un agent sera notifié et pourra accepter votre mission.',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Icône bouclier jaune avec check
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD400),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.verified_user_rounded,
+                color: Colors.black,
+                size: 20,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -450,10 +799,14 @@ class SectionTitleStrip extends StatelessWidget {
 /// Carte «Signaler un problème» en pied de page d’accueil.
 /// Aperçu des missions disponibles pour les agents
 class AvailableMissionsPreview extends StatelessWidget {
-  const AvailableMissionsPreview({super.key});
+  final List<MissionModel> missions;
+
+  const AvailableMissionsPreview({super.key, required this.missions});
 
   @override
   Widget build(BuildContext context) {
+    final displayMissions = missions.take(4).toList();
+
     return Container(
       constraints: const BoxConstraints(
           minHeight: 100, maxHeight: 140), // Flexible height range
@@ -463,7 +816,7 @@ class AvailableMissionsPreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -490,51 +843,59 @@ class AvailableMissionsPreview extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          const Text(
-            'Découvrez les missions près de chez vous',
-            style: TextStyle(fontSize: 14, color: Colors.grey),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: GridView.count(
-              crossAxisCount: 2,
-              childAspectRatio: 1.5,
-              children: List.generate(4, (index) {
-                return Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[50],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[200]!),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.location_on_outlined,
-                        color: Colors.grey[400],
-                        size: 32,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Mission ${index + 1}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+          if (displayMissions.isEmpty)
+            const Expanded(
+              child: Center(
+                child: Text(
+                  'Aucune mission disponible',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: GridView.count(
+                crossAxisCount: 2,
+                childAspectRatio: 1.5,
+                children: displayMissions.map((mission) {
+                  return Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[200]!),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.location_on_outlined,
+                          color: Colors.grey[400],
+                          size: 32,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '2.5 km • 50€/h',
-                        style: TextStyle(fontSize: 10, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                );
-              }),
+                        const SizedBox(height: 8),
+                        Text(
+                          mission.title,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${mission.price.toStringAsFixed(0)} FCFA',
+                          style:
+                              TextStyle(fontSize: 10, color: Colors.grey[600]),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
             ),
-          ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
@@ -573,7 +934,7 @@ class ReportLitigeCardPanel extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.red.withOpacity(0.05),
+          color: Colors.red.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(16),
           boxShadow: [],
         ),
@@ -585,7 +946,7 @@ class ReportLitigeCardPanel extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.black.withOpacity(0.1)),
+                border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
               ),
               child: const Icon(
                 Icons.shield_outlined,
@@ -653,8 +1014,15 @@ class ReportLitigeCardPanel extends StatelessWidget {
 /// Liste horizontale des profils d'agents certifiés (données API / seeder).
 class AgentSuggestionSlider extends StatefulWidget {
   final List<Map<String, dynamic>> agents;
+  final Set<String> favoriteAgentIds;
+  final Function(String) onToggleFavorite;
 
-  const AgentSuggestionSlider({super.key, required this.agents});
+  const AgentSuggestionSlider({
+    super.key,
+    required this.agents,
+    required this.favoriteAgentIds,
+    required this.onToggleFavorite,
+  });
 
   @override
   State<AgentSuggestionSlider> createState() => _AgentSuggestionSliderState();
@@ -670,7 +1038,7 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
   void initState() {
     super.initState();
     _autoScrollTimer = Timer.periodic(
-      const Duration(milliseconds: 1400),
+      const Duration(seconds: 4),
       _onTick,
     );
   }
@@ -719,17 +1087,26 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
       );
     }
 
-    final display = <Map<String, String>>[];
+    final display = <Map<String, dynamic>>[];
     for (final raw in rows) {
       final fn = raw['first_name']?.toString() ?? '';
       final ln = raw['last_name']?.toString() ?? '';
       final un = raw['username']?.toString() ?? '';
       final name =
           ('$fn $ln').trim().isEmpty ? un : '${fn.trim()} ${ln.trim()}'.trim();
+
+      // Extraire les tags d'expertise
+      final expertiseTags = (raw['expertise_tags'] as List<dynamic>?)
+              ?.map((tag) => tag.toString())
+              .toList() ??
+          [];
+
       display.add({
         'name': name.isEmpty ? 'Agent' : name,
         'role': raw['specialty']?.toString() ?? 'Agent terrain',
         'image': 'assets/images/avatar/user.png',
+        'expertise_tags': expertiseTags,
+        'agent_id': raw['id']?.toString() ?? '',
       });
     }
 
@@ -742,10 +1119,18 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
         itemCount: display.length * 15,
         itemBuilder: (context, index) {
           final agent = display[index % display.length];
+          final agentId = agent['agent_id']?.toString() ?? '';
           return AgentCard(
             name: agent['name']!,
             role: agent['role']!,
             imagePath: agent['image']!,
+            expertiseTags: (agent['expertise_tags'] as List<dynamic>?)
+                    ?.map((e) => e.toString())
+                    .toList() ??
+                [],
+            agentId: agentId,
+            isFavorite: widget.favoriteAgentIds.contains(agentId),
+            onToggleFavorite: widget.onToggleFavorite,
           );
         },
       ),
@@ -758,12 +1143,20 @@ class AgentCard extends StatelessWidget {
   final String name;
   final String role;
   final String imagePath;
+  final List<String> expertiseTags;
+  final String agentId;
+  final bool isFavorite;
+  final Function(String) onToggleFavorite;
 
   const AgentCard({
     super.key,
     required this.name,
     required this.role,
     required this.imagePath,
+    this.expertiseTags = const [],
+    required this.agentId,
+    required this.isFavorite,
+    required this.onToggleFavorite,
   });
 
   @override
@@ -776,7 +1169,7 @@ class AgentCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -816,6 +1209,32 @@ class AgentCard extends StatelessWidget {
                 padding: const EdgeInsets.all(2),
                 child: const Icon(Icons.verified, color: Colors.blue, size: 16),
               ),
+              // Icône favoris
+              Positioned(
+                top: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: () => onToggleFavorite(agentId),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: isFavorite ? Colors.red : Colors.grey,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 10),
@@ -828,6 +1247,34 @@ class AgentCard extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
+          const SizedBox(height: 4),
+          // Tags d'expertise
+          if (expertiseTags.isNotEmpty)
+            Wrap(
+              spacing: 4,
+              runSpacing: 2,
+              alignment: WrapAlignment.center,
+              children: expertiseTags.take(2).map((tag) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFD400).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    tag,
+                    style: const TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF715D00),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
           const SizedBox(height: 6),
           // Petit bouton profil
           Container(
@@ -870,7 +1317,7 @@ class AgentSuggestionTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -993,7 +1440,7 @@ class OngoingMissionCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 8,
               offset: const Offset(0, 4),
             ),
@@ -1041,7 +1488,7 @@ class OngoingMissionCard extends StatelessWidget {
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: missionStatus?.badgeBackgroundColor ??
-                              Colors.grey.withOpacity(0.2),
+                              Colors.grey.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
@@ -1184,7 +1631,7 @@ class HistoryEntryRow extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: missionStatus?.badgeBackgroundColor ??
-                        Colors.grey.withOpacity(0.2),
+                        Colors.grey.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

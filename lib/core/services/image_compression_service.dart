@@ -15,7 +15,7 @@ class ImageCompressionService {
   static const int defaultQuality = 75;
 
   /// Taille maximale en pixels (côté le plus long)
-  static const int maxWidthHeight = 1920;
+  static const int maxWidthHeight = 1280;
 
   /// Taille maximale du fichier en Mo
   static const double maxFileSizeMB = 3.0;

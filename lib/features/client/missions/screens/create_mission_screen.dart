@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 
-import 'package:fonaco/core/routes/app_routes.dart';
+import 'package:fonaco/core/constants/app_constants.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/providers/mission_provider.dart';
 import 'package:fonaco/core/services/feedback_service.dart';
@@ -13,6 +13,7 @@ import '../widgets/create_mission_step_type.dart';
 import '../widgets/create_mission_step_details.dart';
 import '../widgets/create_mission_step_logistics.dart';
 import '../widgets/create_mission_step_recap.dart';
+import 'mission_success_screen.dart';
 
 /// Flux de création de mission (4 étapes, conteneur plat, sans FeexPay).
 class CreateMissionScreen extends StatefulWidget {
@@ -31,36 +32,61 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
   int? _categoryId;
   String _categoryName = '';
   bool _needsProcuration = false;
+  bool _isUrgent = false;
+  bool _isConfidential = false;
+  String _recurrence = 'once'; // 'once', 'weekly', 'monthly'
 
   final TextEditingController _adminPlace = TextEditingController();
   final TextEditingController _address = TextEditingController();
   final TextEditingController _description = TextEditingController();
   final TextEditingController _targetAgent = TextEditingController();
-  final TextEditingController _price = TextEditingController(text: '15000');
+  final TextEditingController _serviceAmount = TextEditingController(
+      text: AppConstants.defaultServiceAmount.toStringAsFixed(0));
+  final TextEditingController _purchaseAmount = TextEditingController(
+      text: AppConstants.defaultPurchaseAmount.toStringAsFixed(0));
 
   List<Map<String, dynamic>> _categories = [];
   bool _loadingCats = true;
+  String? _catsError;
   bool _submitting = false;
-
-  static const double _defaultLat = 6.3725;
-  static const double _defaultLng = 2.4318;
 
   @override
   void initState() {
     super.initState();
-    for (final c in [_adminPlace, _address, _description, _price]) {
+    for (final c in [
+      _adminPlace,
+      _address,
+      _description,
+      _serviceAmount,
+      _purchaseAmount,
+    ]) {
       c.addListener(() => setState(() {}));
     }
     _loadCategories();
   }
 
   Future<void> _loadCategories() async {
-    final rows = await _repo.fetchServiceCategories();
-    if (!mounted) return;
     setState(() {
-      _categories = rows;
-      _loadingCats = false;
+      _loadingCats = true;
+      _catsError = null;
     });
+    try {
+      final rows = await _repo
+          .fetchServiceCategories()
+          .timeout(const Duration(seconds: 12));
+      if (!mounted) return;
+      setState(() {
+        _categories = rows;
+        _loadingCats = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingCats = false;
+        _catsError =
+            'Impossible de charger les catégories. Vérifiez votre connexion.';
+      });
+    }
   }
 
   @override
@@ -69,9 +95,29 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
     _address.dispose();
     _description.dispose();
     _targetAgent.dispose();
-    _price.dispose();
+    _serviceAmount.dispose();
+    _purchaseAmount.dispose();
     super.dispose();
   }
+
+  double get _serviceAmountValue {
+    final raw = _serviceAmount.text.replaceAll(',', '.').trim();
+    return double.tryParse(raw) ?? 0;
+  }
+
+  double get _purchaseAmountValue {
+    final raw = _purchaseAmount.text.replaceAll(',', '.').trim();
+    return double.tryParse(raw) ?? 0;
+  }
+
+  double get _optionsCost =>
+      (_isUrgent ? AppConstants.optionCost : 0) +
+      (_isConfidential ? AppConstants.optionCost : 0);
+
+  double get _fonnaqoFee => _serviceAmountValue * 0.10;
+
+  double get _totalAmount =>
+      _serviceAmountValue + _purchaseAmountValue + _optionsCost + _fonnaqoFee;
 
   void _cancelAndHome() {
     final shell = MainShellScope.maybeOf(context);
@@ -81,11 +127,14 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
       _categoryId = null;
       _categoryName = '';
       _needsProcuration = false;
+      _isUrgent = false;
+      _isConfidential = false;
       _adminPlace.clear();
       _address.clear();
       _description.clear();
       _targetAgent.clear();
-      _price.text = '15000';
+      _serviceAmount.text = '15000';
+      _purchaseAmount.text = '0';
     });
     shell?.closeCreateMission();
     shell?.setIndex(0);
@@ -236,9 +285,9 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
   }
 
   Future<void> _confirm() async {
-    final raw = _price.text.replaceAll(',', '.').trim();
-    final price = double.tryParse(raw) ?? 0;
-    if (price <= 0) return;
+    final serviceAmount = _serviceAmountValue;
+    final purchaseAmount = _purchaseAmountValue;
+    if (serviceAmount <= 0) return;
 
     // Vérifier que l'utilisateur a un numéro de téléphone
     final phoneCheck = await _checkPhoneNumber();
@@ -250,6 +299,8 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
 
     setState(() => _submitting = true);
     try {
+      // Frais Fonnaqo (10% de la prestation) + coût des options.
+      final serviceFee = _fonnaqoFee + _optionsCost;
       await _repo.createMission(
         MissionCreatePayload(
           title: _missionTitle(),
@@ -257,11 +308,16 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
               ? _missionTitle()
               : _missionDescription(),
           address: _address.text.trim(),
-          latitude: _defaultLat,
-          longitude: _defaultLng,
-          price: price,
-          serviceFee: price * 0.10,
+          latitude: AppConstants.abidjanCenterLatitude,
+          longitude: AppConstants.abidjanCenterLongitude,
+          price: serviceAmount,
+          serviceFee: serviceFee,
           requiresProcuration: _needsProcuration,
+          isUrgent: _isUrgent,
+          isConfidential: _isConfidential,
+          purchaseAmount: purchaseAmount,
+          serviceAmount: serviceAmount,
+          recurrence: _recurrence,
           targetAgentUsername: _targetAgent.text.trim().isEmpty
               ? null
               : _targetAgent.text.trim(),
@@ -269,36 +325,27 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
       );
       if (!mounted) return;
 
-      // NAVIGATION PROPRE : nettoyer la pile et revenir au Dashboard.
-      // 1. Si on est dans le shell principal (cas normal),
-      //    on ferme le mode création et on revient à l'onglet Home.
-      // 2. Sinon, on rebascule sur la route racine via pushAndRemoveUntil
-      //    pour garantir une pile propre et un rafraîchissement complet.
-      final shell = MainShellScope.maybeOf(context);
-      if (shell != null) {
-        shell.closeCreateMission();
-        shell.setIndex(0);
-      } else {
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          AppRoutes.mainShell,
-          (route) => false,
-        );
-      }
-
-      // Feedback APRÈS la navigation pour éviter tout blocage UI.
-      if (mounted) {
-        FeedbackService.showSuccess(context, 'Mission créée avec succès.');
-      }
+      final missionTitle = _missionTitle();
+      final total = _totalAmount;
 
       // Rafraîchissement des missions en arrière-plan (best-effort).
       try {
-        if (mounted) {
-          await Provider.of<MissionProvider>(context, listen: false)
-              .refreshMissions();
-        }
+        await Provider.of<MissionProvider>(context, listen: false)
+            .refreshMissions();
       } catch (e, st) {
         _logger.e('Refresh missions failed', error: e, stackTrace: st);
       }
+
+      if (!mounted) return;
+      // Redirection vers la page de succès.
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => MissionSuccessScreen(
+            missionTitle: missionTitle,
+            totalAmount: total,
+          ),
+        ),
+      );
     } catch (e, st) {
       _logger.e('createMission failed', error: e, stackTrace: st);
       if (!mounted) return;
@@ -314,23 +361,15 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
       width: double.infinity,
       height: double.infinity,
       decoration: const BoxDecoration(
-        color: Color(0xFFF4F4F4),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(4)),
+        color: Color(0xFFF8F9FA),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
             child: Row(
               children: [
-                Text(
-                  'Étape $_step / 4',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                  ),
-                ),
                 const Spacer(),
                 IconButton(
                   tooltip: 'Annuler et retour à l’accueil',
@@ -340,89 +379,240 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: _buildStepper(),
+          ),
+          const SizedBox(height: 16),
           Expanded(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFAFAFA),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE3E3E3)),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: _step == 1
-                  ? CreateMissionStepType(
-                      selected: _flowType,
-                      onSelect: (v) => setState(() => _flowType = v),
-                    )
-                  : _step == 2
-                      ? _loadingCats
-                          ? const Center(child: CircularProgressIndicator())
-                          : CreateMissionStepDetails(
-                              flowType: _flowType ?? 'service',
-                              categories: _categories,
-                              selectedCategoryId: _categoryId,
-                              onCategorySelected: (id) {
-                                String name = '';
-                                for (final row in _categories) {
-                                  final rid = row['id'] is int
-                                      ? row['id'] as int
-                                      : int.tryParse('${row['id']}');
-                                  if (rid == id) {
-                                    name = row['name']?.toString() ?? '';
-                                    break;
-                                  }
-                                }
-                                setState(() {
-                                  _categoryId = id;
-                                  _categoryName = name;
-                                });
-                              },
-                              needsProcuration: _needsProcuration,
-                              onProcurationChanged: (v) =>
-                                  setState(() => _needsProcuration = v),
-                              adminPlaceController: _adminPlace,
-                              onNext: () => setState(() => _step = 3),
-                            )
-                      : _step == 3
-                          ? CreateMissionStepLogistics(
-                              addressController: _address,
-                              descriptionController: _description,
-                              targetAgentController: _targetAgent,
-                              onNext: () => setState(() => _step = 4),
-                            )
-                          : CreateMissionStepRecap(
-                              priceController: _price,
-                              summaryTitle: _missionTitle(),
-                              summaryLines: _recapSummaryLines(),
-                              isSubmitting: _submitting,
-                              onConfirm: _confirm,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_step == 1)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: CreateMissionStepType(
+                        selected: _flowType,
+                        onSelect: (v) => setState(() => _flowType = v),
+                      ),
+                    ),
+                  if (_step == 2)
+                    _loadingCats
+                        ? const Padding(
+                            padding: EdgeInsets.all(32),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        : _catsError != null
+                            ? Padding(
+                                padding: const EdgeInsets.all(32),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.error_outline,
+                                        size: 48, color: Colors.red),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      _catsError!,
+                                      textAlign: TextAlign.center,
+                                      style:
+                                          const TextStyle(color: Colors.red),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    ElevatedButton(
+                                      onPressed: _loadCategories,
+                                      child: const Text('Réessayer'),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 20),
+                                child: CreateMissionStepDetails(
+                                  flowType: _flowType ?? 'service',
+                                  categories: _categories,
+                                  selectedCategoryId: _categoryId,
+                                  onCategorySelected: (id) {
+                                    String name = '';
+                                    for (final row in _categories) {
+                                      final rid = row['id'] is int
+                                          ? row['id'] as int
+                                          : int.tryParse('${row['id']}');
+                                      if (rid == id) {
+                                        name = row['name']?.toString() ?? '';
+                                        break;
+                                      }
+                                    }
+                                    setState(() {
+                                      _categoryId = id;
+                                      _categoryName = name;
+                                    });
+                                  },
+                                  needsProcuration: _needsProcuration,
+                                  onProcurationChanged: (v) =>
+                                      setState(() => _needsProcuration = v),
+                                  adminPlaceController: _adminPlace,
+                                  addressController: _address,
+                                  descriptionController: _description,
+                                  recurrence: _recurrence,
+                                  onRecurrenceChanged: (v) =>
+                                      setState(() => _recurrence = v),
+                                  onNext: () => setState(() => _step = 3),
+                                ),
+                              ),
+                  if (_step == 3)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: CreateMissionStepLogistics(
+                        targetAgentController: _targetAgent,
+                        isUrgent: _isUrgent,
+                        isConfidential: _isConfidential,
+                        onUrgentChanged: (v) => setState(() => _isUrgent = v),
+                        onConfidentialChanged: (v) =>
+                            setState(() => _isConfidential = v),
+                        onNext: () => setState(() => _step = 4),
+                      ),
+                    ),
+                  if (_step == 4)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: CreateMissionStepRecap(
+                        serviceAmountController: _serviceAmount,
+                        purchaseAmountController: _purchaseAmount,
+                        isUrgent: _isUrgent,
+                        isConfidential: _isConfidential,
+                        summaryTitle: _missionTitle(),
+                        summaryLines: _recapSummaryLines(),
+                        isSubmitting: _submitting,
+                        onConfirm: _confirm,
+                      ),
+                    ),
+                  if (_step == 1 && _flowType != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                      child: SizedBox(
+                        height: 56,
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => setState(() => _step = 2),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFD400),
+                            foregroundColor: Colors.black,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Continuer',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              SizedBox(width: 8),
+                              Icon(Icons.chevron_right, size: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (_step == 2)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                      child: SizedBox(
+                        height: 56,
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: (_flowType == 'queue' &&
+                                      _adminPlace.text.trim().isNotEmpty) ||
+                                  (_flowType == 'service' &&
+                                      _categoryId != null)
+                              ? () => setState(() => _step = 3)
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFD400),
+                            foregroundColor: Colors.black,
+                            disabledBackgroundColor: Colors.grey[300],
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Continuer',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              SizedBox(width: 8),
+                              Icon(Icons.chevron_right, size: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (_step == 3)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                      child: SizedBox(
+                        height: 56,
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => setState(() => _step = 4),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFFFD400),
+                            foregroundColor: Colors.black,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'Continuer',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              SizedBox(width: 8),
+                              Icon(Icons.chevron_right, size: 20),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
-          if (_step == 1 && _flowType != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-              child: SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () => setState(() => _step = 2),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD400),
-                    foregroundColor: Colors.black,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Continuer',
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
+    );
+  }
+
+  Widget _buildStepper() {
+    return Row(
+      children: List.generate(4, (index) {
+        final isActive = index < _step;
+        return Expanded(
+          child: Container(
+            margin: EdgeInsets.only(right: index < 3 ? 8 : 0),
+            height: 8,
+            decoration: BoxDecoration(
+              color:
+                  isActive ? const Color(0xFFFFD400) : const Color(0xFFE0E0E0),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        );
+      }),
     );
   }
 }

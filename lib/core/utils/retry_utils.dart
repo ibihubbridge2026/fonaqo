@@ -7,8 +7,7 @@ import 'package:logger/logger.dart';
 class RetryUtils {
   static const int defaultMaxRetries = 3;
 
-  static const Duration defaultBaseDelay =
-      Duration(seconds: 1);
+  static const Duration defaultBaseDelay = Duration(seconds: 1);
 
   static const double defaultBackoffMultiplier = 2.0;
 
@@ -17,8 +16,7 @@ class RetryUtils {
     Future<T> Function() operation, {
     int maxRetries = defaultMaxRetries,
     Duration baseDelay = defaultBaseDelay,
-    double backoffMultiplier =
-        defaultBackoffMultiplier,
+    double backoffMultiplier = defaultBackoffMultiplier,
     Logger? logger,
     String? operationName,
   }) async {
@@ -43,8 +41,7 @@ class RetryUtils {
       } catch (e) {
         attempts++;
 
-        final isRetryable =
-            _isRetryableError(e);
+        final isRetryable = _isRetryableError(e);
 
         if (!isRetryable) {
           logger?.e(
@@ -127,29 +124,22 @@ class RetryUtils {
       return false;
     }
 
-    return (statusCode >= 500 &&
-            statusCode < 600) ||
-        statusCode == 429;
+    return (statusCode >= 500 && statusCode < 600) || statusCode == 429;
   }
 
   /// Calcule le délai exponentiel
   static Duration calculateRetryDelay(
     int attempt, {
     Duration baseDelay = defaultBaseDelay,
-    double multiplier =
-        defaultBackoffMultiplier,
+    double multiplier = defaultBackoffMultiplier,
     Duration? maxDelay,
   }) {
     final milliseconds =
-        (baseDelay.inMilliseconds *
-                (multiplier * attempt))
-            .round();
+        (baseDelay.inMilliseconds * (multiplier * attempt)).round();
 
-    final delay =
-        Duration(milliseconds: milliseconds);
+    final delay = Duration(milliseconds: milliseconds);
 
-    if (maxDelay != null &&
-        delay > maxDelay) {
+    if (maxDelay != null && delay > maxDelay) {
       return maxDelay;
     }
 
@@ -160,15 +150,13 @@ class RetryUtils {
   static Interceptor createRetryInterceptor({
     int maxRetries = defaultMaxRetries,
     Duration baseDelay = defaultBaseDelay,
-    double backoffMultiplier =
-        defaultBackoffMultiplier,
+    double backoffMultiplier = defaultBackoffMultiplier,
     Logger? logger,
   }) {
     return RetryInterceptor(
       maxRetries: maxRetries,
       baseDelay: baseDelay,
-      backoffMultiplier:
-          backoffMultiplier,
+      backoffMultiplier: backoffMultiplier,
       logger: logger,
     );
   }
@@ -185,12 +173,9 @@ class RetryInterceptor extends Interceptor {
   final Logger? logger;
 
   RetryInterceptor({
-    this.maxRetries =
-        RetryUtils.defaultMaxRetries,
-    this.baseDelay =
-        RetryUtils.defaultBaseDelay,
-    this.backoffMultiplier =
-        RetryUtils.defaultBackoffMultiplier,
+    this.maxRetries = RetryUtils.defaultMaxRetries,
+    this.baseDelay = RetryUtils.defaultBaseDelay,
+    this.backoffMultiplier = RetryUtils.defaultBackoffMultiplier,
     this.logger,
   });
 
@@ -199,25 +184,29 @@ class RetryInterceptor extends Interceptor {
     DioException err,
     ErrorInterceptorHandler handler,
   ) async {
-    final requestOptions =
-        err.requestOptions;
+    final requestOptions = err.requestOptions;
 
-    final retryCount =
-        requestOptions.extra['retryCount']
-            as int? ??
-            0;
+    // Retry uniquement pour les requêtes GET
+    // POST, PUT, PATCH, DELETE ne doivent pas être retry pour éviter les duplications
+    final isGetRequest = requestOptions.method.toUpperCase() == 'GET';
 
-    if (!_isRetryableError(err) ||
-        retryCount >= maxRetries) {
+    if (!isGetRequest) {
+      logger?.d(
+          '⏭️ Skip retry for ${requestOptions.method} ${requestOptions.uri}');
       handler.next(err);
       return;
     }
 
-    requestOptions.extra['retryCount'] =
-        retryCount + 1;
+    final retryCount = requestOptions.extra['retryCount'] as int? ?? 0;
 
-    final delay =
-        RetryUtils.calculateRetryDelay(
+    if (!_isRetryableError(err) || retryCount >= maxRetries) {
+      handler.next(err);
+      return;
+    }
+
+    requestOptions.extra['retryCount'] = retryCount + 1;
+
+    final delay = RetryUtils.calculateRetryDelay(
       retryCount + 1,
       baseDelay: baseDelay,
       multiplier: backoffMultiplier,
@@ -254,8 +243,7 @@ class RetryInterceptor extends Interceptor {
         return true;
 
       case DioExceptionType.badResponse:
-        return RetryUtils
-            .isRetryableStatusCode(
+        return RetryUtils.isRetryableStatusCode(
           error.response?.statusCode,
         );
 
@@ -271,23 +259,18 @@ class RetryInterceptor extends Interceptor {
 extension DioRetryExtension on Dio {
   Future<Response<T>> executeWithRetry<T>(
     RequestOptions options, {
-    int maxRetries =
-        RetryUtils.defaultMaxRetries,
-    Duration baseDelay =
-        RetryUtils.defaultBaseDelay,
-    double backoffMultiplier =
-        RetryUtils.defaultBackoffMultiplier,
+    int maxRetries = RetryUtils.defaultMaxRetries,
+    Duration baseDelay = RetryUtils.defaultBaseDelay,
+    double backoffMultiplier = RetryUtils.defaultBackoffMultiplier,
     Logger? logger,
   }) {
     return RetryUtils.executeWithRetry(
       () => fetch<T>(options),
       maxRetries: maxRetries,
       baseDelay: baseDelay,
-      backoffMultiplier:
-          backoffMultiplier,
+      backoffMultiplier: backoffMultiplier,
       logger: logger,
-      operationName:
-          'HTTP ${options.method} ${options.path}',
+      operationName: 'HTTP ${options.method} ${options.path}',
     );
   }
 }

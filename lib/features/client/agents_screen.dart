@@ -1,5 +1,11 @@
+import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:fonaco/core/constants/app_constants.dart';
+import 'package:fonaco/core/services/cache_service.dart';
+import 'package:fonaco/core/widgets/skeleton_loading.dart';
 import 'package:fonaco/features/client/missions/mission_repository.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -15,16 +21,20 @@ class AgentsScreen extends StatefulWidget {
 class _AgentsScreenState extends State<AgentsScreen> {
   final Logger _log = Logger();
   final MissionRepository _missionRepository = MissionRepository();
+  final CacheService _cacheService = CacheService();
 
   List<Map<String, dynamic>> _agents = [];
 
   bool _isLoadingAgents = false;
   bool _locating = false;
+  bool _nearbyMode = false; // Mode "Proches de moi" désactivé par défaut
+  String? _selectedExpertiseTag; // Tag d'expertise sélectionné pour filtrage
+  Set<String> _favoriteAgentIds = {};
 
   static const Color _accent = Color(0xFFFFD400);
 
   final CameraPosition _initialCamera = const CameraPosition(
-    target: LatLng(5.3363, -4.0260),
+    target: LatLng(AppConstants.defaultLatitude, AppConstants.defaultLongitude),
     zoom: 12.8,
   );
 
@@ -32,15 +42,68 @@ class _AgentsScreenState extends State<AgentsScreen> {
   LatLng? _currentLatLng;
 
   Set<Marker> _markers = <Marker>{};
+  double _currentZoom = 12.8;
+  Timer? _debounceTimer;
 
   @override
   void initState() {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _initLocation();
+      // Charger les favoris
+      _loadFavoriteAgents();
+      // Charger tous les agents d'abord (sans contrainte GPS)
       await _loadAgents();
+      // Initialiser la localisation en arrière-plan
+      await _initLocation();
     });
+  }
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    super.dispose();
+  }
+
+  void _loadFavoriteAgents() {
+    if (!_cacheService.isInitialized) return;
+    try {
+      _cacheService.init().then((_) {
+        if (mounted) {
+          setState(() {
+            _favoriteAgentIds = _cacheService.getFavoriteAgents().toSet();
+          });
+        }
+      });
+    } catch (e) {
+      // Ignorer les erreurs
+    }
+  }
+
+  void _toggleFavoriteAgent(String agentId) {
+    if (!_cacheService.isInitialized) {
+      _cacheService.init().then((_) {
+        _cacheService.toggleFavoriteAgent(agentId);
+        if (mounted) {
+          setState(() {
+            if (_favoriteAgentIds.contains(agentId)) {
+              _favoriteAgentIds.remove(agentId);
+            } else {
+              _favoriteAgentIds.add(agentId);
+            }
+          });
+        }
+      });
+    } else {
+      _cacheService.toggleFavoriteAgent(agentId);
+      setState(() {
+        if (_favoriteAgentIds.contains(agentId)) {
+          _favoriteAgentIds.remove(agentId);
+        } else {
+          _favoriteAgentIds.add(agentId);
+        }
+      });
+    }
   }
 
   Future<void> _loadAgents({
@@ -56,15 +119,16 @@ class _AgentsScreenState extends State<AgentsScreen> {
     setState(() => _isLoadingAgents = true);
 
     try {
-      if (_currentLatLng == null) {
-        setState(() => _isLoadingAgents = false);
-        return;
-      }
+      // Si mode "Proches de moi" est activé et localisation disponible, utiliser les coordonnées
+      // Sinon, charger tous les agents sans contrainte GPS
+      final useLocation = _nearbyMode && _currentLatLng != null;
 
       final agents = await _missionRepository.fetchNearbyAgents(
-        latitude: _currentLatLng!.latitude,
-        longitude: _currentLatLng!.longitude,
-        radiusKm: radiusKm,
+        latitude: useLocation ? _currentLatLng!.latitude : null,
+        longitude: useLocation ? _currentLatLng!.longitude : null,
+        radiusKm: useLocation
+            ? (radiusKm ?? AppConstants.defaultSearchRadiusKm)
+            : null,
         minRating: minRating,
         verifiedOnly: verifiedOnly,
         missionTypes: missionTypes,
@@ -75,19 +139,21 @@ class _AgentsScreenState extends State<AgentsScreen> {
 
       if (!mounted) return;
 
+      // Utiliser les coordonnées actuelles ou les coordonnées par défaut
+      final centerLatLng = _currentLatLng ??
+          LatLng(AppConstants.defaultLatitude, AppConstants.defaultLongitude);
+
       setState(() {
         _agents = agents;
         _isLoadingAgents = false;
-      });
-
-      setState(() {
-        _markers = _buildMarkersAround(_currentLatLng!);
+        _markers = _buildMarkersAround(centerLatLng);
       });
     } catch (e) {
       if (!mounted) return;
 
       setState(() => _isLoadingAgents = false);
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -99,7 +165,17 @@ class _AgentsScreenState extends State<AgentsScreen> {
     }
   }
 
-  List<Map<String, dynamic>> get _filteredAgents => _agents;
+  List<Map<String, dynamic>> get _filteredAgents {
+    if (_selectedExpertiseTag == null) return _agents;
+
+    return _agents.where((agent) {
+      final tags = (agent['expertise_tags'] as List<dynamic>?)
+              ?.map((tag) => tag.toString())
+              .toList() ??
+          [];
+      return tags.contains(_selectedExpertiseTag);
+    }).toList();
+  }
 
   Future<void> _initLocation() async {
     if (!mounted) return;
@@ -130,6 +206,21 @@ class _AgentsScreenState extends State<AgentsScreen> {
         return;
       }
 
+      // 1. Essayer d'abord avec la dernière position connue (rapide)
+      final lastKnownPosition = await Geolocator.getLastKnownPosition();
+      if (lastKnownPosition != null && mounted) {
+        final me =
+            LatLng(lastKnownPosition.latitude, lastKnownPosition.longitude);
+        setState(() {
+          _currentLatLng = me;
+          _markers = _buildMarkersAround(me);
+          _locating = false;
+        });
+        await _animateTo(me);
+        _log.i('📍 Position connue utilisée: ${me.latitude}, ${me.longitude}');
+      }
+
+      // 2. Obtenir la position actuelle en arrière-plan (plus précise)
       final position = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.medium,
@@ -148,6 +239,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
       });
 
       await _animateTo(me);
+      _log.i('📍 Position actuelle obtenue: ${me.latitude}, ${me.longitude}');
     } catch (e, st) {
       _log.e(
         'Erreur localisation agents',
@@ -157,7 +249,10 @@ class _AgentsScreenState extends State<AgentsScreen> {
 
       if (!mounted) return;
 
-      final fallback = const LatLng(5.3600, -4.0083);
+      final fallback = const LatLng(
+        AppConstants.defaultLatitude,
+        AppConstants.defaultLongitude,
+      );
 
       setState(() {
         _currentLatLng = fallback;
@@ -200,40 +295,125 @@ class _AgentsScreenState extends State<AgentsScreen> {
       ),
     );
 
+    // Clustering manuel basé sur le niveau de zoom
+    final clusterRadius =
+        _currentZoom < 13 ? 0.01 : 0.005; // Plus grand quand zoom éloigné
+    final clusters = <List<Map<String, dynamic>>>[];
+
     for (final agent in _filteredAgents) {
       final lat = _parseCoordinate(agent['latitude']);
       final lng = _parseCoordinate(agent['longitude']);
 
       if (lat == null || lng == null) continue;
-
       if (lat.abs() > 90 || lng.abs() > 180) continue;
 
-      final name =
-          '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
+      bool addedToCluster = false;
 
-      final specialty = agent['specialty'] ?? 'Agent terrain';
+      for (final cluster in clusters) {
+        final clusterLat = _parseCoordinate(cluster.first['latitude']);
+        final clusterLng = _parseCoordinate(cluster.first['longitude']);
 
-      final distance = agent['distance_km'];
+        if (clusterLat != null && clusterLng != null) {
+          final distance = _calculateDistance(lat, lng, clusterLat, clusterLng);
+          if (distance < clusterRadius) {
+            cluster.add(agent);
+            addedToCluster = true;
+            break;
+          }
+        }
+      }
 
-      markers.add(
-        Marker(
-          markerId: MarkerId('agent_${agent['id']}'),
-          position: LatLng(lat, lng),
-          infoWindow: InfoWindow(
-            title: name.isNotEmpty ? name : 'Agent',
-            snippet: _formatDistance(distance).isNotEmpty
-                ? '$specialty • ${_formatDistance(distance)}'
-                : specialty,
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueYellow,
-          ),
-          onTap: () => _onAgentMarkerTapped(agent),
-        ),
-      );
+      if (!addedToCluster) {
+        clusters.add([agent]);
+      }
+    }
+
+    // Créer les marqueurs (clusters ou individuels)
+    for (final cluster in clusters) {
+      if (cluster.length > 1 && _currentZoom < 14) {
+        // Créer un marqueur de cluster
+        final clusterLat = _parseCoordinate(cluster.first['latitude']);
+        final clusterLng = _parseCoordinate(cluster.first['longitude']);
+
+        if (clusterLat != null && clusterLng != null) {
+          markers.add(
+            Marker(
+              markerId: MarkerId('cluster_${cluster.first['id']}'),
+              position: LatLng(clusterLat, clusterLng),
+              infoWindow: InfoWindow(
+                title: '${cluster.length} agents',
+                snippet: 'Zoom pour voir les détails',
+              ),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueOrange,
+              ),
+              onTap: () {
+                // Zoomer sur le cluster
+                _mapController?.animateCamera(
+                  CameraUpdate.newCameraPosition(
+                    CameraPosition(
+                      target: LatLng(clusterLat, clusterLng),
+                      zoom: _currentZoom + 2,
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        }
+      } else {
+        // Afficher les marqueurs individuels
+        for (final agent in cluster) {
+          final lat = _parseCoordinate(agent['latitude']);
+          final lng = _parseCoordinate(agent['longitude']);
+
+          if (lat == null || lng == null) continue;
+
+          final name =
+              '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
+
+          final specialty = agent['specialty'] ?? 'Agent terrain';
+
+          final distance = agent['distance_km'];
+
+          markers.add(
+            Marker(
+              markerId: MarkerId('agent_${agent['id']}'),
+              position: LatLng(lat, lng),
+              infoWindow: InfoWindow(
+                title: name.isNotEmpty ? name : 'Agent',
+                snippet: _formatDistance(distance).isNotEmpty
+                    ? '$specialty • ${_formatDistance(distance)}'
+                    : specialty,
+              ),
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueYellow,
+              ),
+              onTap: () => _onAgentMarkerTapped(agent),
+            ),
+          );
+        }
+      }
     }
 
     return markers;
+  }
+
+  double _calculateDistance(
+      double lat1, double lng1, double lat2, double lng2) {
+    const double earthRadius = 6371; // km
+    final dLat = _toRadians(lat2 - lat1);
+    final dLng = _toRadians(lng2 - lng1);
+
+    final a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(dLat / 2) * cos(dLat / 2) * sin(dLng / 2) * sin(dLng / 2);
+    final c = 2 * asin(sqrt(a));
+
+    return earthRadius * c;
+  }
+
+  double _toRadians(double degree) {
+    return degree * 3.141592653589793 / 180;
   }
 
   void _onAgentMarkerTapped(Map<String, dynamic> agent) {
@@ -341,7 +521,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
               decoration: BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.black.withOpacity(0.1)),
+                border: Border.all(color: Colors.black.withValues(alpha: 0.1)),
               ),
               child: const TextField(
                 decoration: InputDecoration(
@@ -404,6 +584,25 @@ class _AgentsScreenState extends State<AgentsScreen> {
                   await _animateTo(me);
                 }
               },
+              onCameraMove: (CameraPosition position) {
+                // Annuler le timer précédent
+                _debounceTimer?.cancel();
+
+                // Nouveau timer avec délai de 300ms
+                _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+                  if (!mounted) return;
+
+                  setState(() {
+                    _currentZoom = position.zoom;
+
+                    // Recalculer les markers avec le nouveau zoom
+                    final centerLatLng = _currentLatLng ??
+                        LatLng(AppConstants.defaultLatitude,
+                            AppConstants.defaultLongitude);
+                    _markers = _buildMarkersAround(centerLatLng);
+                  });
+                });
+              },
             ),
           ),
           Positioned(
@@ -430,7 +629,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
                           borderRadius: BorderRadius.circular(30),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.08),
+                              color: Colors.black.withValues(alpha: 0.08),
                               blurRadius: 14,
                             ),
                           ],
@@ -501,7 +700,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.10),
+                      color: Colors.black.withValues(alpha: 0.10),
                       blurRadius: 18,
                       offset: const Offset(0, -6),
                     ),
@@ -534,13 +733,58 @@ class _AgentsScreenState extends State<AgentsScreen> {
                               fontSize: 16,
                             ),
                           ),
+                          // Interrupteur "Proches de moi"
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _nearbyMode = !_nearbyMode;
+                              });
+                              _loadAgents();
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _nearbyMode
+                                    ? const Color(0xFFFFD400)
+                                    : Colors.grey[200],
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.location_on,
+                                    size: 16,
+                                    color: _nearbyMode
+                                        ? Colors.black
+                                        : Colors.grey[600],
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Proches de moi',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: _nearbyMode
+                                          ? Colors.black
+                                          : Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
                     Expanded(
                       child: _isLoadingAgents
-                          ? const Center(
-                              child: CircularProgressIndicator(),
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: SkeletonLoading.list(itemCount: 3),
                             )
                           : ListView.separated(
                               padding: const EdgeInsets.fromLTRB(
@@ -553,8 +797,19 @@ class _AgentsScreenState extends State<AgentsScreen> {
                               separatorBuilder: (_, __) =>
                                   const SizedBox(height: 12),
                               itemBuilder: (context, index) {
+                                final agent = _filteredAgents[index];
+                                final agentId = agent['id']?.toString() ?? '';
                                 return AgentListTile(
-                                  agent: _filteredAgents[index],
+                                  agent: agent,
+                                  selectedTag: _selectedExpertiseTag,
+                                  onTagSelected: (tag) {
+                                    setState(() {
+                                      _selectedExpertiseTag = tag;
+                                    });
+                                  },
+                                  isFavorite:
+                                      _favoriteAgentIds.contains(agentId),
+                                  onToggleFavorite: _toggleFavoriteAgent,
                                 );
                               },
                             ),
@@ -572,10 +827,18 @@ class _AgentsScreenState extends State<AgentsScreen> {
 
 class AgentListTile extends StatelessWidget {
   final Map<String, dynamic> agent;
+  final String? selectedTag;
+  final Function(String?) onTagSelected;
+  final bool isFavorite;
+  final Function(String) onToggleFavorite;
 
   const AgentListTile({
     super.key,
     required this.agent,
+    this.selectedTag,
+    required this.onTagSelected,
+    required this.isFavorite,
+    required this.onToggleFavorite,
   });
 
   static String _formatDistance(dynamic distance) {
@@ -608,6 +871,12 @@ class AgentListTile extends StatelessWidget {
 
     final avatarUrl = agent['avatar_url'];
 
+    // Extraire les tags d'expertise
+    final expertiseTags = (agent['expertise_tags'] as List<dynamic>?)
+            ?.map((tag) => tag.toString())
+            .toList() ??
+        [];
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -615,7 +884,7 @@ class AgentListTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 10,
           ),
         ],
@@ -651,6 +920,32 @@ class AgentListTile extends StatelessWidget {
                     size: 14,
                   ),
                 ),
+              // Icône favoris
+              Positioned(
+                top: 0,
+                right: 0,
+                child: GestureDetector(
+                  onTap: () => onToggleFavorite(agent['id']?.toString() ?? ''),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.1),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: isFavorite ? Colors.red : Colors.grey,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(width: 15),
@@ -676,6 +971,48 @@ class AgentListTile extends StatelessWidget {
                     fontSize: 12,
                   ),
                 ),
+                const SizedBox(height: 4),
+                // Tags d'expertise
+                if (expertiseTags.isNotEmpty)
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 2,
+                    children: expertiseTags.take(3).map((tag) {
+                      final isSelected = selectedTag == tag;
+                      return GestureDetector(
+                        onTap: () {
+                          onTagSelected(isSelected ? null : tag);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? const Color(0xFFFFD400)
+                                : const Color(0xFFFFD400)
+                                    .withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                            border: isSelected
+                                ? Border.all(
+                                    color: const Color(0xFFFFD400), width: 1)
+                                : null,
+                          ),
+                          child: Text(
+                            tag,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: isSelected
+                                  ? Colors.black
+                                  : const Color(0xFF715D00),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 const SizedBox(height: 5),
                 Row(
                   children: [
@@ -954,7 +1291,7 @@ class _AgentFilterSheetState extends State<_AgentFilterSheet> {
                       color: Colors.grey[50],
                       borderRadius: BorderRadius.circular(30),
                       border: Border.all(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withValues(alpha: 0.06),
                       ),
                     ),
                     child: SwitchListTile(

@@ -10,8 +10,9 @@ import '../utils/retry_utils.dart';
 class BaseClient {
   /// Base API (suffixe /api/v1/). Les chemins passés à Dio sont relatifs, ex. `accounts/login/`.
   static String get _baseUrl => ApiConfig.baseUrl;
-  static const Duration _connectTimeout = Duration(seconds: 30);
-  static const Duration _receiveTimeout = Duration(seconds: 30);
+  static const Duration _connectTimeout = Duration(seconds: 10);
+  static const Duration _receiveTimeout = Duration(seconds: 20);
+  static const Duration _sendTimeout = Duration(seconds: 20);
 
   /// Hôte et port du serveur (ex. `192.168.1.73:8000`) pour WebSockets `ws://…`.
   static String get apiHostAndPort => ApiConfig.wsHost;
@@ -42,6 +43,7 @@ class BaseClient {
         baseUrl: _baseUrl,
         connectTimeout: _connectTimeout,
         receiveTimeout: _receiveTimeout,
+        sendTimeout: _sendTimeout,
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',

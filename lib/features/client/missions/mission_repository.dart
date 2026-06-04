@@ -3,6 +3,7 @@ import 'package:logger/logger.dart';
 
 import 'package:fonaco/core/api/base_client.dart';
 import 'package:fonaco/core/models/mission_model.dart';
+import 'package:fonaco/core/services/cache_service.dart';
 
 /// Données pour créer une mission (POST /missions/).
 class MissionCreatePayload {
@@ -15,6 +16,11 @@ class MissionCreatePayload {
   final double serviceFee;
   final bool requiresProcuration;
   final String? targetAgentUsername;
+  final bool isUrgent;
+  final bool isConfidential;
+  final double purchaseAmount;
+  final double serviceAmount;
+  final String recurrence;
 
   const MissionCreatePayload({
     required this.title,
@@ -26,6 +32,11 @@ class MissionCreatePayload {
     required this.serviceFee,
     this.requiresProcuration = false,
     this.targetAgentUsername,
+    this.isUrgent = false,
+    this.isConfidential = false,
+    this.purchaseAmount = 0,
+    this.serviceAmount = 0,
+    this.recurrence = 'once',
   });
 
   Map<String, dynamic> toJson() => {
@@ -37,6 +48,11 @@ class MissionCreatePayload {
         'price': price,
         'service_fee': serviceFee,
         'requires_procuration': requiresProcuration,
+        'is_urgent': isUrgent,
+        'is_confidential': isConfidential,
+        'purchase_amount': purchaseAmount,
+        'service_amount': serviceAmount,
+        'recurrence': recurrence,
         if (targetAgentUsername != null)
           'target_agent_username': targetAgentUsername,
       };
@@ -46,6 +62,7 @@ class MissionCreatePayload {
 class MissionRepository {
   final BaseClient _baseClient;
   final Logger _logger = Logger();
+  final CacheService _cacheService = CacheService();
 
   MissionRepository({BaseClient? baseClient})
       : _baseClient = baseClient ?? BaseClient();
@@ -125,16 +142,23 @@ class MissionRepository {
         query['lng'] = longitude.toString();
       }
 
+      _logger.i('📡 Appel API: missions/ avec params: $query');
+
       final response = await _baseClient.get(
         'missions/',
         queryParameters: query,
       );
+
+      _logger.i(
+          '📡 Réponse API: status=${response.statusCode}, data=${response.data}');
 
       if (response.statusCode != 200) {
         throw Exception('Erreur HTTP ${response.statusCode}');
       }
 
       final rows = _extractListFromEnvelope(response.data);
+      _logger.i('✅ Missions parsées: ${rows.length}');
+
       return rows
           .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -145,6 +169,27 @@ class MissionRepository {
   }
 
   Future<MissionModel> fetchMissionDetails(String missionId) async {
+    // 1. Initialiser le cache si nécessaire
+    if (!_cacheService.isInitialized) {
+      try {
+        await _cacheService.init();
+      } catch (e) {
+        _logger.w('⚠️ Erreur initialisation cache: $e');
+      }
+    }
+
+    // 2. Charger depuis le cache d'abord (Cache-First)
+    final cachedMission = _cacheService.getCachedMission(missionId);
+    if (cachedMission != null) {
+      _logger.i('📦 Mission $missionId chargée depuis le cache');
+      try {
+        return MissionModel.fromJson(cachedMission);
+      } catch (e) {
+        _logger.w('⚠️ Erreur parsing cache mission: $e');
+      }
+    }
+
+    // 3. Si pas de cache ou erreur, charger depuis l'API
     try {
       final response = await _baseClient.get('missions/$missionId/');
       if (response.statusCode != 200) {
@@ -164,10 +209,44 @@ class MissionRepository {
         }
       }
 
-      return MissionModel.fromJson(missionMap);
+      final mission = MissionModel.fromJson(missionMap);
+
+      // 4. Mettre à jour le cache en arrière-plan
+      _cacheService.cacheMission(missionId, mission.toJson());
+
+      return mission;
     } catch (e, st) {
       _logger.e('fetchMissionDetails - Erreur: $e', error: e, stackTrace: st);
       rethrow;
+    }
+  }
+
+  /// Rafraîchir silencieusement les détails d'une mission (background refresh)
+  Future<void> refreshMissionDetails(String missionId) async {
+    try {
+      final response = await _baseClient.get('missions/$missionId/');
+      if (response.statusCode != 200) {
+        _logger
+            .w('⚠️ Refresh mission $missionId échoué: ${response.statusCode}');
+        return;
+      }
+
+      Map<String, dynamic> missionMap;
+      try {
+        missionMap = _extractObjectFromEnvelope(response.data);
+      } catch (e) {
+        if (response.data is Map<String, dynamic>) {
+          missionMap = response.data as Map<String, dynamic>;
+        } else {
+          return;
+        }
+      }
+
+      // Mettre à jour le cache
+      await _cacheService.cacheMission(missionId, missionMap);
+      _logger.i('🔄 Mission $missionId rafraîchie en arrière-plan');
+    } catch (e, st) {
+      _logger.w('⚠️ Erreur refresh mission: $e', error: e, stackTrace: st);
     }
   }
 
@@ -274,9 +353,10 @@ class MissionRepository {
 
   /// Agents à proximité (GET /accounts/agents/nearby/).
   /// Accepte les coordonnées GPS et les filtres optionnels.
+  /// Si latitude/longitude ne sont pas fournis, récupère tous les agents actifs.
   Future<List<Map<String, dynamic>>> fetchNearbyAgents({
-    required double latitude,
-    required double longitude,
+    double? latitude,
+    double? longitude,
     double? radiusKm,
     double? minRating,
     bool? verifiedOnly,
@@ -286,11 +366,15 @@ class MissionRepository {
     int limit = 20,
   }) async {
     try {
-      final queryParams = <String, String>{
-        'latitude': latitude.toString(),
-        'longitude': longitude.toString(),
-      };
-      if (radiusKm != null) queryParams['radius_km'] = radiusKm.toString();
+      final queryParams = <String, String>{};
+
+      // N'envoyer les coordonnées que si elles sont fournies (mode "Proches de moi")
+      if (latitude != null && longitude != null) {
+        queryParams['latitude'] = latitude.toString();
+        queryParams['longitude'] = longitude.toString();
+        if (radiusKm != null) queryParams['radius_km'] = radiusKm.toString();
+      }
+
       if (minRating != null) queryParams['min_rating'] = minRating.toString();
       if (verifiedOnly != null)
         queryParams['verified_only'] = verifiedOnly.toString();
@@ -303,7 +387,7 @@ class MissionRepository {
 
       final response = await _baseClient.get(
         'accounts/agents/nearby/',
-        queryParameters: queryParams,
+        queryParameters: queryParams.isNotEmpty ? queryParams : null,
       );
       if (response.statusCode != 200) return [];
       final body = response.data;
@@ -316,6 +400,34 @@ class MissionRepository {
     } catch (e, st) {
       _logger.e('fetchNearbyAgents', error: e, stackTrace: st);
       return [];
+    }
+  }
+
+  /// Noter une mission terminée
+  Future<void> rateMission(
+    String missionId,
+    int rating,
+    String comment,
+  ) async {
+    try {
+      _logger.i('Notation de la mission $missionId: $rating étoiles');
+
+      final response = await _baseClient.post(
+        'missions/$missionId/rate/',
+        data: {
+          'rating': rating,
+          'comment': comment,
+        },
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception('Erreur HTTP ${response.statusCode}');
+      }
+
+      _logger.i('✅ Mission notée avec succès');
+    } catch (e, st) {
+      _logger.e('rateMission', error: e, stackTrace: st);
+      rethrow;
     }
   }
 }

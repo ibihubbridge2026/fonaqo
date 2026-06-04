@@ -1,5 +1,4 @@
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 
 /// Service de gestion du cache offline avec Hive
@@ -80,6 +79,50 @@ class CacheService {
     } catch (e) {
       _logger.e('❌ Erreur lecture cache missions: $e');
       return [];
+    }
+  }
+
+  /// Sauvegarde une réponse JSON brute (pour dashboard/agents suggestions)
+  Future<void> cacheJsonResponse(String key, String jsonString) async {
+    try {
+      final box = Hive.box(_cacheBoxName);
+      await box.put('json_$key', jsonString);
+      await box.put(
+          'json_${key}_timestamp', DateTime.now().millisecondsSinceEpoch);
+      _logger.i('📦 JSON mis en cache: $key');
+    } catch (e) {
+      _logger.e('❌ Erreur cache JSON ($key): $e');
+    }
+  }
+
+  /// Récupère une réponse JSON brute depuis le cache
+  String? getCachedJsonResponse(String key) {
+    try {
+      if (!_isInitialized) {
+        _logger.w('⚠️ CacheService non initialisé');
+        return null;
+      }
+      final box = Hive.box(_cacheBoxName);
+      return box.get('json_$key');
+    } catch (e) {
+      _logger.e('❌ Erreur lecture cache JSON ($key): $e');
+      return null;
+    }
+  }
+
+  /// Vérifie si le cache JSON est valide (moins de 5 minutes)
+  bool isJsonCacheValid(String key, {int maxAgeMinutes = 5}) {
+    try {
+      final box = Hive.box(_cacheBoxName);
+      final timestamp = box.get('json_${key}_timestamp');
+      if (timestamp == null) return false;
+
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final maxAge = maxAgeMinutes * 60 * 1000;
+      return (now - timestamp) < maxAge;
+    } catch (e) {
+      _logger.e('❌ Erreur validation cache JSON ($key): $e');
+      return false;
     }
   }
 
@@ -273,6 +316,124 @@ class CacheService {
       }
     } catch (e) {
       _logger.e('❌ Erreur nettoyage cache expiré: $e');
+    }
+  }
+
+  // ==================== FAVORIS AGENTS ====================
+
+  /// Sauvegarde la liste des agents favoris
+  Future<void> saveFavoriteAgents(List<String> agentIds) async {
+    try {
+      final box = Hive.box(_cacheBoxName);
+      await box.put('favorite_agents', agentIds);
+      _logger.i('❤️ ${agentIds.length} agents favoris sauvegardés');
+    } catch (e) {
+      _logger.e('❌ Erreur sauvegarde favoris: $e');
+    }
+  }
+
+  /// Récupère la liste des agents favoris
+  List<String> getFavoriteAgents() {
+    try {
+      if (!_isInitialized) {
+        _logger.w('⚠️ CacheService non initialisé');
+        return [];
+      }
+      final box = Hive.box(_cacheBoxName);
+      final favorites = box.get('favorite_agents', defaultValue: <String>[]);
+      if (favorites is List) {
+        return favorites.map((e) => e.toString()).toList();
+      }
+      return [];
+    } catch (e) {
+      _logger.e('❌ Erreur lecture favoris: $e');
+      return [];
+    }
+  }
+
+  /// Ajoute un agent aux favoris
+  Future<void> addFavoriteAgent(String agentId) async {
+    try {
+      final favorites = getFavoriteAgents();
+      if (!favorites.contains(agentId)) {
+        favorites.add(agentId);
+        await saveFavoriteAgents(favorites);
+        _logger.i('❤️ Agent $agentId ajouté aux favoris');
+      }
+    } catch (e) {
+      _logger.e('❌ Erreur ajout favori: $e');
+    }
+  }
+
+  /// Retire un agent des favoris
+  Future<void> removeFavoriteAgent(String agentId) async {
+    try {
+      final favorites = getFavoriteAgents();
+      favorites.remove(agentId);
+      await saveFavoriteAgents(favorites);
+      _logger.i('💔 Agent $agentId retiré des favoris');
+    } catch (e) {
+      _logger.e('❌ Erreur retrait favori: $e');
+    }
+  }
+
+  /// Vérifie si un agent est dans les favoris
+  bool isAgentFavorite(String agentId) {
+    return getFavoriteAgents().contains(agentId);
+  }
+
+  /// Bascule le statut de favori d'un agent
+  Future<void> toggleFavoriteAgent(String agentId) async {
+    if (isAgentFavorite(agentId)) {
+      await removeFavoriteAgent(agentId);
+    } else {
+      await addFavoriteAgent(agentId);
+    }
+  }
+
+  // ==================== MISSIONS NOTÉES ====================
+
+  /// Sauvegarde la liste des missions notées
+  Future<void> saveRatedMissions(List<String> missionIds) async {
+    try {
+      final box = Hive.box(_cacheBoxName);
+      await box.put('rated_missions', missionIds);
+      _logger.i('⭐ ${missionIds.length} missions notées sauvegardées');
+    } catch (e) {
+      _logger.e('❌ Erreur sauvegarde missions notées: $e');
+    }
+  }
+
+  /// Récupère la liste des missions notées
+  List<String> getRatedMissionIds() {
+    try {
+      if (!_isInitialized) {
+        _logger.w('⚠️ CacheService non initialisé');
+        return [];
+      }
+      final box = Hive.box(_cacheBoxName);
+      final rated = box.get('rated_missions', defaultValue: <String>[]);
+      if (rated is List) {
+        return rated.map((e) => e.toString()).toList();
+      }
+      return [];
+    } catch (e) {
+      _logger.e('❌ Erreur lecture missions notées: $e');
+      return [];
+    }
+  }
+
+  /// Ajoute une mission à la liste des missions notées
+  Future<void> addRatedMission(String missionId) async {
+    try {
+      final rated = getRatedMissionIds();
+      if (!rated.contains(missionId)) {
+        rated.add(missionId);
+        await saveRatedMissions(rated);
+        _logger.i('⭐ Mission $missionId marquée comme notée');
+      }
+    } catch (e) {
+      _logger.e('❌ Erreur ajout mission notée: $e');
     }
   }
 }
