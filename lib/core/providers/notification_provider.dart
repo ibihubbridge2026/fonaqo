@@ -62,7 +62,7 @@ class NotificationProvider extends ChangeNotifier {
 
   /// Start polling for updates (fallback if WebSocket not available)
   void _startPolling() {
-    Timer.periodic(const Duration(seconds: 30), (timer) async {
+    Timer.periodic(const Duration(seconds: 60), (timer) async {
       await refreshCounts();
     });
   }

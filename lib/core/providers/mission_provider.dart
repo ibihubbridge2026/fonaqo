@@ -18,6 +18,12 @@ class MissionProvider extends ChangeNotifier {
     await fetchMissions();
   }
 
+  /// Ajouter une mission localement (après création)
+  void addMission(MissionModel mission) {
+    _missions.insert(0, mission);
+    notifyListeners();
+  }
+
   /// Récupérer les missions depuis l'API
   Future<void> fetchMissions() async {
     _setLoading(true);

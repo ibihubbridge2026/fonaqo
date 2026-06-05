@@ -12,7 +12,6 @@ import 'package:fonaco/core/widgets/skeleton_loading.dart';
 import 'package:fonaco/widgets/main_wrapper.dart';
 import 'mission_repository.dart';
 import 'screens/create_mission_screen.dart';
-import 'widgets/mission_rating_dialog.dart';
 
 class MissionsScreen extends StatefulWidget {
   /// Contrôle si on affiche la liste des missions ou le flux de création.
@@ -46,7 +45,8 @@ class _MissionsScreenState extends State<MissionsScreen> {
       _loading = true;
       _error = null;
     });
-    _loadMissions();
+    // Charger les missions avec un délai pour éviter les problèmes de timing
+    Future.microtask(() => _loadMissions());
     // Écouter les changements pour rafraîchir la liste quand on quitte le mode création
     widget.showCreateMissionListenable.addListener(_onCreateModeChanged);
   }
@@ -189,8 +189,9 @@ class _MissionsScreenState extends State<MissionsScreen> {
       );
       debugPrint('✅ Missions reçues: ${missions.length}');
 
-      // Vérifier les missions terminées non notées
-      _checkForUnratedMissions(missions);
+      // Désactivé: Vérifier les missions terminées non notées
+      // Le modal ne devrait s'afficher que lors d'une action utilisateur spécifique
+      // _checkForUnratedMissions(missions);
 
       // Mettre à jour le cache
       try {
@@ -225,56 +226,6 @@ class _MissionsScreenState extends State<MissionsScreen> {
       _isFetching = false;
       debugPrint(
           '🏁 _loadMissions terminé (loading=$_loading, error=$_error, missions=${_missions.length})');
-    }
-  }
-
-  /// Vérifie les missions terminées non notées et affiche le dialogue de notation
-  void _checkForUnratedMissions(List<MissionModel> missions) {
-    // Récupérer les IDs des missions déjà notées depuis le cache
-    final ratedMissionIds = _cacheService.getRatedMissionIds();
-
-    // Trouver les missions terminées non notées
-    final unratedMissions = missions.where((mission) {
-      return mission.status == MissionStatus.COMPLETED &&
-          mission.clientRating == null &&
-          !ratedMissionIds.contains(mission.id);
-    }).toList();
-
-    // Afficher le dialogue pour la première mission non notée
-    if (unratedMissions.isNotEmpty && mounted) {
-      final missionToRate = unratedMissions.first;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (dialogContext) => MissionRatingDialog(
-              missionId: missionToRate.id,
-              onSubmit: (rating, comment) async {
-                try {
-                  await _repo.rateMission(missionToRate.id, rating, comment);
-                  if (!mounted) return;
-                  // Marquer la mission comme notée dans le cache
-                  await _cacheService.addRatedMission(missionToRate.id);
-                  if (!mounted) return;
-                  // Rafraîchir la liste des missions
-                  _loadMissions();
-                } catch (e) {
-                  debugPrint('❌ Erreur notation mission: $e');
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Erreur lors de la notation: $e'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              },
-            ),
-          );
-        }
-      });
     }
   }
 

@@ -88,45 +88,6 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Vérifie si un token JWT est expiré en parsant le payload
-  bool _isTokenExpired(String token) {
-    try {
-      // Format JWT: header.payload.signature
-      final parts = token.split('.');
-      if (parts.length != 3) return true; // Format invalide = expiré
-
-      final payload = parts[1];
-      // Padding pour base64 si nécessaire
-      final paddedPayload =
-          payload.padRight((payload.length + 3) ~/ 4 * 4, '=');
-
-      final decoded = String.fromCharCodes(base64
-          .decode(paddedPayload.replaceAll('-', '+').replaceAll('_', '/')));
-
-      final payloadMap = jsonDecode(decoded) as Map<String, dynamic>;
-      final exp = payloadMap['exp'] as int?;
-
-      if (exp == null)
-        return true; // Pas de date d'expiration = expiré par sécurité
-
-      final expirationTime = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
-      final now = DateTime.now();
-
-      // Ajouter une marge de 30 secondes pour éviter les courses aux conditions
-      final isExpired =
-          now.isAfter(expirationTime.subtract(const Duration(seconds: 30)));
-
-      if (isExpired) {
-        _logger.d('Token expiré: expiration=$expirationTime, now=$now');
-      }
-
-      return isExpired;
-    } catch (e) {
-      _logger.e('Erreur parsing token JWT: $e');
-      return true; // En cas d'erreur, considérer comme expiré
-    }
-  }
-
   // =========================
   // AUTH METHODS (LOGIN, REGISTER, GOOGLE)
   // =========================
@@ -432,28 +393,19 @@ class AuthProvider extends ChangeNotifier {
       _logger.i(
           '  👤 User Data: ${userDataString != null ? "Présent (${userDataString.length} chars)" : "ABSENT"}');
 
-      // Vérification basique de l'expiration du token (format JWT)
-      if (token != null && _isTokenExpired(token)) {
-        _logger.w(
-            '🚨 Token JWT expiré détecté au démarrage, nettoyage automatique');
-        await _secureStorage.deleteAll();
-        _clearUserDataAndNotify();
-        _setError('Votre session a expiré. Veuillez vous reconnecter.');
-        return;
-      }
+      // NE PLUS VÉRIFIER L'EXPIRATION AU DÉMARRAGE
+      // Laisser l'intercepteur Dio gérer les erreurs 401 réelles
+      // Cela évite les déconnexions intempestives
 
       if (token != null && userDataString != null) {
-        // Charger l'utilisateur depuis le cache SANS tenter de refresh
+        // Charger l'utilisateur depuis le cache SANS vérifier l'expiration
         try {
           _currentUser = UserModel.fromJson(jsonDecode(userDataString));
           _isAuthenticated = true;
           _logger.i(
               '✅ Utilisateur chargé depuis le cache: ${_currentUser?.email}');
-          _logger.i('📍 Session restaurée (refresh automatique désactivé)');
-          _logger
-              .i('🛡️ handleTokenExpired ne sera JAMAIS appelé au démarrage');
-          _logger.i(
-              '📍 Seule une vraie erreur 401 API déclenchera la déconnexion');
+          _logger.i('📍 Session restaurée (sans vérification d\'expiration)');
+          _logger.i('� L\'intercepteur gérera les 401 si nécessaire');
         } catch (e) {
           _logger.e('❌ Erreur parsing utilisateur depuis cache: $e');
           await _secureStorage.deleteAll();
@@ -462,13 +414,8 @@ class AuthProvider extends ChangeNotifier {
           notifyListeners();
           return;
         }
-
-        // REFRESH AUTOMATIQUE DÉSACTIVÉ - Laisser l'intercepteur gérer les 401 réelles
-        _logger.i(
-            '📍 Refresh automatique désactivé - l\'intercepteur gérera les 401 si nécessaire');
       } else {
         _logger.w('⚠️ Session incomplète - certains tokens manquent');
-        _logger.w('📍 Aucune action de déconnexion automatique au démarrage');
       }
       notifyListeners();
     } catch (e) {

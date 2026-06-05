@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -41,6 +43,12 @@ class Step5TrackingView extends StatelessWidget {
                     target: LatLng(5.3363, -4.0260), // Abidjan
                     zoom: 14,
                   ),
+                  zoomGesturesEnabled: true,
+                  zoomControlsEnabled: true,
+                  gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                    Factory<OneSequenceGestureRecognizer>(
+                        () => EagerGestureRecognizer()),
+                  },
                   markers: {
                     // Position client
                     Marker(

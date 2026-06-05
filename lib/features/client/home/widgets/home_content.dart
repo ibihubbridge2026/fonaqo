@@ -11,6 +11,7 @@ import 'package:fonaco/widgets/main_wrapper.dart';
 import 'package:provider/provider.dart';
 
 import 'package:fonaco/features/client/missions/mission_repository.dart';
+import 'package:fonaco/features/client/screens/client_agent_profile_screen.dart';
 
 /// Constante pour la couleur des liens "Voir tous"
 /// Peut être changée en Colors.grey[700] pour un look plus discret
@@ -94,23 +95,6 @@ class _HomeContentState extends State<HomeContent> {
     }
   }
 
-  @override
-  void didUpdateWidget(HomeContent oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    // Vérifier si l'état d'authentification a changé
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    final wasAuthenticated = auth.isAuthenticated;
-
-    // Ne recharger que si l'état d'authentification a changé
-    // (connexion/déconnexion) pour éviter les requêtes API en doublon
-    // Le cache et le flux initial gèrent l'affichage normal
-    if (wasAuthenticated != _wasAuthenticated) {
-      _wasAuthenticated = wasAuthenticated;
-      _loadDashboard();
-    }
-  }
-
   Future<void> _loadDashboard() async {
     final auth = Provider.of<AuthProvider>(context, listen: false);
     if (!auth.isAuthenticated) {
@@ -142,6 +126,7 @@ class _HomeContentState extends State<HomeContent> {
 
   void _loadFromCache() {
     try {
+      print('📦 Chargement depuis le cache...');
       // Charger les missions depuis le cache
       final cachedMissionsJson =
           _cacheService.getCachedJsonResponse('dashboard_missions');
@@ -155,10 +140,13 @@ class _HomeContentState extends State<HomeContent> {
           if (mounted) {
             setState(() {
               _missions = missionsList;
-              _dashLoading = false;
+              // Ne pas mettre _dashLoading à false ici - attendre l'API ou un délai minimum
             });
+            print('✅ ${missionsList.length} missions chargées depuis le cache');
           }
         }
+      } else {
+        print('⚠️ Cache missions vide ou invalide');
       }
 
       // Charger les agents depuis le cache
@@ -175,21 +163,33 @@ class _HomeContentState extends State<HomeContent> {
             setState(() {
               _suggestedAgents = agentsList;
             });
+            print('✅ ${agentsList.length} agents chargés depuis le cache');
           }
         }
+      } else {
+        print('⚠️ Cache agents vide ou invalide');
       }
     } catch (e) {
+      print('❌ Erreur chargement cache: $e');
       // Erreur de cache, continuer avec API
     }
   }
 
   Future<void> _loadFromApi() async {
+    final startTime = DateTime.now();
     try {
       final missions = await _missionRepo.fetchMissionsList();
+
+      print('📡 Missions reçues depuis API: ${missions.length}');
+      for (var m in missions) {
+        print('  - ${m.title} (status: ${m.status})');
+      }
 
       // Pour l'instant, nous n'utilisons pas la localisation
       // TODO: Ajouter la localisation à UserModel et utiliser les coordonnées utilisateur
       final agents = await _missionRepo.fetchAgentSuggestions();
+
+      print('📡 Agents reçus depuis API: ${agents.length}');
 
       // Mettre à jour le cache
       try {
@@ -207,6 +207,12 @@ class _HomeContentState extends State<HomeContent> {
         // Erreur de cache, ignorer
       }
 
+      // Attendre au moins 200ms pour que l'utilisateur voie l'indicateur de chargement
+      final elapsed = DateTime.now().difference(startTime).inMilliseconds;
+      if (elapsed < 200) {
+        await Future.delayed(Duration(milliseconds: 200 - elapsed));
+      }
+
       if (!mounted) return;
       setState(() {
         _missions = missions;
@@ -215,6 +221,7 @@ class _HomeContentState extends State<HomeContent> {
         _dashError = null;
       });
     } catch (e) {
+      print('❌ Erreur chargement API: $e');
       if (!mounted) return;
       setState(() {
         _dashError = e.toString();
@@ -293,6 +300,7 @@ class _HomeContentState extends State<HomeContent> {
         PrimaryCreateMissionPanel(
           onPressed: () async {
             if (shell != null) {
+              shell.setIndex(1);
               shell.openCreateMission();
             }
           },
@@ -303,8 +311,9 @@ class _HomeContentState extends State<HomeContent> {
         ),
         const SizedBox(height: 12),
         if (_dashLoading)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          Container(
+            height: 100,
+            margin: const EdgeInsets.symmetric(horizontal: 20),
             child: SkeletonLoading.dashboardCard(),
           )
         else ...[
@@ -322,7 +331,12 @@ class _HomeContentState extends State<HomeContent> {
         SectionTitleStrip(
           title: 'Suggestions d\'agents',
           showSeeAll: true,
-          onSeeAllPressed: shell == null ? null : () => shell.setIndex(2),
+          seeAllText: 'Voir mes favoris',
+          onSeeAllPressed: shell == null
+              ? null
+              : () {
+                  Navigator.pushNamed(context, AppRoutes.favoriteAgents);
+                },
         ),
         const SizedBox(height: 12),
         if (_dashLoading)
@@ -343,11 +357,6 @@ class _HomeContentState extends State<HomeContent> {
           const SizedBox.shrink()
         else
           QuickHistoryEntries(missions: _historyMissions()),
-        const SizedBox(height: 25),
-        if (_dashLoading)
-          const SizedBox.shrink()
-        else
-          AvailableMissionsPreview(missions: _missions),
         const SizedBox(height: 25),
         const ReportLitigeCardPanel(),
         SizedBox(height: bottomReserve),
@@ -743,12 +752,14 @@ class PrimaryCreateMissionPanel extends StatelessWidget {
 class SectionTitleStrip extends StatelessWidget {
   final String title;
   final bool showSeeAll;
+  final String? seeAllText;
   final VoidCallback? onSeeAllPressed;
 
   const SectionTitleStrip({
     super.key,
     required this.title,
     this.showSeeAll = true,
+    this.seeAllText,
     this.onSeeAllPressed,
   });
 
@@ -774,7 +785,7 @@ class SectionTitleStrip extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Voir tous',
+                    seeAllText ?? 'Voir tous',
                     style: TextStyle(
                       color: _seeAllColor,
                       fontWeight: FontWeight.bold,
@@ -1277,18 +1288,37 @@ class AgentCard extends StatelessWidget {
             ),
           const SizedBox(height: 6),
           // Petit bouton profil
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFD400),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Text(
-              'Consultez le Profil',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ClientAgentProfileScreen(
+                    agentId: agentId,
+                    name: name,
+                    role: role,
+                    imagePath: imagePath,
+                    expertiseTags: expertiseTags,
+                    rating: 4.5,
+                    isVerified: true,
+                    isOnline: true,
+                  ),
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD400),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Consultez le Profil',
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
               ),
             ),
           ),

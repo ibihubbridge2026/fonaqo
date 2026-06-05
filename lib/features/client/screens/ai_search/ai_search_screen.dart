@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../widgets/custom_app_bar.dart';
 import '../../providers/ai_search_provider.dart';
 import '../../widgets/ai_agent_card.dart';
 
@@ -26,12 +27,12 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
 
   void _performSearch() async {
     if (_controller.text.trim().isEmpty) return;
-    
+
     setState(() => _isSearching = true);
-    
+
     final provider = context.read<AiSearchProvider>();
     await provider.searchAgents(_controller.text.trim());
-    
+
     setState(() => _isSearching = false);
   }
 
@@ -41,17 +42,8 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface.withOpacity(0.9),
-        elevation: 0,
-        title: Text(
-          'Recherche IA',
-          style: TextStyle(
-            color: AppColors.primary,
-            fontWeight: FontWeight.w800,
-            fontSize: 24,
-          ),
-        ),
+      appBar: CustomAppBar.detailStack(
+        title: 'Recherche IA',
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -60,19 +52,19 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
           children: [
             // Section Input IA
             _buildInputSection(provider),
-            
+
             const SizedBox(height: 24),
-            
+
             // Section Résultat IA (Compréhension)
             if (provider.analysisResult != null)
               _buildAnalysisSection(provider),
-            
+
             const SizedBox(height: 24),
-            
+
             // Section Agents Recommandés
             if (provider.suggestedAgents.isNotEmpty)
               _buildAgentsSection(provider),
-              
+
             // Loading State
             if (provider.isLoading)
               const Center(
@@ -119,7 +111,8 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
             maxLines: 3,
             style: TextStyle(color: AppColors.onSurface, fontSize: 16),
             decoration: InputDecoration(
-              hintText: 'Ex: "J\'ai besoin de quelqu\'un pour faire la queue à la banque demain matin..."',
+              hintText:
+                  'Ex: "J\'ai besoin de quelqu\'un pour faire la queue à la banque demain matin..."',
               hintStyle: TextStyle(color: AppColors.onSurfaceVariant),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -135,14 +128,19 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
             height: 50,
             child: ElevatedButton.icon(
               onPressed: _isSearching ? null : _performSearch,
-              icon: _isSearching 
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.search),
-              label: Text(_isSearching ? 'Analyse en cours...' : 'Lancer la recherche'),
+              icon: _isSearching
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.search),
+              label: Text(
+                  _isSearching ? 'Analyse en cours...' : 'Lancer la recherche'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: AppColors.onPrimary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
             ),
           ),
@@ -232,7 +230,9 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
             ),
             TextButton(
               onPressed: () {},
-              child: Text('Voir tout', style: TextStyle(color: AppColors.secondary, fontWeight: FontWeight.bold)),
+              child: Text('Voir tout',
+                  style: TextStyle(
+                      color: AppColors.secondary, fontWeight: FontWeight.bold)),
             ),
           ],
         ),

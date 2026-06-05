@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:fonaco/widgets/custom_app_bar.dart';
 
 /// Écran de profil d'agent (basique pour l'instant)
 class AgentProfileScreen extends StatelessWidget {
@@ -26,11 +27,8 @@ class AgentProfileScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
-      appBar: AppBar(
-        title: Text(name.isEmpty ? 'Profil Agent' : name),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+      appBar: CustomAppBar.detailStack(
+        title: name.isEmpty ? 'Profil Agent' : name,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),

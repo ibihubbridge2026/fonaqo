@@ -71,8 +71,16 @@ class MissionRepository {
     if (body is! Map) return [];
     final data = body['data'];
     if (data is List<dynamic>) return data;
-    if (data is Map<String, dynamic> && data['results'] is List<dynamic>) {
-      return data['results'] as List<dynamic>;
+    if (data is Map<String, dynamic>) {
+      // Cas standard: data.results
+      if (data['results'] is List<dynamic>) {
+        return data['results'] as List<dynamic>;
+      }
+      // Cas double imbrication: data.data.results
+      if (data['data'] is Map<String, dynamic> &&
+          data['data']['results'] is List<dynamic>) {
+        return data['data']['results'] as List<dynamic>;
+      }
     }
     return [];
   }

@@ -322,10 +322,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           onPressed: () {
                             Navigator.pop(context);
                           },
-                          child: const Text(
+                          child: Text(
                             "Connectez vous",
                             style: TextStyle(
-                              color: Color(0xFFFFD700),
+                              color: Colors.grey[700],
                               fontWeight: FontWeight.bold,
                             ),
                           ),

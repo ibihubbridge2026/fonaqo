@@ -63,9 +63,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (success && mounted) {
-      // Demander la localisation après une connexion réussie (silencieux)
-      await _requestLocationAfterLogin();
-
       // Vérifier si l'utilisateur a un numéro de téléphone
       final authProvider = context.read<AuthProvider>();
       final currentUser = authProvider.currentUser;
@@ -84,6 +81,9 @@ class _LoginScreenState extends State<LoginScreen> {
           AppRoutes.mainShell,
         );
       }
+
+      // Demander la localisation en arrière-plan après redirection (non bloquant)
+      _requestLocationAfterLogin();
     }
   }
 
@@ -262,10 +262,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           AppRoutes.forgotPassword,
                         );
                       },
-                      child: const Text(
+                      child: Text(
                         "Mot de passe oublié ?",
                         style: TextStyle(
-                          color: Color(0xFFFFD700),
+                          color: Colors.grey[700],
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -330,10 +330,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             AppRoutes.register,
                           );
                         },
-                        child: const Text(
+                        child: Text(
                           "S'inscrire",
                           style: TextStyle(
-                            color: Color(0xFFFFD700),
+                            color: Colors.grey[700],
                             fontWeight: FontWeight.bold,
                           ),
                         ),

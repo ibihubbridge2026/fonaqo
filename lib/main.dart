@@ -43,6 +43,7 @@ import 'features/events/event_detail_screen.dart';
 
 import 'features/client/missions/mission_detail_screen.dart';
 import 'features/client/missions/missions_screen.dart';
+import 'features/client/screens/favorite_agents_screen.dart';
 
 import 'features/map/agents_map_screen.dart';
 
@@ -279,6 +280,8 @@ class FonacoApp extends StatelessWidget {
               AppRoutes.onboarding: (context) => const OnboardingScreen(),
               AppRoutes.mainShell: (context) => const MainWrapper(),
               AppRoutes.missionDetail: (context) => const MissionDetailScreen(),
+              AppRoutes.favoriteAgents: (context) =>
+                  const FavoriteAgentsScreen(),
               AppRoutes.eventDetail: (context) => const EventDetailScreen(),
               AppRoutes.litige: (context) => const LitigeScreen(),
               AppRoutes.notifications: (context) => const NotificationsScreen(),

@@ -65,4 +65,7 @@ abstract final class AppRoutes {
   static const String securitySettings = '/profile/security';
 
   static const String language = '/profile/language';
+
+  /// Agents favoris
+  static const String favoriteAgents = '/favorite-agents';
 }

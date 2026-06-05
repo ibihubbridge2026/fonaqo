@@ -10,9 +10,9 @@ import '../utils/retry_utils.dart';
 class BaseClient {
   /// Base API (suffixe /api/v1/). Les chemins passés à Dio sont relatifs, ex. `accounts/login/`.
   static String get _baseUrl => ApiConfig.baseUrl;
-  static const Duration _connectTimeout = Duration(seconds: 10);
-  static const Duration _receiveTimeout = Duration(seconds: 20);
-  static const Duration _sendTimeout = Duration(seconds: 20);
+  static const Duration _connectTimeout = Duration(seconds: 30);
+  static const Duration _receiveTimeout = Duration(seconds: 30);
+  static const Duration _sendTimeout = Duration(seconds: 30);
 
   /// Hôte et port du serveur (ex. `192.168.1.73:8000`) pour WebSockets `ws://…`.
   static String get apiHostAndPort => ApiConfig.wsHost;
@@ -53,7 +53,9 @@ class BaseClient {
 
     // Ajout des intercepteurs
     _dio.interceptors.add(_AuthInterceptor(_secureStorage, _logger, _dio));
-    _dio.interceptors.add(_LoggingInterceptor(_logger));
+    // LoggingInterceptor désactivé en production pour améliorer les performances
+    // Commenter la ligne suivante pour activer en développement
+    // _dio.interceptors.add(_LoggingInterceptor(_logger));
     _dio.interceptors.add(RetryUtils.createRetryInterceptor(logger: _logger));
   }
 
@@ -321,13 +323,20 @@ class _AuthInterceptor extends Interceptor {
     RequestInterceptorHandler handler,
   ) async {
     if (_isPublicPath(options.path)) {
+      _logger.d('🔓 Chemin public, skip auth: ${options.path}');
       handler.next(options);
       return;
     }
 
     final token = await _secureStorage.read(key: _tokenKey);
+    _logger.d(
+        '🔑 Token lu depuis storage: ${token != null ? "Présent (${token.length} chars)" : "ABSENT"} pour ${options.path}');
+
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
+      _logger.d('✅ Header Authorization ajouté');
+    } else {
+      _logger.w('⚠️ Token absent ou vide, header non ajouté');
     }
     handler.next(options);
   }

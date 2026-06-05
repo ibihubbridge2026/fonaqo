@@ -301,7 +301,7 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
     try {
       // Frais Fonnaqo (10% de la prestation) + coût des options.
       final serviceFee = _fonnaqoFee + _optionsCost;
-      await _repo.createMission(
+      final createdMission = await _repo.createMission(
         MissionCreatePayload(
           title: _missionTitle(),
           description: _missionDescription().trim().isEmpty
@@ -325,6 +325,16 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
       );
       if (!mounted) return;
 
+      // Ajouter la mission créée localement pour affichage immédiat
+      try {
+        if (mounted) {
+          Provider.of<MissionProvider>(context, listen: false)
+              .addMission(createdMission);
+        }
+      } catch (e, st) {
+        _logger.e('Erreur ajout mission locale', error: e, stackTrace: st);
+      }
+
       final missionTitle = _missionTitle();
       final total = _totalAmount;
 
@@ -338,14 +348,22 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
 
       if (!mounted) return;
       // Redirection vers la page de succès.
-      Navigator.of(context).push(
+      Navigator.of(context)
+          .push(
         MaterialPageRoute(
           builder: (_) => MissionSuccessScreen(
             missionTitle: missionTitle,
             totalAmount: total,
           ),
         ),
-      );
+      )
+          .then((_) {
+        // Rafraîchir la liste des missions après retour de l'écran de succès
+        if (mounted) {
+          Provider.of<MissionProvider>(context, listen: false)
+              .refreshMissions();
+        }
+      });
     } catch (e, st) {
       _logger.e('createMission failed', error: e, stackTrace: st);
       if (!mounted) return;
@@ -415,8 +433,7 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
                                     Text(
                                       _catsError!,
                                       textAlign: TextAlign.center,
-                                      style:
-                                          const TextStyle(color: Colors.red),
+                                      style: const TextStyle(color: Colors.red),
                                     ),
                                     const SizedBox(height: 16),
                                     ElevatedButton(
@@ -427,8 +444,8 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
                                 ),
                               )
                             : Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 20),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 20),
                                 child: CreateMissionStepDetails(
                                   flowType: _flowType ?? 'service',
                                   categories: _categories,
