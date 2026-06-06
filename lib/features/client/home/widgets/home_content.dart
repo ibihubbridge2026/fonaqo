@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
+import 'package:fonaco/core/providers/favorites_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/services/cache_service.dart';
 import 'package:fonaco/core/widgets/skeleton_loading.dart';
@@ -25,7 +26,11 @@ class HomeContent extends StatefulWidget {
   State<HomeContent> createState() => _HomeContentState();
 }
 
-class _HomeContentState extends State<HomeContent> {
+class _HomeContentState extends State<HomeContent>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   final PageController _pageController = PageController();
   Timer? _heroTimer;
   final MissionRepository _missionRepo = MissionRepository();
@@ -37,8 +42,6 @@ class _HomeContentState extends State<HomeContent> {
   String? _dashError;
 
   int _logicalHeroPageIndex = 0;
-  Set<String> _favoriteAgentIds = {};
-  bool _wasAuthenticated = false;
 
   @override
   void initState() {
@@ -46,53 +49,16 @@ class _HomeContentState extends State<HomeContent> {
     _heroTimer = Timer.periodic(const Duration(seconds: 4), _onHeroTick);
     // Lazy loading: delay data loading until after first frame
     Future.microtask(() => _loadDashboard());
-    // Charger les favoris
-    _loadFavoriteAgents();
-
-    // Initialiser l'état d'authentification
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    _wasAuthenticated = auth.isAuthenticated;
-  }
-
-  void _loadFavoriteAgents() {
-    if (!_cacheService.isInitialized) return;
-    try {
-      _cacheService.init().then((_) {
-        if (mounted) {
-          setState(() {
-            _favoriteAgentIds = _cacheService.getFavoriteAgents().toSet();
-          });
-        }
-      });
-    } catch (e) {
-      // Ignorer les erreurs
-    }
+    // Initialiser le provider de favoris
+    final favoritesProvider =
+        Provider.of<FavoritesProvider>(context, listen: false);
+    favoritesProvider.init();
   }
 
   void _toggleFavoriteAgent(String agentId) {
-    if (!_cacheService.isInitialized) {
-      _cacheService.init().then((_) {
-        _cacheService.toggleFavoriteAgent(agentId);
-        if (mounted) {
-          setState(() {
-            if (_favoriteAgentIds.contains(agentId)) {
-              _favoriteAgentIds.remove(agentId);
-            } else {
-              _favoriteAgentIds.add(agentId);
-            }
-          });
-        }
-      });
-    } else {
-      _cacheService.toggleFavoriteAgent(agentId);
-      setState(() {
-        if (_favoriteAgentIds.contains(agentId)) {
-          _favoriteAgentIds.remove(agentId);
-        } else {
-          _favoriteAgentIds.add(agentId);
-        }
-      });
-    }
+    final favoritesProvider =
+        Provider.of<FavoritesProvider>(context, listen: false);
+    favoritesProvider.toggleFavorite(agentId);
   }
 
   Future<void> _loadDashboard() async {
@@ -281,6 +247,7 @@ class _HomeContentState extends State<HomeContent> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final bottomReserve = MediaQuery.paddingOf(context).bottom + 12;
     final shell = MainShellScope.maybeOf(context);
 
@@ -344,7 +311,8 @@ class _HomeContentState extends State<HomeContent> {
         else
           AgentSuggestionSlider(
             agents: _suggestedAgents,
-            favoriteAgentIds: _favoriteAgentIds,
+            favoriteAgentIds:
+                Provider.of<FavoritesProvider>(context).favoriteAgentIds,
             onToggleFavorite: _toggleFavoriteAgent,
           ),
         const SizedBox(height: 25),

@@ -28,13 +28,13 @@ class ChatOfflineService {
     try {
       final prefs = await SharedPreferences.getInstance();
       final pendingJson = prefs.getStringList('pending_messages') ?? [];
-      
+
       _pendingMessages.clear();
       for (final jsonStr in pendingJson) {
         final message = json.decode(jsonStr) as Map<String, dynamic>;
         _pendingMessages.add(message);
       }
-      
+
       print('Messages en attente chargés: ${_pendingMessages.length}');
     } catch (e) {
       print('Erreur chargement messages en attente: $e');
@@ -45,7 +45,8 @@ class ChatOfflineService {
   Future<void> _savePendingMessages() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final pendingJson = _pendingMessages.map((msg) => json.encode(msg)).toList();
+      final pendingJson =
+          _pendingMessages.map((msg) => json.encode(msg)).toList();
       await prefs.setStringList('pending_messages', pendingJson);
     } catch (e) {
       print('Erreur sauvegarde messages en attente: $e');
@@ -54,7 +55,8 @@ class ChatOfflineService {
 
   /// Configure l'écouteur de connectivité
   void _setupConnectivityListener() {
-    _connectivitySubscription = Connectivity().onConnectivityChanged.listen((result) {
+    _connectivitySubscription =
+        Connectivity().onConnectivityChanged.listen((result) {
       if (result != ConnectivityResult.none && !_isConnected) {
         // Retour de connexion, tenter de se reconnecter et d'envoyer les messages en attente
         _retryPendingMessages();
@@ -63,7 +65,8 @@ class ChatOfflineService {
   }
 
   /// Connecte au WebSocket chat
-  Future<void> connectToChat(String missionId, Function(Map<String, dynamic>) onMessage) async {
+  Future<void> connectToChat(
+      String missionId, Function(Map<String, dynamic>) onMessage) async {
     try {
       final wsUrl = 'ws://${ApiConfig.apiHostAndPort}/ws/chat/$missionId/';
       _chatWebSocket = WebSocketChannel.connect(Uri.parse(wsUrl));
@@ -105,7 +108,7 @@ class ChatOfflineService {
     if (_isConnected && _chatWebSocket != null) {
       try {
         _chatWebSocket!.sink.add(json.encode(message));
-        
+
         // Si l'envoi réussit, ne pas ajouter à la queue
         return true;
       } catch (e) {
@@ -117,10 +120,10 @@ class ChatOfflineService {
     // Ajouter à la queue locale
     _pendingMessages.add(messageWithMeta);
     await _savePendingMessages();
-    
+
     // Démarrer le timer de retry
     _startRetryTimer();
-    
+
     print('Message ajouté à la queue hors ligne: ${_pendingMessages.length}');
     return false;
   }
@@ -139,7 +142,8 @@ class ChatOfflineService {
       return;
     }
 
-    print('Tentative d\'envoi de ${_pendingMessages.length} messages en attente');
+    print(
+        'Tentative d\'envoi de ${_pendingMessages.length} messages en attente');
 
     final messagesToSend = List<Map<String, dynamic>>.from(_pendingMessages);
     bool allSent = true;
@@ -152,10 +156,10 @@ class ChatOfflineService {
         cleanMessage.remove('local_id');
 
         _chatWebSocket!.sink.add(json.encode(cleanMessage));
-        
+
         // Retirer de la queue si l'envoi réussit
         _pendingMessages.remove(message);
-        
+
         print('Message envoyé avec succès: ${message['local_id']}');
       } catch (e) {
         print('Échec envoi message ${message['local_id']}: $e');
@@ -179,7 +183,8 @@ class ChatOfflineService {
   }
 
   /// Retourne la liste des messages en attente
-  List<Map<String, dynamic>> get pendingMessages => List.unmodifiable(_pendingMessages);
+  List<Map<String, dynamic>> get pendingMessages =>
+      List.unmodifiable(_pendingMessages);
 
   /// Retourne le nombre de messages en attente
   int get pendingCount => _pendingMessages.length;
@@ -193,15 +198,16 @@ class ChatOfflineService {
   Future<void> cleanupOldMessages() async {
     final cutoff = DateTime.now().subtract(const Duration(hours: 24));
     final initialCount = _pendingMessages.length;
-    
+
     _pendingMessages.removeWhere((msg) {
       final timestamp = DateTime.parse(msg['timestamp']);
       return timestamp.isBefore(cutoff);
     });
-    
+
     if (_pendingMessages.length != initialCount) {
       await _savePendingMessages();
-      print('Nettoyage: ${initialCount - _pendingMessages.length} anciens messages supprimés');
+      print(
+          'Nettoyage: ${initialCount - _pendingMessages.length} anciens messages supprimés');
     }
   }
 

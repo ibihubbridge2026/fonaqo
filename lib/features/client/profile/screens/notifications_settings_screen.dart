@@ -46,11 +46,17 @@ class _NotificationsSettingsScreenState
               onChanged: (v) => setState(() => _emailEnabled = v),
             ),
             const SizedBox(height: 12),
-            _SwitchTile(
-              title: 'SMS',
-              subtitle: 'Urgences et codes de vérification',
-              value: _smsEnabled,
-              onChanged: (v) => setState(() => _smsEnabled = v),
+            // SMS notifications temporarily disabled
+            Opacity(
+              opacity: 0.5,
+              child: IgnorePointer(
+                child: _SwitchTile(
+                  title: 'SMS',
+                  subtitle: 'Urgences et codes de vérification',
+                  value: _smsEnabled,
+                  onChanged: (v) => setState(() => _smsEnabled = v),
+                ),
+              ),
             ),
           ],
         ),

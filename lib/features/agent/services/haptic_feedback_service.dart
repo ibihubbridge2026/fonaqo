@@ -2,7 +2,8 @@ import 'package:flutter/services.dart';
 
 /// Service pour gérer les retours haptiques
 class HapticFeedbackService {
-  static final HapticFeedbackService _instance = HapticFeedbackService._internal();
+  static final HapticFeedbackService _instance =
+      HapticFeedbackService._internal();
   factory HapticFeedbackService() => _instance;
   HapticFeedbackService._internal();
 

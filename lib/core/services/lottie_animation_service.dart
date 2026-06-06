@@ -135,7 +135,7 @@ class LottieAnimationService {
   }) {
     // Essayer de charger depuis le réseau (URL CDN) ou depuis les assets locaux
     // Pour la production, vous pouvez héberger les animations sur un CDN
-    
+
     try {
       // Option 1: Depuis les assets locaux (recommandé pour la performance)
       return Lottie.asset(

@@ -17,13 +17,13 @@ class OfflineCacheService {
   /// Initialisation de Hive - À appeler dans main() avant runApp()
   Future<void> init() async {
     await Hive.initFlutter();
-    
+
     // Ouverture des boxes
     await Hive.openBox(missionsBox);
     await Hive.openBox(profileBox);
     await Hive.openBox(settingsBox);
     await Hive.openBox(onboardingBox);
-    
+
     debugPrint('✅ Hive initialisé - Mode offline prêt');
   }
 
@@ -57,7 +57,7 @@ class OfflineCacheService {
       final box = Hive.box(missionsBox);
       final lastUpdateStr = box.get('last_update') as String?;
       if (lastUpdateStr == null) return false;
-      
+
       final lastUpdate = DateTime.parse(lastUpdateStr);
       final age = DateTime.now().difference(lastUpdate);
       return age.inMinutes < maxAgeMinutes;
@@ -91,7 +91,8 @@ class OfflineCacheService {
   }
 
   bool isOnboardingComplete() {
-    return Hive.box(onboardingBox).get('onboarding_complete', defaultValue: false);
+    return Hive.box(onboardingBox)
+        .get('onboarding_complete', defaultValue: false);
   }
 
   /// Nettoyage du cache

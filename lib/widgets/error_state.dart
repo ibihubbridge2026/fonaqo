@@ -38,7 +38,7 @@ class ErrorState extends StatelessWidget {
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  color: AppTheme.errorColor.withOpacity( 0.1),
+                  color: AppTheme.errorColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(50),
                 ),
                 child: Icon(
@@ -47,9 +47,9 @@ class ErrorState extends StatelessWidget {
                   color: AppTheme.errorColor,
                 ),
               ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Titre
             Text(
               title,
@@ -60,9 +60,9 @@ class ErrorState extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            
+
             const SizedBox(height: 12),
-            
+
             // Message
             Text(
               message,
@@ -72,9 +72,9 @@ class ErrorState extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             // Bouton Réessayer
             if (onRetry != null)
               SizedBox(
@@ -131,7 +131,8 @@ class ServerErrorState extends StatelessWidget {
   Widget build(BuildContext context) {
     return ErrorState(
       title: 'Erreur serveur',
-      message: 'Nos services sont temporairement indisponibles. Réessayez plus tard.',
+      message:
+          'Nos services sont temporairement indisponibles. Réessayez plus tard.',
       onRetry: onRetry,
       icon: Icons.cloud_off,
     );
@@ -185,7 +186,7 @@ class EmptyState extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity( 0.1),
+                color: AppTheme.primaryColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(40),
               ),
               child: Icon(
@@ -194,9 +195,7 @@ class EmptyState extends StatelessWidget {
                 color: AppTheme.primaryColor,
               ),
             ),
-            
             const SizedBox(height: 16),
-            
             Text(
               title,
               style: const TextStyle(
@@ -206,9 +205,7 @@ class EmptyState extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            
             const SizedBox(height: 8),
-            
             Text(
               message,
               style: const TextStyle(
@@ -217,7 +214,6 @@ class EmptyState extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            
             if (action != null) ...[
               const SizedBox(height: 16),
               action!,

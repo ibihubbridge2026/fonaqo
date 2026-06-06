@@ -48,6 +48,7 @@ class ErrorMonitoringService {
     String? category,
     Map<String, dynamic>? data,
   }) async {
-    debugPrint('[ErrorMonitoring][breadcrumb][${category ?? "default"}] $message');
+    debugPrint(
+        '[ErrorMonitoring][breadcrumb][${category ?? "default"}] $message');
   }
 }

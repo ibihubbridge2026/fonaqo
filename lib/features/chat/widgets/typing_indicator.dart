@@ -112,7 +112,7 @@ class _TypingDotsState extends State<_TypingDots>
           children: List.generate(3, (index) {
             final delay = index * 0.3;
             final opacity = (_animation.value - delay).clamp(0.0, 1.0);
-            
+
             return Container(
               margin: const EdgeInsets.symmetric(horizontal: 2),
               width: 4,

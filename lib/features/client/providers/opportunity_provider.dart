@@ -29,14 +29,14 @@ class OpportunityProvider extends ChangeNotifier {
       );
 
       if (response is List) {
-        _opportunities = response
-            .map((json) => OpportunityModel.fromJson(json))
-            .toList();
+        _opportunities =
+            response.map((json) => OpportunityModel.fromJson(json)).toList();
       } else {
         _opportunities = [];
       }
     } catch (e) {
-      _error = "Impossible de charger les opportunités. Vérifiez votre connexion.";
+      _error =
+          "Impossible de charger les opportunités. Vérifiez votre connexion.";
       print("Erreur OpportunityProvider: $e");
     } finally {
       _isLoading = false;

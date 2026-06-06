@@ -94,15 +94,15 @@ class Boost {
 
 /// Statut du boost
 enum BoostStatus {
-  pending,    // En attente de paiement
-  active,     // Actif
-  expired,    // Expiré
-  cancelled,  // Annulé
+  pending, // En attente de paiement
+  active, // Actif
+  expired, // Expiré
+  cancelled, // Annulé
 }
 
 extension BoostStatusExtension on BoostStatus {
   String toJson() => toString().split('.').last;
-  
+
   static BoostStatus fromJson(String value) {
     switch (value) {
       case 'pending':

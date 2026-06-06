@@ -71,15 +71,13 @@ class ChatProvider with ChangeNotifier {
       // Mettre à jour le cache
       await _cacheConversations();
 
-      _isLoadingConversations = false;
-      notifyListeners();
-
       _logger.i('Loaded ${_conversations.length} conversations');
     } catch (e) {
       _error = e.toString();
+      _logger.e('Error loading conversations: $e');
+    } finally {
       _isLoadingConversations = false;
       notifyListeners();
-      _logger.e('Error loading conversations: $e');
     }
   }
 
@@ -122,15 +120,13 @@ class ChatProvider with ChangeNotifier {
       // Mettre à jour le cache
       await _cacheMessages(conversationId);
 
-      _isLoadingMessages = false;
-      notifyListeners();
-
       _logger.i('Loaded ${messages.length} messages for $conversationId');
     } catch (e) {
       _error = e.toString();
+      _logger.e('Error loading messages: $e');
+    } finally {
       _isLoadingMessages = false;
       notifyListeners();
-      _logger.e('Error loading messages: $e');
     }
   }
 

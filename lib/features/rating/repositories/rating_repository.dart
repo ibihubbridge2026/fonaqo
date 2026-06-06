@@ -51,7 +51,9 @@ class RatingRepository {
 
       if (response.statusCode == 200) {
         final data = response.data as List;
-        return data.map((item) => Rating.fromJson(item as Map<String, dynamic>)).toList();
+        return data
+            .map((item) => Rating.fromJson(item as Map<String, dynamic>))
+            .toList();
       }
 
       return [];
@@ -68,7 +70,9 @@ class RatingRepository {
 
       if (response.statusCode == 200) {
         final data = response.data as List;
-        return data.map((item) => Rating.fromJson(item as Map<String, dynamic>)).toList();
+        return data
+            .map((item) => Rating.fromJson(item as Map<String, dynamic>))
+            .toList();
       }
 
       return [];

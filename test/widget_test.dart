@@ -7,7 +7,8 @@ import 'package:fonaco/main.dart';
 void main() {
   testWidgets('App loads', (WidgetTester tester) async {
     await tester.pumpWidget(
-      FonacoApp(isFirstTime: false, isLoggedIn: false, authProvider: AuthProvider()),
+      FonacoApp(
+          isFirstTime: false, isLoggedIn: false, authProvider: AuthProvider()),
     );
     expect(find.byType(MaterialApp), findsOneWidget);
   });

@@ -36,7 +36,6 @@ class _OpportunityScreenState extends State<OpportunityScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -70,7 +69,8 @@ class _OpportunityScreenState extends State<OpportunityScreen> {
               builder: (context, provider, _) {
                 if (provider.isLoading) {
                   return Center(
-                      child: CircularProgressIndicator(color: AppColors.primary));
+                      child:
+                          CircularProgressIndicator(color: AppColors.primary));
                 }
                 if (provider.error != null) {
                   return Center(
@@ -138,7 +138,8 @@ class _OpportunityScreenState extends State<OpportunityScreen> {
             decoration: BoxDecoration(
               color: AppColors.surfaceContainerLowest,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.outlineVariant.withOpacity(0.5)),
+              border:
+                  Border.all(color: AppColors.outlineVariant.withOpacity(0.5)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.05),
@@ -150,7 +151,8 @@ class _OpportunityScreenState extends State<OpportunityScreen> {
             child: TextField(
               decoration: InputDecoration(
                 hintText: 'Rechercher un service...',
-                prefixIcon: Icon(Icons.search, color: AppColors.onSurfaceVariant),
+                prefixIcon:
+                    Icon(Icons.search, color: AppColors.onSurfaceVariant),
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16),
               ),

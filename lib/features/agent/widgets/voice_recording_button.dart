@@ -19,18 +19,18 @@ class VoiceRecordingButton extends StatefulWidget {
 
 class _VoiceRecordingButtonState extends State<VoiceRecordingButton> {
   final AudioService _audioService = AudioService();
-  
+
   bool _isRecording = false;
   bool _isDragging = false;
   double _dragOffset = 0.0;
   Timer? _recordingTimer;
-  
+
   @override
   void dispose() {
     _recordingTimer?.cancel();
     super.dispose();
   }
-  
+
   Future<void> _startRecording() async {
     final success = await _audioService.startRecording();
     if (success != null) {
@@ -38,63 +38,65 @@ class _VoiceRecordingButtonState extends State<VoiceRecordingButton> {
         _isRecording = true;
         _dragOffset = 0.0;
       });
-      
+
       // Timer pour mettre à jour l'UI
-      _recordingTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
+      _recordingTimer =
+          Timer.periodic(const Duration(milliseconds: 100), (timer) {
         if (mounted) {
           setState(() {}); // Mettre à jour l'affichage de la durée
         }
       });
     }
   }
-  
+
   Future<void> _stopRecording() async {
     _recordingTimer?.cancel();
-    
+
     final path = await _audioService.stopRecording();
     if (path != null && widget.onRecordingComplete != null) {
       widget.onRecordingComplete!(path);
     }
-    
+
     setState(() {
       _isRecording = false;
       _dragOffset = 0.0;
     });
   }
-  
+
   Future<void> _cancelRecording() async {
     _recordingTimer?.cancel();
     await _audioService.cancelRecording();
-    
+
     if (widget.onCancel != null) {
       widget.onCancel!();
     }
-    
+
     setState(() {
       _isRecording = false;
       _dragOffset = 0.0;
     });
   }
-  
+
   void _onPanStart(DragStartDetails details) {
     if (!_isRecording) {
       _startRecording();
     }
   }
-  
+
   void _onPanUpdate(DragUpdateDetails details) {
     if (_isRecording) {
       setState(() {
         _dragOffset += details.delta.dx;
       });
-      
+
       // Vérifier si l'utilisateur a glissé assez loin pour annuler
-      if (_dragOffset < -100) { // 100px vers la gauche
+      if (_dragOffset < -100) {
+        // 100px vers la gauche
         _cancelRecording();
       }
     }
   }
-  
+
   void _onPanEnd(DragEndDetails details) {
     if (_isRecording) {
       if (_dragOffset > -100) {
@@ -102,7 +104,7 @@ class _VoiceRecordingButtonState extends State<VoiceRecordingButton> {
       }
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     if (_isRecording) {
@@ -111,7 +113,7 @@ class _VoiceRecordingButtonState extends State<VoiceRecordingButton> {
       return _buildMicrophoneButton();
     }
   }
-  
+
   Widget _buildMicrophoneButton() {
     return GestureDetector(
       onPanStart: _onPanStart,
@@ -139,7 +141,7 @@ class _VoiceRecordingButtonState extends State<VoiceRecordingButton> {
       ),
     );
   }
-  
+
   Widget _buildRecordingInterface() {
     return Transform.translate(
       offset: Offset(_dragOffset, 0),
@@ -185,9 +187,9 @@ class _VoiceRecordingButtonState extends State<VoiceRecordingButton> {
                   size: 20,
                 ),
               ),
-            
+
             const SizedBox(width: 16),
-            
+
             // Timer et ondes sonores
             Expanded(
               child: Column(
@@ -195,7 +197,8 @@ class _VoiceRecordingButtonState extends State<VoiceRecordingButton> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _audioService.formatDuration(_audioService.recordingDuration),
+                    _audioService
+                        .formatDuration(_audioService.recordingDuration),
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -204,17 +207,24 @@ class _VoiceRecordingButtonState extends State<VoiceRecordingButton> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _dragOffset < -50 ? 'Glisser pour annuler' : 'Enregistrement...',
+                    _dragOffset < -50
+                        ? 'Glisser pour annuler'
+                        : 'Enregistrement...',
                     style: TextStyle(
                       fontSize: 12,
-                      color: _dragOffset < -50 ? Colors.red : Colors.grey.shade600,
+                      color:
+                          _dragOffset < -50 ? Colors.red : Colors.grey.shade600,
                     ),
                   ),
                   const SizedBox(height: 8),
                   // Ondes sonores animées
                   Row(
                     children: List.generate(5, (index) {
-                      final height = 20.0 + (_audioService.recordingDuration.inMilliseconds % 1000) / 100 * (index % 2 == 0 ? 10 : -10);
+                      final height = 20.0 +
+                          (_audioService.recordingDuration.inMilliseconds %
+                                  1000) /
+                              100 *
+                              (index % 2 == 0 ? 10 : -10);
                       return Padding(
                         padding: const EdgeInsets.only(right: 3),
                         child: AnimatedContainer(
@@ -232,7 +242,7 @@ class _VoiceRecordingButtonState extends State<VoiceRecordingButton> {
                 ],
               ),
             ),
-            
+
             // Indicateur de glissement
             Container(
               width: 40,

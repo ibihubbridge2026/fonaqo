@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:fonaco/core/services/feedback_service.dart';
+import 'package:fonaco/core/services/memory_auth_cache.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
 
@@ -14,6 +15,7 @@ import '../services/notification_service.dart';
 /// Provider pour gérer l'état d'authentification
 class AuthProvider extends ChangeNotifier {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  final MemoryAuthCache _memoryCache = MemoryAuthCache();
 
   static const String _tokenKey = 'jwt_access_token';
   static const String _refreshTokenKey = 'jwt_refresh_token';
@@ -78,6 +80,7 @@ class AuthProvider extends ChangeNotifier {
   void handleTokenExpired() {
     _logger.w('Déconnexion automatique : token expiré');
     _clearUserDataAndNotify();
+    _memoryCache.clear();
     _setError('Votre session a expiré. Veuillez vous reconnecter.');
   }
 
@@ -86,6 +89,36 @@ class AuthProvider extends ChangeNotifier {
     _currentUser = null;
     _isAuthenticated = false;
     notifyListeners();
+  }
+
+  /// Vérifie si un token JWT est expiré
+  bool _isTokenExpired(String token) {
+    try {
+      // JWT structure: header.payload.signature
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+
+      final payload = parts[1];
+      final decoded =
+          utf8.decode(base64Url.decode(base64Url.normalize(payload)));
+      final payloadMap = jsonDecode(decoded) as Map<String, dynamic>;
+
+      final exp = payloadMap['exp'] as int?;
+      if (exp == null) return false;
+
+      final expiryDate = DateTime.fromMillisecondsSinceEpoch(exp * 1000);
+      final isExpired = DateTime.now().isAfter(expiryDate);
+
+      if (isExpired) {
+        _logger.w(
+            '⚠️ Token JWT expiré (exp: $expiryDate, now: ${DateTime.now()})');
+      }
+
+      return isExpired;
+    } catch (e) {
+      _logger.e('Erreur vérification expiration token: $e');
+      return true; // En cas d'erreur, considérer comme expiré
+    }
   }
 
   // =========================
@@ -297,7 +330,7 @@ class AuthProvider extends ChangeNotifier {
   // =========================
 
   Future<void> _saveAuthData(Map<String, dynamic> data) async {
-    final accessToken = data['access_token'];
+    var accessToken = data['access_token'];
     final refreshTokenValue = data['refresh_token'];
     final userData = data['user'];
 
@@ -306,30 +339,22 @@ class AuthProvider extends ChangeNotifier {
     await _secureStorage.deleteAll();
     _logger.d('🗑️ Stockage nettoyé');
 
-    await _secureStorage.write(key: _tokenKey, value: accessToken);
-    _logger.d('🔑 Access token sauvegardé: ${_tokenKey}');
-
-    if (refreshTokenValue != null) {
-      await _secureStorage.write(
-          key: _refreshTokenKey, value: refreshTokenValue);
-      _logger.d('🔄 Refresh token sauvegardé: ${_refreshTokenKey}');
+    // Nettoyer le token pour éviter les caractères parasites (#, espaces, etc.)
+    if (accessToken is String) {
+      accessToken =
+          accessToken.trim().replaceAll('#', '').replaceAll(RegExp(r'\s'), '');
     }
 
-    await _secureStorage.write(key: _userKey, value: jsonEncode(userData));
-    _logger.d('👤 Données utilisateur sauvegardées: ${_userKey}');
+    // Sauvegarder dans MemoryAuthCache ET SecureStorage
+    await _memoryCache.saveTokens(accessToken, refreshTokenValue);
+    await _memoryCache.saveUserData(jsonEncode(userData));
 
-    // Vérification que tout est bien sauvegardé
-    final savedToken = await _secureStorage.read(key: _tokenKey);
-    final savedUser = await _secureStorage.read(key: _userKey);
+    _logger.d('🔑 Access token sauvegardé: $_tokenKey');
+    _logger.d('🔄 Refresh token sauvegardé: $_refreshTokenKey');
+    _logger.d('👤 Données utilisateur sauvegardées: $_userKey');
 
-    if (savedToken != null && savedUser != null) {
-      _logger.i('✅ Données d\'authentification sauvegardées avec succès');
-      _currentUser = UserModel.fromJson(userData);
-      _isAuthenticated = true;
-    } else {
-      _logger.e('❌ Erreur lors de la sauvegarde des données');
-      throw Exception('Échec de la sauvegarde des données d\'authentification');
-    }
+    _currentUser = UserModel.fromJson(userData);
+    _isAuthenticated = true;
 
     await NotificationService().sendTokenToBackend(accessToken);
     notifyListeners();
@@ -337,8 +362,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> refreshToken() async {
     try {
-      final storedRefreshToken =
-          await _secureStorage.read(key: _refreshTokenKey);
+      final storedRefreshToken = _memoryCache.refreshToken;
 
       if (storedRefreshToken == null || storedRefreshToken.isEmpty) {
         _logger.w('Refresh token manquant');
@@ -353,7 +377,8 @@ class AuthProvider extends ChangeNotifier {
       if (response.statusCode == 200) {
         final newAccessToken = response.data['access'];
         if (newAccessToken != null) {
-          await _secureStorage.write(key: _tokenKey, value: newAccessToken);
+          // Mettre à jour MemoryAuthCache ET SecureStorage
+          await _memoryCache.updateAccessToken(newAccessToken);
           _logger.i('✅ Access token rafraîchi avec succès');
           return true;
         }
@@ -371,6 +396,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     _setLoading(true);
+    await _memoryCache.clear();
     await _secureStorage.deleteAll();
     _clearUserDataAndNotify();
     _setLoading(false);
@@ -378,49 +404,75 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _loadUserData() async {
     try {
-      // LOGS DÉTAILLÉS DU SECURE STORAGE AU DÉMARRAGE
-      _logger.i('🔍 Vérification du SecureStorage au démarrage...');
+      // Charger depuis MemoryAuthCache d'abord
+      await _memoryCache.loadFromStorage();
 
-      final token = await _secureStorage.read(key: _tokenKey);
-      final refreshToken = await _secureStorage.read(key: _refreshTokenKey);
-      final userDataString = await _secureStorage.read(key: _userKey);
+      final token = _memoryCache.accessToken;
+      final userDataString = _memoryCache.userData;
 
-      _logger.i('📋 Contenu SecureStorage:');
-      _logger.i(
-          '  🎫 Token: ${token != null ? "Présent (${token.length} chars)" : "ABSENT"}');
-      _logger.i(
-          '  🔄 Refresh Token: ${refreshToken != null ? "Présent (${refreshToken.length} chars)" : "ABSENT"}');
-      _logger.i(
-          '  👤 User Data: ${userDataString != null ? "Présent (${userDataString.length} chars)" : "ABSENT"}');
-
-      // NE PLUS VÉRIFIER L'EXPIRATION AU DÉMARRAGE
-      // Laisser l'intercepteur Dio gérer les erreurs 401 réelles
-      // Cela évite les déconnexions intempestives
+      _logger.i('🔍 Vérification de l\'authentification au démarrage...');
 
       if (token != null && userDataString != null) {
-        // Charger l'utilisateur depuis le cache SANS vérifier l'expiration
-        try {
-          _currentUser = UserModel.fromJson(jsonDecode(userDataString));
-          _isAuthenticated = true;
-          _logger.i(
-              '✅ Utilisateur chargé depuis le cache: ${_currentUser?.email}');
-          _logger.i('📍 Session restaurée (sans vérification d\'expiration)');
-          _logger.i('� L\'intercepteur gérera les 401 si nécessaire');
-        } catch (e) {
-          _logger.e('❌ Erreur parsing utilisateur depuis cache: $e');
+        // VÉRIFIER L'EXPIRATION DU TOKEN
+        if (_isTokenExpired(token)) {
+          _logger.w('⚠️ Token expiré détecté au démarrage');
+
+          // Tenter de rafraîchir le token
+          final refreshed = await refreshToken();
+
+          if (refreshed) {
+            _logger.i('✅ Token rafraîchi avec succès');
+            // Recharger depuis le cache après refresh
+            await _memoryCache.loadFromStorage();
+            final newToken = _memoryCache.accessToken;
+
+            if (newToken != null && !_isTokenExpired(newToken)) {
+              try {
+                _currentUser = UserModel.fromJson(jsonDecode(userDataString));
+                _isAuthenticated = true;
+                _logger.i(
+                    '✅ Utilisateur authentifié après refresh: ${_currentUser?.email}');
+                notifyListeners();
+                return;
+              } catch (e) {
+                _logger.e('❌ Erreur parsing utilisateur: $e');
+              }
+            }
+          }
+
+          // Si refresh échoue ou token toujours expiré, logout complet
+          _logger
+              .w('🚨 Refresh échoué ou token toujours expiré - logout complet');
+          await _memoryCache.clear();
           await _secureStorage.deleteAll();
           _currentUser = null;
           _isAuthenticated = false;
           notifyListeners();
           return;
         }
+
+        // Token valide, charger l'utilisateur
+        try {
+          _currentUser = UserModel.fromJson(jsonDecode(userDataString));
+          _isAuthenticated = true;
+          _logger.i('✅ Utilisateur chargé: ${_currentUser?.email}');
+          _logger.i('📍 Session valide (token non expiré)');
+        } catch (e) {
+          _logger.e('❌ Erreur parsing utilisateur: $e');
+          await _memoryCache.clear();
+          _currentUser = null;
+          _isAuthenticated = false;
+        }
       } else {
-        _logger.w('⚠️ Session incomplète - certains tokens manquent');
+        _logger.w('⚠️ Aucun token ou user data trouvé');
+        _isAuthenticated = false;
+        _currentUser = null;
       }
+
       notifyListeners();
     } catch (e) {
       _logger.e('❌ Erreur critique chargement utilisateur: $e');
-      // Seulement en cas d'erreur critique, on nettoie tout
+      await _memoryCache.clear();
       await _secureStorage.deleteAll();
       _currentUser = null;
       _isAuthenticated = false;
@@ -428,7 +480,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> getToken() async => await _secureStorage.read(key: _tokenKey);
+  Future<String?> getToken() async => _memoryCache.accessToken;
 
   // =========================
   // PROFILE & SETTINGS
@@ -465,8 +517,9 @@ class AuthProvider extends ChangeNotifier {
   /// Vérifie si l'utilisateur est authentifié
   Future<void> checkAuth() async {
     try {
-      final token = await _secureStorage.read(key: _tokenKey);
-      final userData = await _secureStorage.read(key: _userKey);
+      await _memoryCache.loadFromStorage();
+      final token = _memoryCache.accessToken;
+      final userData = _memoryCache.userData;
 
       if (token != null && userData != null) {
         _currentUser = UserModel.fromJson(jsonDecode(userData));

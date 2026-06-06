@@ -6,7 +6,11 @@ class SocialCircleButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
 
-  const SocialCircleButton({super.key, required this.color, required this.icon, required this.onTap});
+  const SocialCircleButton(
+      {super.key,
+      required this.color,
+      required this.icon,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +23,12 @@ class SocialCircleButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: color,
           shape: BoxShape.circle,
-          boxShadow: [BoxShadow(color: color.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))],
+          boxShadow: [
+            BoxShadow(
+                color: color.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 4))
+          ],
         ),
         alignment: Alignment.center,
         child: FaIcon(icon, color: Colors.white, size: 20),

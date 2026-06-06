@@ -2,15 +2,15 @@
 class Rating {
   final String id;
   final String missionId;
-  final String raterId;        // ID de celui qui note
-  final String raterName;      // Nom de celui qui note
+  final String raterId; // ID de celui qui note
+  final String raterName; // Nom de celui qui note
   final String? raterAvatar;
-  final String ratedId;        // ID de celui noté
-  final String ratedName;      // Nom de celui noté
+  final String ratedId; // ID de celui noté
+  final String ratedName; // Nom de celui noté
   final String? ratedAvatar;
-  final int score;             // 1-5 étoiles
-  final String? comment;      // Commentaire optionnel
-  final RatingType type;       // client_to_agent ou agent_to_client
+  final int score; // 1-5 étoiles
+  final String? comment; // Commentaire optionnel
+  final RatingType type; // client_to_agent ou agent_to_client
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -112,7 +112,7 @@ enum RatingType {
 
 extension RatingTypeExtension on RatingType {
   String toJson() => toString().split('.').last;
-  
+
   static RatingType fromJson(String value) {
     switch (value) {
       case 'client_to_agent':
@@ -128,13 +128,13 @@ extension RatingTypeExtension on RatingType {
 /// Statistiques de notation pour un utilisateur
 class RatingStats {
   final String userId;
-  final double averageScore;    // Moyenne 1-5
-  final int totalRatings;       // Nombre total de notes
-  final int fiveStarCount;      // Nombre de 5 étoiles
-  final int fourStarCount;      // Nombre de 4 étoiles
-  final int threeStarCount;     // Nombre de 3 étoiles
-  final int twoStarCount;       // Nombre de 2 étoiles
-  final int oneStarCount;       // Nombre de 1 étoile
+  final double averageScore; // Moyenne 1-5
+  final int totalRatings; // Nombre total de notes
+  final int fiveStarCount; // Nombre de 5 étoiles
+  final int fourStarCount; // Nombre de 4 étoiles
+  final int threeStarCount; // Nombre de 3 étoiles
+  final int twoStarCount; // Nombre de 2 étoiles
+  final int oneStarCount; // Nombre de 1 étoile
 
   RatingStats({
     required this.userId,

@@ -201,9 +201,18 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
           _biometricEnabled = true;
         });
         _showSuccessSnackBar('Authentification biométrique activée');
+      } else {
+        // User cancelled or authentication failed
+        setState(() {
+          _biometricEnabled = false;
+        });
       }
     } catch (e) {
-      _showErrorSnackBar('Échec de l\'authentification biométrique');
+      // Handle any errors (no biometrics configured, cancelled, etc.)
+      setState(() {
+        _biometricEnabled = false;
+      });
+      // Don't show error snackbar - just silently disable
     }
   }
 
@@ -468,7 +477,13 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
       obscureText: isPassword,
       decoration: InputDecoration(
         labelText: label,
+        filled: true,
+        fillColor: Colors.white,
         border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey[300]!),
         ),

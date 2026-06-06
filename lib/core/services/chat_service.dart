@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:async';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:web_socket_channel/io.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:logger/logger.dart';
 import '../api/base_client.dart';
+import '../services/memory_auth_cache.dart';
 
 /// Modèle de message pour le chat
 class ChatMessage {
@@ -112,8 +112,10 @@ class ChatService {
       _currentUser = userId;
 
       // Construire l'URL WebSocket avec token JWT
-      const storage = FlutterSecureStorage();
-      final token = await storage.read(key: 'jwt_access_token');
+      final token = MemoryAuthCache().accessToken;
+      if (token == null || token.isEmpty) {
+        throw Exception('No access token');
+      }
       final baseUrl = BaseClient.apiHostAndPort;
       final wsUri = Uri(
         scheme: 'ws',

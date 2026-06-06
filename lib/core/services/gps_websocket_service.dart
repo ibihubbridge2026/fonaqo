@@ -2,13 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:logger/logger.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../api/base_client.dart';
+import 'memory_auth_cache.dart';
 
 /// WebSocket `ws://<hôte>/ws/gps/<mission_id>/?token=…` (Django Channels + JWT).
 class GpsWebSocketService extends ChangeNotifier {
@@ -49,8 +49,7 @@ class GpsWebSocketService extends ChangeNotifier {
 
     await disconnect();
 
-    const storage = FlutterSecureStorage();
-    final token = await storage.read(key: 'jwt_access_token');
+    final token = MemoryAuthCache().accessToken;
     if (token == null || token.isEmpty) {
       _lastError = 'Session expirée (token manquant).';
       notifyListeners();

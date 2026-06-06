@@ -42,7 +42,9 @@ class BoostRepository {
 
       if (response.statusCode == 200) {
         final data = response.data as List;
-        return data.map((item) => Boost.fromJson(item as Map<String, dynamic>)).toList();
+        return data
+            .map((item) => Boost.fromJson(item as Map<String, dynamic>))
+            .toList();
       }
 
       return [];
@@ -65,7 +67,9 @@ class BoostRepository {
 
       if (response.statusCode == 200) {
         final data = response.data['results'] as List;
-        return data.map((item) => Boost.fromJson(item as Map<String, dynamic>)).toList();
+        return data
+            .map((item) => Boost.fromJson(item as Map<String, dynamic>))
+            .toList();
       }
 
       return [];
@@ -153,7 +157,9 @@ class BoostRepository {
 
       if (response.statusCode == 200) {
         final data = response.data as List;
-        return data.map((item) => Boost.fromJson(item as Map<String, dynamic>)).toList();
+        return data
+            .map((item) => Boost.fromJson(item as Map<String, dynamic>))
+            .toList();
       }
 
       return [];

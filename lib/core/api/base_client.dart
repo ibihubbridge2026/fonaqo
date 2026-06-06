@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logger/logger.dart';
 
 import '../config/api_config.dart';
+import '../services/memory_auth_cache.dart';
 import '../utils/retry_utils.dart';
 
 /// Client HTTP centralisé pour toutes les appels API
@@ -291,16 +293,18 @@ class _AuthInterceptor extends Interceptor {
   final Logger _logger;
   final Dio _dio; // Ajout de l'instance Dio
   final Function()? onTokenExpired;
+  final MemoryAuthCache _memoryCache;
   static const String _tokenKey = 'jwt_access_token';
   static const String _refreshTokenKey = 'jwt_refresh_token';
   bool _isRefreshing = false;
+  Completer<void>? _refreshCompleter;
 
   _AuthInterceptor(
     this._secureStorage,
     this._logger,
     this._dio, {
     this.onTokenExpired,
-  });
+  }) : _memoryCache = MemoryAuthCache();
 
   /// Vérifie si le chemin est public (ne nécessite pas d'authentification)
   bool _isPublicPath(String path) {
@@ -328,9 +332,10 @@ class _AuthInterceptor extends Interceptor {
       return;
     }
 
-    final token = await _secureStorage.read(key: _tokenKey);
+    // Lire le token depuis MemoryAuthCache (pas de SecureStorage)
+    final token = _memoryCache.accessToken;
     _logger.d(
-        '🔑 Token lu depuis storage: ${token != null ? "Présent (${token.length} chars)" : "ABSENT"} pour ${options.path}');
+        '🔑 Token lu depuis mémoire: ${token != null ? "Présent (${token.length} chars)" : "ABSENT"} pour ${options.path}');
 
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
@@ -352,6 +357,17 @@ class _AuthInterceptor extends Interceptor {
         '🔍 Analyse erreur: statusCode=${err.response?.statusCode}, isPublicPath=${_isPublicPath(err.requestOptions.path)}');
 
     if (isExact401 && isNotPublicPath && hasResponse) {
+      // Protection contre les boucles de refresh infinies
+      final refreshAttempt =
+          err.requestOptions.extra['refresh_attempt'] as int? ?? 0;
+      if (refreshAttempt >= 1) {
+        _logger.w('🚨 Refresh déjà tenté pour cette requête, déconnexion');
+        await _memoryCache.clear();
+        onTokenExpired?.call();
+        return handler.reject(err);
+      }
+      err.requestOptions.extra['refresh_attempt'] = refreshAttempt + 1;
+
       // Log détaillé pour debug des erreurs 401
       _logger.e('🔴 VRAIE ERREUR 401 DÉTECTÉE:');
       _logger.e('📍 URL: ${err.requestOptions.uri}');
@@ -360,22 +376,52 @@ class _AuthInterceptor extends Interceptor {
       _logger.e('📍 Corps de l\'erreur: ${err.response?.data}');
       _logger.e('📍 Message: ${err.message}');
 
-      // Tenter de rafraîchir le token pour toute erreur 401
-      _logger.w('🔄 401 reçu — tentative de rafraîchissement du token JWT');
-      final refreshed = await _tryRefreshToken();
+      // MUTEX REFRESH: Si déjà en cours de refresh, attendre
+      if (_isRefreshing) {
+        _logger.w('⏳ Refresh déjà en cours, attente...');
+        if (_refreshCompleter != null) {
+          await _refreshCompleter!.future;
 
-      if (refreshed) {
-        // Réessayer la requête originale avec le nouveau token
-        final newToken = await _secureStorage.read(key: _tokenKey);
-        if (newToken != null) {
-          err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+          // Une fois le refresh terminé, réessayer avec le nouveau token
+          final newToken = _memoryCache.accessToken;
+          if (newToken != null) {
+            err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+            try {
+              final response = await _dio.fetch(err.requestOptions);
+              handler.resolve(response);
+              return;
+            } catch (e) {
+              _logger.e('Échec de la réessai après refresh: $e');
+            }
+          }
+        }
+        // Si échec après attente, continuer vers logout
+      } else {
+        // Premier 401: lancer le refresh
+        _isRefreshing = true;
+        _refreshCompleter = Completer<void>();
 
-          try {
-            final response = await _dio.fetch(err.requestOptions);
-            handler.resolve(response);
-            return;
-          } catch (e) {
-            _logger.e('Échec de la réessai après rafraîchissement: $e');
+        _logger.w('🔄 401 reçu — tentative de rafraîchissement du token JWT');
+        final refreshed = await _tryRefreshToken();
+
+        // Notifier tous les requêtes en attente
+        _refreshCompleter!.complete();
+        _isRefreshing = false;
+        _refreshCompleter = null;
+
+        if (refreshed) {
+          // Réessayer la requête originale avec le nouveau token
+          final newToken = _memoryCache.accessToken;
+          if (newToken != null) {
+            err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+
+            try {
+              final response = await _dio.fetch(err.requestOptions);
+              handler.resolve(response);
+              return;
+            } catch (e) {
+              _logger.e('Échec de la réessai après rafraîchissement: $e');
+            }
           }
         }
       }
@@ -404,8 +450,11 @@ class _AuthInterceptor extends Interceptor {
   /// Tente de rafraîchir le token JWT
   Future<bool> _tryRefreshToken() async {
     try {
-      final refreshToken = await _secureStorage.read(key: 'jwt_refresh_token');
-      if (refreshToken == null) return false;
+      final refreshToken = _memoryCache.refreshToken;
+      if (refreshToken == null || refreshToken.isEmpty) {
+        _logger.w('Refresh token absent ou vide, déconnexion requise');
+        return false;
+      }
 
       final dio = Dio(BaseOptions(
         baseUrl: ApiConfig.baseUrl,
@@ -422,8 +471,17 @@ class _AuthInterceptor extends Interceptor {
       );
 
       if (response.statusCode == 200) {
-        final newAccessToken = response.data['access'];
-        await _secureStorage.write(key: _tokenKey, value: newAccessToken);
+        final newAccessToken = response.data['access'] as String?;
+        if (newAccessToken == null || newAccessToken.isEmpty) {
+          _logger.e('Access token absent dans la réponse de refresh');
+          return false;
+        }
+        // Nettoyer le token pour éviter les caractères parasites (#, espaces, etc.)
+        final cleanToken = newAccessToken
+            .trim()
+            .replaceAll('#', '')
+            .replaceAll(RegExp(r'\s'), '');
+        await _memoryCache.updateAccessToken(cleanToken);
         _logger.i('Token JWT rafraîchi avec succès');
         return true;
       }
@@ -431,68 +489,6 @@ class _AuthInterceptor extends Interceptor {
       _logger.e('Échec du rafraîchissement du token: $e');
     }
     return false;
-  }
-}
-
-/// Intercepteur pour le logging des requêtes/réponses
-class _LoggingInterceptor extends Interceptor {
-  final Logger _logger;
-
-  _LoggingInterceptor(this._logger);
-
-  @override
-  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    _logger.d('🚀 [${options.method}] ${options.uri}');
-    if (options.data != null) {
-      _logger.d('📤 Request Data: ${options.data}');
-    }
-    if (options.queryParameters.isNotEmpty) {
-      _logger.d('📤 Query Params: ${options.queryParameters}');
-    }
-    handler.next(options);
-  }
-
-  @override
-  void onResponse(Response response, ResponseInterceptorHandler handler) {
-    _logger.i('✅ [${response.statusCode}] ${response.requestOptions.uri}');
-    _logger.d('📥 Response Data: ${response.data}');
-    handler.next(response);
-  }
-
-  @override
-  void onError(DioException err, ErrorInterceptorHandler handler) {
-    // Catégoriser et logger les erreurs de manière plus intelligente
-    switch (err.type) {
-      case DioExceptionType.connectionError:
-        _logger.w('🔌 Connexion refusée: ${err.requestOptions.uri.host}');
-        break;
-      case DioExceptionType.connectionTimeout:
-        _logger.w('⏱️ Timeout de connexion: ${err.requestOptions.uri}');
-        break;
-      case DioExceptionType.receiveTimeout:
-        _logger.w('⏱️ Timeout de réception: ${err.requestOptions.uri}');
-        break;
-      case DioExceptionType.sendTimeout:
-        _logger.w('⏱️ Timeout d\'envoi: ${err.requestOptions.uri}');
-        break;
-      case DioExceptionType.badResponse:
-        _logger.e('❌ [${err.response?.statusCode}] ${err.requestOptions.uri}');
-        if (err.response?.data != null) {
-          _logger.d('📥 Response Data: ${err.response?.data}');
-        }
-        break;
-      case DioExceptionType.cancel:
-        _logger.d('🚫 Requête annulée: ${err.requestOptions.uri}');
-        break;
-      case DioExceptionType.badCertificate:
-        _logger.e('� Erreur SSL: ${err.requestOptions.uri}');
-        break;
-      case DioExceptionType.unknown:
-        _logger.e('❌ Erreur inconnue: ${err.message}');
-        break;
-    }
-
-    handler.next(err);
   }
 }
 

@@ -59,7 +59,8 @@ class ChatImageService {
   Future<File?> compressImage(String filePath) async {
     try {
       final originalSize = await File(filePath).length();
-      _logger.d('Original image size: ${(originalSize / 1024).toStringAsFixed(2)} KB');
+      _logger.d(
+          'Original image size: ${(originalSize / 1024).toStringAsFixed(2)} KB');
 
       final compressed = await _compressionService.compressImage(
         filePath: filePath,
@@ -70,7 +71,8 @@ class ChatImageService {
       if (compressed != null) {
         final compressedSize = await compressed.length();
         final reduction = ((1 - compressedSize / originalSize) * 100);
-        _logger.i('Compressed image: ${(compressedSize / 1024).toStringAsFixed(2)} KB (-${reduction.toStringAsFixed(1)}%)');
+        _logger.i(
+            'Compressed image: ${(compressedSize / 1024).toStringAsFixed(2)} KB (-${reduction.toStringAsFixed(1)}%)');
       }
 
       return compressed;

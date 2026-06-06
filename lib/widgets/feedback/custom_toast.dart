@@ -6,7 +6,7 @@ class CustomToast extends StatefulWidget {
   final String message;
   final FeedbackType type;
   final Duration duration;
-  
+
   const CustomToast({
     super.key,
     required this.message,
@@ -18,12 +18,12 @@ class CustomToast extends StatefulWidget {
   State<CustomToast> createState() => _CustomToastState();
 }
 
-class _CustomToastState extends State<CustomToast> 
+class _CustomToastState extends State<CustomToast>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
-  
+
   @override
   void initState() {
     super.initState();
@@ -31,7 +31,7 @@ class _CustomToastState extends State<CustomToast>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    
+
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, -1),
       end: Offset.zero,
@@ -39,7 +39,7 @@ class _CustomToastState extends State<CustomToast>
       parent: _controller,
       curve: Curves.easeOutBack,
     ));
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -47,9 +47,9 @@ class _CustomToastState extends State<CustomToast>
       parent: _controller,
       curve: Curves.easeInOut,
     ));
-    
+
     _controller.forward();
-    
+
     // Auto-dismiss
     Future.delayed(widget.duration, () {
       if (mounted) {
@@ -59,17 +59,17 @@ class _CustomToastState extends State<CustomToast>
       }
     });
   }
-  
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final colors = _getColors();
-    
+
     return Material(
       color: Colors.transparent,
       child: FadeTransition(
@@ -120,7 +120,7 @@ class _CustomToastState extends State<CustomToast>
       ),
     );
   }
-  
+
   _ToastColors _getColors() {
     switch (widget.type) {
       case FeedbackType.success:
@@ -165,7 +165,7 @@ class _ToastColors {
   final IconData icon;
   final Color iconColor;
   final Color shadow;
-  
+
   _ToastColors({
     required this.background,
     required this.text,

@@ -22,7 +22,7 @@ class StepIndicator extends StatelessWidget {
           height: 4,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(2),
-            color: Colors.grey.withOpacity( 0.2),
+            color: Colors.grey.withOpacity(0.2),
           ),
           child: FractionallySizedBox(
             alignment: Alignment.centerLeft,
@@ -35,15 +35,15 @@ class StepIndicator extends StatelessWidget {
             ),
           ),
         ),
-        
+
         const SizedBox(height: 12),
-        
+
         // Titres des étapes
         Row(
           children: List.generate(totalSteps, (index) {
             final isActive = index + 1 <= currentStep;
             final isCurrent = index + 1 == currentStep;
-            
+
             return Expanded(
               child: Column(
                 children: [
@@ -54,42 +54,44 @@ class StepIndicator extends StatelessWidget {
                     height: 32,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isActive 
-                          ? AppTheme.primaryColor 
-                          : Colors.grey.withOpacity( 0.3),
-                      boxShadow: isCurrent ? [
-                        BoxShadow(
-                          color: AppTheme.primaryColor.withOpacity( 0.3),
-                          blurRadius: 8,
-                          spreadRadius: 2,
-                        ),
-                      ] : null,
+                      color: isActive
+                          ? AppTheme.primaryColor
+                          : Colors.grey.withOpacity(0.3),
+                      boxShadow: isCurrent
+                          ? [
+                              BoxShadow(
+                                color: AppTheme.primaryColor.withOpacity(0.3),
+                                blurRadius: 8,
+                                spreadRadius: 2,
+                              ),
+                            ]
+                          : null,
                     ),
                     child: Center(
                       child: Text(
                         '${index + 1}',
                         style: TextStyle(
-                          color: isActive 
-                              ? AppTheme.secondaryColor 
-                              : Colors.grey,
+                          color:
+                              isActive ? AppTheme.secondaryColor : Colors.grey,
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
                         ),
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 8),
-                  
+
                   // Titre de l'étape
                   Text(
                     titles[index],
                     style: TextStyle(
-                      color: isActive 
-                          ? AppTheme.secondaryColor 
-                          : Colors.grey.withOpacity( 0.6),
+                      color: isActive
+                          ? AppTheme.secondaryColor
+                          : Colors.grey.withOpacity(0.6),
                       fontSize: 12,
-                      fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight:
+                          isCurrent ? FontWeight.w600 : FontWeight.normal,
                     ),
                     textAlign: TextAlign.center,
                     maxLines: 1,

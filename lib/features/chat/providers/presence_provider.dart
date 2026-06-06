@@ -19,11 +19,13 @@ class PresenceProvider with ChangeNotifier {
   Timer? _cleanupTimer;
 
   // Getters
-  Map<String, PresenceStatus> get userPresence => Map.unmodifiable(_userPresence);
+  Map<String, PresenceStatus> get userPresence =>
+      Map.unmodifiable(_userPresence);
   Map<String, DateTime> get lastSeen => Map.unmodifiable(_lastSeen);
 
   /// Met à jour la présence d'un utilisateur
-  void updatePresence(String userId, PresenceStatus status, {DateTime? lastSeen}) {
+  void updatePresence(String userId, PresenceStatus status,
+      {DateTime? lastSeen}) {
     _userPresence[userId] = status;
     if (lastSeen != null) {
       _lastSeen[userId] = lastSeen;

@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fonaco/core/constants/app_constants.dart';
 import 'package:fonaco/core/services/cache_service.dart';
+import 'package:fonaco/core/utils/marker_icon_cache.dart';
 import 'package:fonaco/core/widgets/skeleton_loading.dart';
 import 'package:fonaco/features/client/missions/mission_repository.dart';
 import 'package:geolocator/geolocator.dart';
@@ -18,10 +18,15 @@ class AgentsScreen extends StatefulWidget {
   State<AgentsScreen> createState() => _AgentsScreenState();
 }
 
-class _AgentsScreenState extends State<AgentsScreen> {
+class _AgentsScreenState extends State<AgentsScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   final Logger _log = Logger();
   final MissionRepository _missionRepository = MissionRepository();
   final CacheService _cacheService = CacheService();
+  final MarkerIconCache _markerCache = MarkerIconCache();
 
   List<Map<String, dynamic>> _agents = [];
 
@@ -289,16 +294,16 @@ class _AgentsScreenState extends State<AgentsScreen> {
           title: 'Ma position',
           snippet: 'Vous êtes ici',
         ),
-        icon: BitmapDescriptor.defaultMarkerWithHue(
-          BitmapDescriptor.hueBlue,
-        ),
+        icon: _markerCache.userMarker,
       ),
     );
 
-    // Clustering manuel basé sur le niveau de zoom
-    final clusterRadius =
-        _currentZoom < 13 ? 0.01 : 0.005; // Plus grand quand zoom éloigné
-    final clusters = <List<Map<String, dynamic>>>[];
+    // Clustering optimisé avec grille spatiale (O(n) au lieu de O(n²))
+    final clusterRadius = _currentZoom < 13 ? 0.01 : 0.005;
+
+    // Utiliser une grille spatiale pour regrouper les agents
+    final gridSize = clusterRadius * 2;
+    final grid = <String, List<Map<String, dynamic>>>{};
 
     for (final agent in _filteredAgents) {
       final lat = _parseCoordinate(agent['latitude']);
@@ -307,143 +312,102 @@ class _AgentsScreenState extends State<AgentsScreen> {
       if (lat == null || lng == null) continue;
       if (lat.abs() > 90 || lng.abs() > 180) continue;
 
-      bool addedToCluster = false;
+      // Calculer la clé de grille
+      final gridLat = (lat / gridSize).floor();
+      final gridLng = (lng / gridSize).floor();
+      final gridKey = '$gridLat,$gridLng';
 
-      for (final cluster in clusters) {
-        final clusterLat = _parseCoordinate(cluster.first['latitude']);
-        final clusterLng = _parseCoordinate(cluster.first['longitude']);
+      grid.putIfAbsent(gridKey, () => []);
+      grid[gridKey]!.add(agent);
+    }
 
-        if (clusterLat != null && clusterLng != null) {
-          final distance = _calculateDistance(lat, lng, clusterLat, clusterLng);
-          if (distance < clusterRadius) {
-            cluster.add(agent);
-            addedToCluster = true;
-            break;
+    // Fusionner les clusters adjacents et créer les markers
+    final processedClusters = <List<Map<String, dynamic>>>[];
+    final visitedGridKeys = <String>{};
+
+    for (final gridKey in grid.keys) {
+      if (visitedGridKeys.contains(gridKey)) continue;
+
+      final cluster = <Map<String, dynamic>>[];
+      final queue = <String>[gridKey];
+      visitedGridKeys.add(gridKey);
+
+      while (queue.isNotEmpty) {
+        final currentKey = queue.removeAt(0);
+        cluster.addAll(grid[currentKey] ?? []);
+
+        // Vérifier les cellules adjacentes
+        final parts = currentKey.split(',');
+        final gridLat = int.parse(parts[0]);
+        final gridLng = int.parse(parts[1]);
+
+        for (int dLat = -1; dLat <= 1; dLat++) {
+          for (int dLng = -1; dLng <= 1; dLng++) {
+            final neighborKey = '${gridLat + dLat},${gridLng + dLng}';
+            if (grid.containsKey(neighborKey) &&
+                !visitedGridKeys.contains(neighborKey)) {
+              visitedGridKeys.add(neighborKey);
+              queue.add(neighborKey);
+            }
           }
         }
       }
 
-      if (!addedToCluster) {
-        clusters.add([agent]);
+      if (cluster.isNotEmpty) {
+        processedClusters.add(cluster);
       }
     }
 
-    // Créer les marqueurs (clusters ou individuels)
-    for (final cluster in clusters) {
-      if (cluster.length > 1 && _currentZoom < 14) {
-        // Créer un marqueur de cluster
-        final clusterLat = _parseCoordinate(cluster.first['latitude']);
-        final clusterLng = _parseCoordinate(cluster.first['longitude']);
+    // Créer les markers à partir des clusters
+    for (final cluster in processedClusters) {
+      if (cluster.length == 1) {
+        // Agent individuel
+        final agent = cluster.first;
+        final lat = _parseCoordinate(agent['latitude']);
+        final lng = _parseCoordinate(agent['longitude']);
 
-        if (clusterLat != null && clusterLng != null) {
-          markers.add(
-            Marker(
-              markerId: MarkerId('cluster_${cluster.first['id']}'),
-              position: LatLng(clusterLat, clusterLng),
-              infoWindow: InfoWindow(
-                title: '${cluster.length} agents',
-                snippet: 'Zoom pour voir les détails',
-              ),
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueOrange,
-              ),
-              onTap: () {
-                // Zoomer sur le cluster
-                _mapController?.animateCamera(
-                  CameraUpdate.newCameraPosition(
-                    CameraPosition(
-                      target: LatLng(clusterLat, clusterLng),
-                      zoom: _currentZoom + 2,
-                    ),
-                  ),
-                );
-              },
-            ),
-          );
-        }
-      } else {
-        // Afficher les marqueurs individuels
-        for (final agent in cluster) {
-          final lat = _parseCoordinate(agent['latitude']);
-          final lng = _parseCoordinate(agent['longitude']);
-
-          if (lat == null || lng == null) continue;
-
-          final name =
-              '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
-
-          final specialty = agent['specialty'] ?? 'Agent terrain';
-
-          final distance = agent['distance_km'];
-
+        if (lat != null && lng != null) {
           markers.add(
             Marker(
               markerId: MarkerId('agent_${agent['id']}'),
               position: LatLng(lat, lng),
               infoWindow: InfoWindow(
-                title: name.isNotEmpty ? name : 'Agent',
-                snippet: _formatDistance(distance).isNotEmpty
-                    ? '$specialty • ${_formatDistance(distance)}'
-                    : specialty,
+                title: agent['first_name'] ?? 'Agent',
+                snippet: agent['specialties']?.join(', ') ?? '',
               ),
-              icon: BitmapDescriptor.defaultMarkerWithHue(
-                BitmapDescriptor.hueYellow,
-              ),
-              onTap: () => _onAgentMarkerTapped(agent),
+              icon: _markerCache.agentMarker,
             ),
           );
         }
+      } else {
+        // Cluster multiple agents
+        final avgLat = cluster.fold<double>(0, (sum, agent) {
+              final lat = _parseCoordinate(agent['latitude']);
+              return sum + (lat ?? 0);
+            }) /
+            cluster.length;
+
+        final avgLng = cluster.fold<double>(0, (sum, agent) {
+              final lng = _parseCoordinate(agent['longitude']);
+              return sum + (lng ?? 0);
+            }) /
+            cluster.length;
+
+        markers.add(
+          Marker(
+            markerId: MarkerId('cluster_${cluster.length}'),
+            position: LatLng(avgLat, avgLng),
+            infoWindow: InfoWindow(
+              title: '${cluster.length} agents',
+              snippet: 'Zoom pour voir les détails',
+            ),
+            icon: _markerCache.clusterMarker,
+          ),
+        );
       }
     }
 
     return markers;
-  }
-
-  double _calculateDistance(
-      double lat1, double lng1, double lat2, double lng2) {
-    const double earthRadius = 6371; // km
-    final dLat = _toRadians(lat2 - lat1);
-    final dLng = _toRadians(lng2 - lng1);
-
-    final a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(dLat / 2) * cos(dLat / 2) * sin(dLng / 2) * sin(dLng / 2);
-    final c = 2 * asin(sqrt(a));
-
-    return earthRadius * c;
-  }
-
-  double _toRadians(double degree) {
-    return degree * 3.141592653589793 / 180;
-  }
-
-  void _onAgentMarkerTapped(Map<String, dynamic> agent) {
-    final name =
-        '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
-
-    final specialty = agent['specialty'] ?? 'Agent terrain';
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$name • $specialty'),
-        duration: const Duration(seconds: 4),
-        action: SnackBarAction(
-          label: 'Voir profil',
-          textColor: Colors.white,
-          onPressed: () => _navigateToAgentProfile(agent),
-        ),
-      ),
-    );
-  }
-
-  void _navigateToAgentProfile(Map<String, dynamic> agent) {
-    Navigator.pushNamed(
-      context,
-      '/agent-profile',
-      arguments: {
-        'agentId': agent['id'],
-        'agent': agent,
-      },
-    );
   }
 
   Future<void> _animateTo(LatLng target) async {
@@ -465,19 +429,6 @@ class _AgentsScreenState extends State<AgentsScreen> {
     return 'Agents proches';
   }
 
-  static String _formatDistance(dynamic distance) {
-    if (distance == null) return '';
-
-    final parsed = double.tryParse(distance.toString());
-    if (parsed == null) return '';
-
-    // Hide distance if > 50km
-    if (parsed > 50) return '';
-
-    // Format to 1 decimal place
-    return '${parsed.toStringAsFixed(1)} km';
-  }
-
   void _showFilterSheet() {
     showModalBottomSheet(
       context: context,
@@ -492,14 +443,19 @@ class _AgentsScreenState extends State<AgentsScreen> {
             onApply:
                 (radiusKm, minRating, verifiedOnly, types, minPrice, maxPrice) {
               Navigator.pop(context);
-              _loadAgents(
-                radiusKm: radiusKm,
-                minRating: minRating,
-                verifiedOnly: verifiedOnly,
-                missionTypes: types,
-                minPrice: minPrice,
-                maxPrice: maxPrice,
-              );
+              // Debounce pour éviter les appels API multiples
+              _debounceTimer?.cancel();
+              _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+                if (!mounted) return;
+                _loadAgents(
+                  radiusKm: radiusKm,
+                  minRating: minRating,
+                  verifiedOnly: verifiedOnly,
+                  missionTypes: types,
+                  minPrice: minPrice,
+                  maxPrice: maxPrice,
+                );
+              });
             },
           ),
         );
@@ -563,6 +519,7 @@ class _AgentsScreenState extends State<AgentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     return Scaffold(
       body: Stack(
         children: [
@@ -585,20 +542,22 @@ class _AgentsScreenState extends State<AgentsScreen> {
                 }
               },
               onCameraMove: (CameraPosition position) {
-                // Annuler le timer précédent
+                // Mise à jour simple du zoom sans recalcul de markers
+                if (!mounted) return;
+                setState(() {
+                  _currentZoom = position.zoom;
+                });
+              },
+              onCameraIdle: () {
+                // Recalcul des markers SEULEMENT quand l'utilisateur arrête de déplacer
                 _debounceTimer?.cancel();
-
-                // Nouveau timer avec délai de 300ms
                 _debounceTimer = Timer(const Duration(milliseconds: 300), () {
                   if (!mounted) return;
 
+                  final centerLatLng = _currentLatLng ??
+                      LatLng(AppConstants.defaultLatitude,
+                          AppConstants.defaultLongitude);
                   setState(() {
-                    _currentZoom = position.zoom;
-
-                    // Recalculer les markers avec le nouveau zoom
-                    final centerLatLng = _currentLatLng ??
-                        LatLng(AppConstants.defaultLatitude,
-                            AppConstants.defaultLongitude);
                     _markers = _buildMarkersAround(centerLatLng);
                   });
                 });
@@ -739,7 +698,13 @@ class _AgentsScreenState extends State<AgentsScreen> {
                               setState(() {
                                 _nearbyMode = !_nearbyMode;
                               });
-                              _loadAgents();
+                              // Debounce pour éviter les appels API multiples
+                              _debounceTimer?.cancel();
+                              _debounceTimer =
+                                  Timer(const Duration(milliseconds: 500), () {
+                                if (!mounted) return;
+                                _loadAgents();
+                              });
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(

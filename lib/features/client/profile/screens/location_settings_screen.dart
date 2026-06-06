@@ -207,7 +207,6 @@ class _LocationSettingsScreenState extends State<LocationSettingsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-
                     if (_isLoading)
                       const Column(
                         children: [

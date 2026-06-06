@@ -51,18 +51,20 @@ class AppConfig {
   /// Initialise la configuration
   static Future<void> initialize() async {
     await dotenv.load(fileName: '.env');
-    
+
     final instance = AppConfig._instance;
-    
+
     // Environment
     final env = dotenv.env['APP_ENV'] ?? 'development';
     instance._environment = AppEnvironment.fromString(env);
     instance._appVersion = dotenv.env['APP_VERSION'] ?? '1.0.0';
-    instance._buildNumber = int.tryParse(dotenv.env['BUILD_NUMBER'] ?? '1') ?? 1;
+    instance._buildNumber =
+        int.tryParse(dotenv.env['BUILD_NUMBER'] ?? '1') ?? 1;
 
     // API
     instance._serverUrl = dotenv.env['SERVER_URL'] ?? 'http://10.0.2.2:8000';
-    instance._apiBaseUrl = dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8000/api/v1/';
+    instance._apiBaseUrl =
+        dotenv.env['API_BASE_URL'] ?? 'http://10.0.2.2:8000/api/v1/';
     instance._connectTimeout = Duration(
       seconds: int.tryParse(dotenv.env['API_CONNECT_TIMEOUT'] ?? '10') ?? 10,
     );
@@ -78,16 +80,20 @@ class AppConfig {
 
     // Firebase
     instance._firebaseProjectId = dotenv.env['FIREBASE_PROJECT_ID'] ?? '';
-    instance._firebaseAppIdAndroid = dotenv.env['FIREBASE_APP_ID_ANDROID'] ?? '';
-    instance._firebaseMessagingSenderId = dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '';
+    instance._firebaseAppIdAndroid =
+        dotenv.env['FIREBASE_APP_ID_ANDROID'] ?? '';
+    instance._firebaseMessagingSenderId =
+        dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] ?? '';
     instance._firebaseApiKey = dotenv.env['FIREBASE_API_KEY'] ?? '';
 
     // Google Maps
     instance._googleMapsApiKey = dotenv.env['GOOGLE_MAPS_API_KEY'] ?? '';
 
     // Sécurité
-    instance._androidEncryptedPrefsName = dotenv.env['ANDROID_ENCRYPTED_PREFS_NAME'] ?? 'secure_storage_fonaqo';
-    instance._iosAccessGroup = dotenv.env['IOS_ACCESS_GROUP'] ?? 'com.fonaqo.secure';
+    instance._androidEncryptedPrefsName =
+        dotenv.env['ANDROID_ENCRYPTED_PREFS_NAME'] ?? 'secure_storage_fonaqo';
+    instance._iosAccessGroup =
+        dotenv.env['IOS_ACCESS_GROUP'] ?? 'com.fonaqo.secure';
 
     // Features flags
     instance._enableAiSearch = dotenv.env['ENABLE_AI_SEARCH'] == 'true';
@@ -113,7 +119,8 @@ class AppConfig {
     print('🌐 API: $_apiBaseUrl');
     print('🔌 WebSocket: $_wsUrl');
     print('🔥 Firebase: $_firebaseProjectId');
-    print('🗺️ Google Maps: ${_googleMapsApiKey.isNotEmpty ? "✓ Configuré" : "✗ Non configuré"}');
+    print(
+        '🗺️ Google Maps: ${_googleMapsApiKey.isNotEmpty ? "✓ Configuré" : "✗ Non configuré"}');
     print('═══════════════════════════════════════════════════════════');
     print('⚙️ Features:');
     print('  - AI Search: ${_enableAiSearch ? "✓" : "✗"}');

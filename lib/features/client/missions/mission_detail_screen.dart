@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/models/mission_model.dart';
+import 'package:fonaco/core/utils/marker_icon_cache.dart';
+import 'package:fonaco/features/chat/chat_repository.dart';
 import 'mission_repository.dart';
 
 class MissionDetailScreen extends StatefulWidget {
@@ -18,8 +21,11 @@ class MissionDetailScreen extends StatefulWidget {
 
 class _MissionDetailScreenState extends State<MissionDetailScreen> {
   final MissionRepository _missionRepository = MissionRepository();
+  final ChatRepository _chatRepository = ChatRepository();
+  final MarkerIconCache _markerCache = MarkerIconCache();
   MissionModel? _mission;
   bool _isLoading = true;
+  bool _isChatLoading = false;
   String? _errorMessage;
   String? _resolvedMissionId;
 
@@ -305,9 +311,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
         markerId: const MarkerId('client'),
         position: missionPosition,
         infoWindow: InfoWindow(title: 'Position mission'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(
-          BitmapDescriptor.hueBlue,
-        ),
+        icon: _markerCache.missionMarker,
       ),
     );
 
@@ -324,9 +328,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
             _mission!.longitude! - 0.0020,
           ),
           infoWindow: InfoWindow(title: _mission!.agentName ?? 'Agent'),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueGreen,
-          ),
+          icon: _markerCache.clusterMarker,
         ),
       );
     }
@@ -382,13 +384,47 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
   }
 
   Widget _buildStatusBadge() {
+    final status = _mission!.status;
+    Color backgroundColor;
+    Color borderColor;
+    Color iconColor;
+    IconData iconData;
+    String text;
+
+    if (status == MissionStatus.CANCELLED) {
+      backgroundColor = Colors.red[50]!;
+      borderColor = Colors.red[200]!;
+      iconColor = Colors.red[700]!;
+      iconData = Icons.warning_amber_rounded;
+      text = 'Mission Annulée';
+    } else if (status == MissionStatus.DISPUTED) {
+      backgroundColor = Colors.orange[50]!;
+      borderColor = Colors.orange[200]!;
+      iconColor = Colors.orange[700]!;
+      iconData = Icons.shield_outlined;
+      text = 'Litige En Cours';
+    } else if (status == MissionStatus.COMPLETED) {
+      backgroundColor = Colors.green[50]!;
+      borderColor = Colors.green[200]!;
+      iconColor = Colors.green[700]!;
+      iconData = Icons.check_circle;
+      text = 'Mission Terminée avec succès';
+    } else {
+      backgroundColor = const Color(0xFFF7C600).withValues(alpha: 0.15);
+      borderColor = const Color(0xFFF7C600).withValues(alpha: 0.3);
+      iconColor = const Color(0xFFF7C600);
+      iconData = Icons.directions_car;
+      text =
+          '${_mission!.statusDisplay.toUpperCase()} - Arrivée estimée : 12 min';
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7C600).withValues(alpha: 0.15),
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFFF7C600).withValues(alpha: 0.3),
+          color: borderColor,
           width: 1,
         ),
       ),
@@ -396,13 +432,13 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.directions_car,
-            color: const Color(0xFFF7C600),
+            iconData,
+            color: iconColor,
             size: 18,
           ),
           const SizedBox(width: 8),
           Text(
-            '${_mission!.statusDisplay.toUpperCase()} - Arrivée estimée : 12 min',
+            text,
             style: const TextStyle(
               color: Color(0xFF121212),
               fontWeight: FontWeight.w700,
@@ -491,8 +527,10 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
       // TODO: Appeler l'API pour libérer les fonds
       // Rediriger vers l'écran de notation
       Navigator.pushNamed(context, AppRoutes.rating);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Fonds libérés !'), backgroundColor: Colors.green));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Fonds libérés !'), backgroundColor: Colors.green));
+      }
     }
   }
 
@@ -636,15 +674,26 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
               color: const Color(0xFFF7C600),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: IconButton(
-              icon: const Icon(
-                Icons.chat,
-                color: Color(0xFF121212),
-              ),
-              onPressed: () {
-                // TODO: Intégrer ChatProvider pour ouvrir discussion existante ou créer nouveau salon
-              },
-            ),
+            child: _isChatLoading
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Color(0xFF121212)),
+                      ),
+                    ),
+                  )
+                : IconButton(
+                    icon: const Icon(
+                      Icons.chat,
+                      color: Color(0xFF121212),
+                    ),
+                    onPressed: _handleChatButton,
+                  ),
           ),
         ],
       ),
@@ -830,10 +879,15 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
               children: [
                 Container(
                   margin: const EdgeInsets.only(top: 4),
-                  child: const Icon(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.green[50],
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
                     Icons.check_circle,
-                    color: Color(0xFFF7C600),
-                    size: 16,
+                    color: Colors.green[700],
+                    size: 14,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -932,5 +986,51 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _handleChatButton() async {
+    if (_mission == null || _resolvedMissionId == null) return;
+
+    setState(() => _isChatLoading = true);
+
+    try {
+      // Créer ou récupérer la conversation pour cette mission
+      final conversation = await _chatRepository.getOrCreateConversation(
+        _resolvedMissionId!,
+      );
+
+      if (conversation != null && mounted) {
+        final conversationId = conversation['id']?.toString();
+        if (conversationId != null) {
+          Navigator.pushNamed(
+            context,
+            AppRoutes.chatDetail,
+            arguments: {'conversationId': conversationId},
+          );
+        } else {
+          throw Exception('Conversation ID not found in response');
+        }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Impossible de créer la conversation'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'ouverture du chat: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isChatLoading = false);
+      }
+    }
   }
 }

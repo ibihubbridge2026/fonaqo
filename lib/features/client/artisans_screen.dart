@@ -50,24 +50,40 @@ class _ArtisansScreenState extends State<ArtisansScreen> {
         'specialty': 'Électricité',
         'location': 'Cotonou, Quartier Fidjrossè',
         'experience': '10 ans d\'expérience',
+        'rating': 4.8,
+        'completed_missions': 156,
+        'estimated_price': '5,000 FCFA/h',
+        'is_top_choice': true,
       },
       {
         'username': 'Moussa',
         'specialty': 'Plomberie',
         'location': 'Porto-Novo, Quartier Ganhi',
         'experience': '15 ans d\'expérience',
+        'rating': 4.5,
+        'completed_missions': 203,
+        'estimated_price': '4,500 FCFA/h',
+        'is_top_choice': false,
       },
       {
         'username': 'Adjoua',
         'specialty': 'Maçonnerie',
         'location': 'Cotonou, Quartier Gbedjromede',
         'experience': '8 ans d\'expérience',
+        'rating': 4.9,
+        'completed_missions': 89,
+        'estimated_price': '6,000 FCFA/h',
+        'is_top_choice': true,
       },
       {
         'username': 'Kouassi',
         'specialty': 'Menuiserie',
         'location': 'Ouidah, Quartier Djègbadji',
         'experience': '12 ans d\'expérience',
+        'rating': 4.7,
+        'completed_missions': 134,
+        'estimated_price': '5,500 FCFA/h',
+        'is_top_choice': false,
       },
     ];
   }
@@ -185,6 +201,15 @@ class _ArtisansScreenState extends State<ArtisansScreen> {
                                 name: artisan['username'] ?? 'Artisan',
                                 location: artisan['location'] ?? '',
                                 experience: artisan['experience'] ?? '',
+                                rating:
+                                    (artisan['rating'] as num?)?.toDouble() ??
+                                        0.0,
+                                completedMissions:
+                                    (artisan['completed_missions'] as int?) ??
+                                        0,
+                                estimatedPrice:
+                                    artisan['estimated_price'] ?? '',
+                                isTopChoice: artisan['is_top_choice'] == true,
                               ),
                             );
                           },
@@ -201,12 +226,20 @@ class ArtisanCard extends StatelessWidget {
   final String name;
   final String location;
   final String experience;
+  final double rating;
+  final int completedMissions;
+  final String estimatedPrice;
+  final bool isTopChoice;
 
   const ArtisanCard({
     super.key,
     required this.name,
     required this.location,
     required this.experience,
+    this.rating = 0.0,
+    this.completedMissions = 0,
+    this.estimatedPrice = '',
+    this.isTopChoice = false,
   });
 
   @override
@@ -236,30 +269,51 @@ class ArtisanCard extends StatelessWidget {
         child: Row(
           children: [
             // Photo de profil
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFFFFD400).withOpacity(0.3),
-                    const Color(0xFFFFD400).withOpacity(0.1),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  name[0].toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
+            Stack(
+              children: [
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFFFFD400).withOpacity(0.3),
+                        const Color(0xFFFFD400).withOpacity(0.1),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: Text(
+                      name[0].toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                if (isTopChoice)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFD400),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.star,
+                        size: 12,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(width: 14),
             // Informations
@@ -267,13 +321,38 @@ class ArtisanCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                      if (isTopChoice) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD400).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Top',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -294,6 +373,62 @@ class ArtisanCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  // Rating étoiles
+                  if (rating > 0)
+                    Row(
+                      children: [
+                        ...List.generate(5, (index) {
+                          return Icon(
+                            index < rating.round()
+                                ? Icons.star
+                                : Icons.star_border,
+                            size: 12,
+                            color: const Color(0xFFFFD400),
+                          );
+                        }),
+                        const SizedBox(width: 4),
+                        Text(
+                          rating.toStringAsFixed(1),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ],
+                    ),
+                  const SizedBox(height: 4),
+                  // Missions complétées et prix
+                  Row(
+                    children: [
+                      if (completedMissions > 0) ...[
+                        Icon(
+                          Icons.check_circle_outline,
+                          color: Colors.green[600],
+                          size: 12,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '$completedMissions missions',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      if (estimatedPrice.isNotEmpty)
+                        Text(
+                          estimatedPrice,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 4),

@@ -133,8 +133,9 @@ class _AiMissionSearchScreenState extends State<AiMissionSearchScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.search),
-              label: Text(
-                  _isSearching ? 'Analyse en cours...' : 'Trouver des missions'),
+              label: Text(_isSearching
+                  ? 'Analyse en cours...'
+                  : 'Trouver des missions'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.black,

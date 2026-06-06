@@ -6,7 +6,8 @@ import 'package:path/path.dart' as path;
 
 /// Service pour l'upload sécurisé de fichiers dans le chat
 class ChatFileUploadService {
-  static final ChatFileUploadService _instance = ChatFileUploadService._internal();
+  static final ChatFileUploadService _instance =
+      ChatFileUploadService._internal();
   factory ChatFileUploadService() => _instance;
   ChatFileUploadService._internal();
 
@@ -14,16 +15,36 @@ class ChatFileUploadService {
   final AppLogger _logger = AppLogger();
 
   /// Types de fichiers autorisés
-  static const List<String> _allowedImageTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
-  static const List<String> _allowedDocumentTypes = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
-  static const List<String> _allowedAudioTypes = ['mp3', 'wav', 'm4a', 'aac', 'ogg'];
+  static const List<String> _allowedImageTypes = [
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'webp'
+  ];
+  static const List<String> _allowedDocumentTypes = [
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx'
+  ];
+  static const List<String> _allowedAudioTypes = [
+    'mp3',
+    'wav',
+    'm4a',
+    'aac',
+    'ogg'
+  ];
   static const List<String> _allowedVideoTypes = ['mp4', 'mov', 'avi', 'mkv'];
 
   /// Taille maximale par type (en octets)
-  static const int _maxImageSize = 5 * 1024 * 1024;       // 5MB
-  static const int _maxDocumentSize = 10 * 1024 * 1024;  // 10MB
-  static const int _maxAudioSize = 10 * 1024 * 1024;     // 10MB
-  static const int _maxVideoSize = 50 * 1024 * 1024;     // 50MB
+  static const int _maxImageSize = 5 * 1024 * 1024; // 5MB
+  static const int _maxDocumentSize = 10 * 1024 * 1024; // 10MB
+  static const int _maxAudioSize = 10 * 1024 * 1024; // 10MB
+  static const int _maxVideoSize = 50 * 1024 * 1024; // 50MB
 
   /// Upload un fichier
   Future<UploadResult?> uploadFile({
@@ -34,7 +55,8 @@ class ChatFileUploadService {
   }) async {
     try {
       final fileName = path.basename(file.path);
-      final extension = path.extension(fileName).replaceFirst('.', '').toLowerCase();
+      final extension =
+          path.extension(fileName).replaceFirst('.', '').toLowerCase();
 
       // Valider le type de fichier
       if (!_isFileTypeAllowed(extension, messageType)) {
@@ -59,7 +81,8 @@ class ChatFileUploadService {
         'message_type': messageType,
       });
 
-      _logger.i('Uploading file: $fileName (${(fileSize / 1024).toStringAsFixed(2)} KB)');
+      _logger.i(
+          'Uploading file: $fileName (${(fileSize / 1024).toStringAsFixed(2)} KB)');
 
       final response = await _api.dio.post(
         '/chat/upload/',
@@ -142,7 +165,8 @@ class ChatFileUploadService {
   String formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
+    if (bytes < 1024 * 1024 * 1024)
+      return '${(bytes / 1024 / 1024).toStringAsFixed(1)} MB';
     return '${(bytes / 1024 / 1024 / 1024).toStringAsFixed(1)} GB';
   }
 }

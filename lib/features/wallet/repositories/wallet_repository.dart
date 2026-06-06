@@ -41,11 +41,15 @@ class WalletRepository {
         params.addAll(filter.toQueryParameters());
       }
 
-      final response = await _api.get('/wallet/transactions/', queryParameters: params);
+      final response =
+          await _api.get('/wallet/transactions/', queryParameters: params);
 
       if (response.statusCode == 200) {
         final data = response.data['results'] as List;
-        return data.map((item) => WalletTransaction.fromJson(item as Map<String, dynamic>)).toList();
+        return data
+            .map((item) =>
+                WalletTransaction.fromJson(item as Map<String, dynamic>))
+            .toList();
       }
 
       return [];
@@ -61,7 +65,8 @@ class WalletRepository {
       final response = await _api.get('/wallet/transactions/$transactionId/');
 
       if (response.statusCode == 200) {
-        return WalletTransaction.fromJson(response.data as Map<String, dynamic>);
+        return WalletTransaction.fromJson(
+            response.data as Map<String, dynamic>);
       }
 
       return null;
@@ -125,7 +130,8 @@ class WalletRepository {
       if (response.statusCode == 200) {
         // Sauvegarder le fichier
         final directory = await getApplicationDocumentsDirectory();
-        final file = File('${directory.path}/wallet_export_${DateTime.now().millisecondsSinceEpoch}.pdf');
+        final file = File(
+            '${directory.path}/wallet_export_${DateTime.now().millisecondsSinceEpoch}.pdf');
         await file.writeAsBytes(response.data);
         _logger.i('PDF exported to ${file.path}');
         return file;
@@ -164,7 +170,8 @@ class WalletRepository {
       if (response.statusCode == 200) {
         // Sauvegarder le fichier
         final directory = await getApplicationDocumentsDirectory();
-        final file = File('${directory.path}/wallet_export_${DateTime.now().millisecondsSinceEpoch}.csv');
+        final file = File(
+            '${directory.path}/wallet_export_${DateTime.now().millisecondsSinceEpoch}.csv');
         await file.writeAsString(response.data);
         _logger.i('CSV exported to ${file.path}');
         return file;
@@ -191,7 +198,8 @@ class WalletRepository {
         params['end_date'] = endDate.toIso8601String();
       }
 
-      final response = await _api.get('/wallet/statistics/', queryParameters: params);
+      final response =
+          await _api.get('/wallet/statistics/', queryParameters: params);
 
       if (response.statusCode == 200) {
         return response.data as Map<String, dynamic>;

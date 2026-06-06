@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logger/logger.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../config/api_config.dart';
+import 'memory_auth_cache.dart';
 
 /// Exception personnalisée pour les erreurs de chat
 class ChatConnectionException implements Exception {
@@ -131,10 +131,7 @@ class ChatWebSocketService extends ChangeNotifier {
     await disconnect();
 
     try {
-      const storage = FlutterSecureStorage();
-
-      final token = await storage.read(key: 'jwt_access_token');
-
+      final token = MemoryAuthCache().accessToken;
       if (token == null || token.isEmpty) {
         throw ChatConnectionException(
           'Token utilisateur introuvable.',

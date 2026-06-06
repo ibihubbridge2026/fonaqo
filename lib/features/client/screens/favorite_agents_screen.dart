@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:fonaco/core/providers/favorites_provider.dart';
 import 'package:fonaco/core/services/cache_service.dart';
 import 'package:fonaco/features/client/missions/mission_repository.dart';
-import 'package:fonaco/widgets/custom_app_bar.dart';
 import 'package:logger/logger.dart';
+import 'package:provider/provider.dart';
 
 /// Écran affichant la liste des agents favoris du client
 class FavoriteAgentsScreen extends StatefulWidget {
@@ -18,10 +19,8 @@ class _FavoriteAgentsScreenState extends State<FavoriteAgentsScreen> {
   final CacheService _cacheService = CacheService();
   final MissionRepository _missionRepository = MissionRepository();
 
-  List<String> _favoriteAgentIds = [];
   List<Map<String, dynamic>> _agents = [];
   bool _isLoading = true;
-  Set<String> _favoriteAgentIdsSet = {};
 
   @override
   void initState() {
@@ -37,9 +36,11 @@ class _FavoriteAgentsScreenState extends State<FavoriteAgentsScreen> {
         await _cacheService.init();
       }
 
-      final favorites = _cacheService.getFavoriteAgents();
-      _favoriteAgentIds = favorites;
-      _favoriteAgentIdsSet = favorites.toSet();
+      final favoritesProvider =
+          Provider.of<FavoritesProvider>(context, listen: false);
+      await favoritesProvider.init();
+
+      final favorites = favoritesProvider.favoriteAgentIds.toList();
 
       // Récupérer les profils complets des agents favoris
       if (favorites.isNotEmpty) {
@@ -65,10 +66,13 @@ class _FavoriteAgentsScreenState extends State<FavoriteAgentsScreen> {
         limit: 100, // Récupérer plus d'agents pour inclure les favoris
       );
 
+      final favoritesProvider =
+          Provider.of<FavoritesProvider>(context, listen: false);
+
       // Filtrer pour ne garder que les agents favoris
       final favoriteAgents = allAgents.where((agent) {
         final agentId = agent['id']?.toString() ?? '';
-        return _favoriteAgentIdsSet.contains(agentId);
+        return favoritesProvider.isFavorite(agentId);
       }).toList();
 
       if (mounted) {
@@ -83,18 +87,16 @@ class _FavoriteAgentsScreenState extends State<FavoriteAgentsScreen> {
   }
 
   void _toggleFavoriteAgent(String agentId) {
-    _cacheService.toggleFavoriteAgent(agentId).then((_) {
+    final favoritesProvider =
+        Provider.of<FavoritesProvider>(context, listen: false);
+    favoritesProvider.toggleFavorite(agentId).then((_) {
       if (mounted) {
         setState(() {
-          if (_favoriteAgentIdsSet.contains(agentId)) {
-            _favoriteAgentIdsSet.remove(agentId);
-            _favoriteAgentIds.remove(agentId);
+          if (!favoritesProvider.isFavorite(agentId)) {
             _agents.removeWhere((agent) => agent['id']?.toString() == agentId);
           } else {
-            _favoriteAgentIdsSet.add(agentId);
-            _favoriteAgentIds.add(agentId);
             // Recharger les profils pour inclure le nouvel agent favori
-            _loadAgentProfiles(_favoriteAgentIds);
+            _loadAgentProfiles(favoritesProvider.favoriteAgentIds.toList());
           }
         });
       }
@@ -105,8 +107,21 @@ class _FavoriteAgentsScreenState extends State<FavoriteAgentsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: CustomAppBar.detailStack(
-        title: 'Mes Agents Favoris',
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'Mes agents favoris',
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
       body: _buildBody(),
     );
@@ -117,35 +132,93 @@ class _FavoriteAgentsScreenState extends State<FavoriteAgentsScreen> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_favoriteAgentIds.isEmpty) {
+    final favoritesProvider = Provider.of<FavoritesProvider>(context);
+    if (favoritesProvider.favoriteAgentIds.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.favorite_border,
+                  size: 64,
+                  color: Colors.grey[400],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Aucun agent favori',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[800],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Ajoutez des agents à vos favoris depuis le dashboard pour les retrouver facilement ici.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                  height: 1.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_agents.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.favorite_border,
+                Icons.search_off,
                 size: 64,
                 color: Colors.grey[400],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 24),
               Text(
-                'Aucun agent favori',
+                'Agents favoris introuvables',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Colors.grey[600],
+                  color: Colors.grey[800],
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Text(
-                'Ajoutez des agents à vos favoris pour les retrouver facilement.',
+                'Les agents que vous avez ajoutés en favori ne sont pas disponibles actuellement.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.grey[500],
+                  color: Colors.grey[600],
+                  height: 1.5,
                 ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: _loadFavoriteAgents,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFD400),
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text('Réessayer'),
               ),
             ],
           ),

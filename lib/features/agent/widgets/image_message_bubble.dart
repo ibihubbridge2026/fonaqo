@@ -35,7 +35,8 @@ class _ImageMessageBubbleState extends State<ImageMessageBubble> {
         top: 8,
       ),
       child: Column(
-        crossAxisAlignment: widget.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment:
+            widget.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           // Bulle principale
           GestureDetector(
@@ -66,16 +67,15 @@ class _ImageMessageBubbleState extends State<ImageMessageBubble> {
                       _buildUploadingPlaceholder()
                     else
                       _buildImage(),
-                    
+
                     // Overlay de progression
-                    if (widget.isUploading)
-                      _buildProgressOverlay(),
+                    if (widget.isUploading) _buildProgressOverlay(),
                   ],
                 ),
               ),
             ),
           ),
-          
+
           // Caption optionnel
           if (widget.caption != null && widget.caption!.isNotEmpty)
             Padding(
@@ -101,7 +101,7 @@ class _ImageMessageBubbleState extends State<ImageMessageBubble> {
       fit: BoxFit.cover,
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;
-        
+
         return Container(
           color: Colors.grey.shade100,
           child: Center(
@@ -235,7 +235,7 @@ class _FullScreenImageView extends StatelessWidget {
             fit: BoxFit.contain,
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
-              
+
               return const Center(
                 child: CircularProgressIndicator(
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),

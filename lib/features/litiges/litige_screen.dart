@@ -159,8 +159,9 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
         const SizedBox(height: 16),
         _Card(
           child: DropdownButtonFormField<String>(
-            value: _selectedMissionId,
+            initialValue: _selectedMissionId,
             hint: const Text('Sélectionner une mission'),
+            isExpanded: true,
             items: _missions
                 .map((mission) => DropdownMenuItem(
                       value: mission.id,
@@ -172,9 +173,22 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
                 _selectedMissionId = value;
               });
             },
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Mission',
-              border: InputBorder.none,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFFFD400)),
+              ),
             ),
           ),
         ),
@@ -183,10 +197,23 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
           child: TextField(
             maxLines: 6,
             onChanged: (value) => _reason = value,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Description',
               hintText: 'Décrivez le problème, ajoutez des détails utiles…',
-              border: InputBorder.none,
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFFFD400)),
+              ),
             ),
           ),
         ),

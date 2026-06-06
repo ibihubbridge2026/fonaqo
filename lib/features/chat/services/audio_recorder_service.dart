@@ -7,7 +7,8 @@ import 'package:fonaco/core/utils/app_logger.dart';
 
 /// Service pour l'enregistrement de messages vocaux
 class AudioRecorderService {
-  static final AudioRecorderService _instance = AudioRecorderService._internal();
+  static final AudioRecorderService _instance =
+      AudioRecorderService._internal();
   factory AudioRecorderService() => _instance;
   AudioRecorderService._internal();
 
@@ -21,11 +22,13 @@ class AudioRecorderService {
   int _recordingDuration = 0; // en secondes
 
   // Stream pour les mises à jour de durée
-  final StreamController<int> _durationController = StreamController.broadcast();
+  final StreamController<int> _durationController =
+      StreamController.broadcast();
   Stream<int> get durationStream => _durationController.stream;
 
   // Stream pour les mises à jour d'amplitude (visualisation)
-  final StreamController<double> _amplitudeController = StreamController.broadcast();
+  final StreamController<double> _amplitudeController =
+      StreamController.broadcast();
   Stream<double> get amplitudeStream => _amplitudeController.stream;
 
   /// Vérifie et demande les permissions
@@ -146,7 +149,8 @@ class AudioRecorderService {
       if (path != null && _currentRecordingPath != null) {
         final file = File(_currentRecordingPath!);
         final size = await file.length();
-        _logger.i('Recording stopped: ${_recordingDuration}s, ${(size / 1024).toStringAsFixed(2)} KB');
+        _logger.i(
+            'Recording stopped: ${_recordingDuration}s, ${(size / 1024).toStringAsFixed(2)} KB');
         return file;
       }
 

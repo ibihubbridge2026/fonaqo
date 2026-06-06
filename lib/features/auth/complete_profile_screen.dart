@@ -18,7 +18,7 @@ class CompleteProfileScreen extends StatefulWidget {
 class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
-  
+
   Country _selectedCountry = Country.defaultCountry;
   bool _isLoading = false;
   String? _errorMessage;
@@ -41,14 +41,16 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
-      final phoneNumber = '${_selectedCountry.dialCode}${_phoneController.text.trim()}';
-      
+
+      final phoneNumber =
+          '${_selectedCountry.dialCode}${_phoneController.text.trim()}';
+
       final success = await authProvider.updatePhoneNumber(phoneNumber);
-      
+
       if (success && mounted) {
-        FeedbackService.showSuccess(context, 'Numéro de téléphone enregistré avec succès !');
-        
+        FeedbackService.showSuccess(
+            context, 'Numéro de téléphone enregistré avec succès !');
+
         // Rediriger vers le mainShell maintenant que le profil est complet
         Navigator.pushReplacementNamed(context, AppRoutes.mainShell);
       }
@@ -84,7 +86,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 20),
-            
+
             // Header
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,

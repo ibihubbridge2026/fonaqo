@@ -10,8 +10,7 @@ class EventDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final args =
-        (ModalRoute.of(context)?.settings.arguments as Map?)
+    final args = (ModalRoute.of(context)?.settings.arguments as Map?)
             ?.cast<String, dynamic>() ??
         const {};
     final title = (args['title'] as String?) ?? 'Événement';

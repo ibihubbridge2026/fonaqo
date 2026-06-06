@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:fonaco/features/client/missions/mission_repository.dart';
 import '../../widgets/custom_app_bar.dart';
 
@@ -11,9 +13,11 @@ class AgentsMapScreen extends StatefulWidget {
 
 class _AgentsMapScreenState extends State<AgentsMapScreen> {
   final MissionRepository _missionRepo = MissionRepository();
+  final MapController _mapController = MapController();
   List<Map<String, dynamic>> _agents = [];
   bool _loading = true;
   String? _error;
+  int _selectedAgentIndex = 0;
 
   @override
   void initState() {
@@ -30,13 +34,25 @@ class _AgentsMapScreenState extends State<AgentsMapScreen> {
     try {
       final agents = await _missionRepo.fetchAgentSuggestions();
       if (!mounted) return;
+
+      final agentsWithLocation = agents
+          .where((agent) =>
+              agent['latitude'] != null && agent['longitude'] != null)
+          .toList();
+
       setState(() {
-        _agents = agents.where((agent) => 
-          agent['latitude'] != null && 
-          agent['longitude'] != null
-        ).toList();
+        _agents = agentsWithLocation;
         _loading = false;
       });
+
+      // Centrer la carte sur le premier agent si disponible
+      if (agentsWithLocation.isNotEmpty) {
+        final firstAgent = agentsWithLocation[0];
+        _mapController.move(
+          LatLng(firstAgent['latitude'], firstAgent['longitude']),
+          14.0,
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -98,35 +114,128 @@ class _AgentsMapScreenState extends State<AgentsMapScreen> {
 
     return Column(
       children: [
-        // Header avec le nombre d'agents
-        Container(
-          padding: const EdgeInsets.all(16),
-          color: Colors.white,
-          child: Row(
+        // FlutterMap
+        Expanded(
+          flex: 2,
+          child: FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: LatLng(
+                _agents[0]['latitude'],
+                _agents[0]['longitude'],
+              ),
+              initialZoom: 14.0,
+              minZoom: 10.0,
+              maxZoom: 18.0,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all,
+              ),
+            ),
             children: [
-              Icon(Icons.location_on, color: Colors.blue[700]),
-              const SizedBox(width: 8),
-              Text(
-                '${_agents.length} agents trouvés',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[800],
-                ),
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.fonaco',
+              ),
+              MarkerLayer(
+                markers: _agents.map((agent) {
+                  final agentId = agent['id']?.toString() ?? '';
+                  final lat = agent['latitude'] as double;
+                  final lng = agent['longitude'] as double;
+                  final index =
+                      _agents.indexWhere((a) => a['id']?.toString() == agentId);
+
+                  return Marker(
+                    point: LatLng(lat, lng),
+                    width: 40,
+                    height: 40,
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedAgentIndex = index;
+                        });
+                        _mapController.move(LatLng(lat, lng), 15.0);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: index == _selectedAgentIndex
+                              ? const Color(0xFFFFD400)
+                              : Colors.black,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                        child: Icon(
+                          Icons.location_on,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
             ],
           ),
         ),
-        
-        // Liste des agents avec localisation
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: _agents.length,
-            itemBuilder: (context, index) {
-              final agent = _agents[index];
-              return _AgentCard(agent: agent);
-            },
+
+        // Bottom Sheet with Agent Cards
+        Container(
+          height: 250,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // Handle for bottom sheet
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+
+              // Horizontal scrollable agent cards
+              Expanded(
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _agents.length,
+                  itemBuilder: (context, index) {
+                    final agent = _agents[index];
+                    return Container(
+                      width: 280,
+                      margin: const EdgeInsets.only(right: 12),
+                      child: _AgentCard(
+                        agent: agent,
+                        isSelected: index == _selectedAgentIndex,
+                        onTap: () {
+                          setState(() {
+                            _selectedAgentIndex = index;
+                          });
+                          _mapController.move(
+                            LatLng(agent['latitude'], agent['longitude']),
+                            15.0,
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -136,12 +245,19 @@ class _AgentsMapScreenState extends State<AgentsMapScreen> {
 
 class _AgentCard extends StatelessWidget {
   final Map<String, dynamic> agent;
+  final bool isSelected;
+  final VoidCallback onTap;
 
-  const _AgentCard({required this.agent});
+  const _AgentCard({
+    required this.agent,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final name = '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
+    final name =
+        '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
     final specialty = agent['specialty'] ?? 'Agent terrain';
     final city = agent['city'] ?? 'Non spécifié';
     final address = agent['address'] ?? 'Non spécifié';
@@ -151,12 +267,26 @@ class _AgentCard extends StatelessWidget {
     final isVerified = agent['is_verified'] ?? false;
     final avatarUrl = agent['avatar_url'];
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
         padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? const Color(0xFFFFD400).withOpacity(0.1)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? const Color(0xFFFFD400) : Colors.grey[300]!,
+            width: isSelected ? 2 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+            ),
+          ],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -167,21 +297,20 @@ class _AgentCard extends StatelessWidget {
                 CircleAvatar(
                   radius: 24,
                   backgroundColor: Colors.blue[100],
-                  backgroundImage: avatarUrl != null 
-                    ? NetworkImage(avatarUrl) 
-                    : null,
+                  backgroundImage:
+                      avatarUrl != null ? NetworkImage(avatarUrl) : null,
                   child: avatarUrl == null
-                    ? Text(
-                        name.isNotEmpty ? name[0].toUpperCase() : 'A',
-                        style: TextStyle(
-                          color: Colors.blue[700],
-                          fontWeight: FontWeight.bold,
-                        ),
-                      )
-                    : null,
+                      ? Text(
+                          name.isNotEmpty ? name[0].toUpperCase() : 'A',
+                          style: TextStyle(
+                            color: Colors.blue[700],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 12),
-                
+
                 // Infos principales
                 Expanded(
                   child: Column(
@@ -192,7 +321,7 @@ class _AgentCard extends StatelessWidget {
                           Text(
                             name.isNotEmpty ? name : 'Agent',
                             style: const TextStyle(
-                              fontSize: 16,
+                              fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -200,7 +329,7 @@ class _AgentCard extends StatelessWidget {
                             const SizedBox(width: 4),
                             Icon(
                               Icons.verified,
-                              size: 16,
+                              size: 14,
                               color: Colors.blue[700],
                             ),
                           ],
@@ -210,26 +339,27 @@ class _AgentCard extends StatelessWidget {
                         specialty,
                         style: TextStyle(
                           color: Colors.grey[600],
-                          fontSize: 14,
+                          fontSize: 12,
                         ),
                       ),
                     ],
                   ),
                 ),
-                
+
                 // Distance si disponible
                 if (distance != null) ...[
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       '${distance} km',
                       style: TextStyle(
                         color: Colors.green[700],
-                        fontSize: 12,
+                        fontSize: 10,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -237,28 +367,29 @@ class _AgentCard extends StatelessWidget {
                 ],
               ],
             ),
-            
-            const SizedBox(height: 12),
-            
+
+            const SizedBox(height: 8),
+
             // Localisation
             Row(
               children: [
-                Icon(Icons.location_on, size: 16, color: Colors.grey[600]),
+                Icon(Icons.location_on, size: 12, color: Colors.grey[600]),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     '$city${address != 'Non spécifié' ? ' • $address' : ''}',
                     style: TextStyle(
                       color: Colors.grey[600],
-                      fontSize: 13,
+                      fontSize: 11,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
-            
+
             const SizedBox(height: 8),
-            
+
             // Stats
             Row(
               children: [
@@ -268,57 +399,12 @@ class _AgentCard extends StatelessWidget {
                   value: '${reliability.toStringAsFixed(0)}%',
                   color: Colors.orange,
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 _StatItem(
                   icon: Icons.check_circle,
-                  label: 'Taux de completion',
+                  label: 'Taux',
                   value: '${completionRate.toStringAsFixed(0)}%',
                   color: Colors.green,
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 12),
-            
-            // Actions
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Chat bientôt disponible')),
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.blue[700]!),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: Text(
-                      'Contacter',
-                      style: TextStyle(color: Colors.blue[700]),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Mission bientôt disponible')),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue[700],
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('Mission'),
-                  ),
                 ),
               ],
             ),
@@ -346,7 +432,7 @@ class _StatItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 16, color: color),
+        Icon(icon, size: 12, color: color),
         const SizedBox(width: 4),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,14 +440,14 @@ class _StatItem extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 9,
                 color: Colors.grey[600],
               ),
             ),
             Text(
               value,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 10,
                 fontWeight: FontWeight.w600,
                 color: color,
               ),

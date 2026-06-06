@@ -260,7 +260,7 @@ class ProfileHeader extends StatelessWidget {
               color: Colors.black,
             ),
           ),
-          const SizedBox(height: 25),      
+          const SizedBox(height: 25),
         ],
       ),
     );

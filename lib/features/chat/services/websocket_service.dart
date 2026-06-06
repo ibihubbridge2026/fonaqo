@@ -10,7 +10,8 @@ import 'package:flutter/material.dart';
 /// Service WebSocket pour le chat en temps réel
 /// Gère la connexion, la reconnexion automatique et les événements
 class ChatWebSocketService {
-  static final ChatWebSocketService _instance = ChatWebSocketService._internal();
+  static final ChatWebSocketService _instance =
+      ChatWebSocketService._internal();
   factory ChatWebSocketService() => _instance;
   ChatWebSocketService._internal();
 
@@ -24,7 +25,8 @@ class ChatWebSocketService {
   String? _accessToken;
 
   // Callbacks pour les événements
-  final StreamController<ChatEvent> _eventController = StreamController.broadcast();
+  final StreamController<ChatEvent> _eventController =
+      StreamController.broadcast();
   Stream<ChatEvent> get events => _eventController.stream;
 
   // Configuration
@@ -213,7 +215,8 @@ class ChatWebSocketService {
     _reconnectAttempts++;
 
     final delay = _reconnectDelay * _reconnectAttempts;
-    _logger.w('Reconnecting in ${delay.inSeconds}s (attempt $_reconnectAttempts/$_maxReconnectAttempts)');
+    _logger.w(
+        'Reconnecting in ${delay.inSeconds}s (attempt $_reconnectAttempts/$_maxReconnectAttempts)');
 
     _reconnectTimer = Timer(delay, () {
       // Note: Need context to reconnect, will be handled by UI layer

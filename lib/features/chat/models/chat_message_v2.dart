@@ -8,17 +8,18 @@ class ChatMessageV2 {
   final String? senderName;
   final String? senderAvatar;
   final MessageType type;
-  final String? content;      // Texte pour text, URL pour image/file/audio
-  final String? fileName;     // Nom du fichier pour file/audio
-  final int? fileSize;        // Taille en octets
+  final String? content; // Texte pour text, URL pour image/file/audio
+  final String? fileName; // Nom du fichier pour file/audio
+  final int? fileSize; // Taille en octets
   final String? fileMimeType; // MIME type du fichier
-  final int? duration;        // Durée en secondes pour audio/video
+  final int? duration; // Durée en secondes pour audio/video
   final MessageStatus status;
   final DateTime timestamp;
   final DateTime? deliveredAt;
   final DateTime? readAt;
   final bool isDeleted;
-  final Map<String, dynamic>? metadata; // Données supplémentaires (location, contact, etc.)
+  final Map<String, dynamic>?
+      metadata; // Données supplémentaires (location, contact, etc.)
 
   ChatMessageV2({
     required this.id,
@@ -212,12 +213,9 @@ class ChatMessageV2 {
       duration: duration,
       status: newStatus,
       timestamp: timestamp,
-      deliveredAt: newStatus == MessageStatus.delivered
-          ? DateTime.now()
-          : deliveredAt,
-      readAt: newStatus == MessageStatus.read
-          ? DateTime.now()
-          : readAt,
+      deliveredAt:
+          newStatus == MessageStatus.delivered ? DateTime.now() : deliveredAt,
+      readAt: newStatus == MessageStatus.read ? DateTime.now() : readAt,
       isDeleted: isDeleted,
       metadata: metadata,
     );

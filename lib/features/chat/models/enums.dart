@@ -13,19 +13,19 @@ enum MessageType {
 
 /// Statut du message
 enum MessageStatus {
-  sending,      // En cours d'envoi
-  sent,         // Envoyé au serveur
-  delivered,    // Livré au destinataire
-  read,         // Lu par le destinataire
-  failed,       // Échec de l'envoi
+  sending, // En cours d'envoi
+  sent, // Envoyé au serveur
+  delivered, // Livré au destinataire
+  read, // Lu par le destinataire
+  failed, // Échec de l'envoi
 }
 
 /// Statut de présence
 enum PresenceStatus {
-  online,       // En ligne
-  offline,      // Hors ligne
-  away,         // Absent
-  busy,         // Occupé
+  online, // En ligne
+  offline, // Hors ligne
+  away, // Absent
+  busy, // Occupé
 }
 
 /// Extension pour convertir les enums en JSON

@@ -71,15 +71,15 @@ class WalletTransaction {
 
 /// Type de transaction
 enum TransactionType {
-  credit,   // Crédit (gain)
-  debit,    // Débit (dépense)
-  refund,   // Remboursement
-  bonus,    // Bonus
+  credit, // Crédit (gain)
+  debit, // Débit (dépense)
+  refund, // Remboursement
+  bonus, // Bonus
 }
 
 extension TransactionTypeExtension on TransactionType {
   String toJson() => toString().split('.').last;
-  
+
   static TransactionType fromJson(String value) {
     switch (value) {
       case 'credit':
@@ -106,7 +106,7 @@ enum TransactionStatus {
 
 extension TransactionStatusExtension on TransactionStatus {
   String toJson() => toString().split('.').last;
-  
+
   static TransactionStatus fromJson(String value) {
     switch (value) {
       case 'pending':

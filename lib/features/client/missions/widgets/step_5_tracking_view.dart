@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:fonaco/core/utils/marker_icon_cache.dart';
 
 class Step5TrackingView extends StatelessWidget {
   /// Appelée lorsque l’utilisateur veut revenir à la liste des missions (dans le shell).
@@ -55,16 +56,14 @@ class Step5TrackingView extends StatelessWidget {
                       markerId: const MarkerId('client'),
                       position: const LatLng(5.3363, -4.0260),
                       infoWindow: const InfoWindow(title: 'Votre position'),
-                      icon: BitmapDescriptor.defaultMarkerWithHue(
-                          BitmapDescriptor.hueBlue),
+                      icon: MarkerIconCache().missionMarker,
                     ),
                     // Position agent
                     Marker(
                       markerId: const MarkerId('agent'),
                       position: const LatLng(5.3400, -4.0280),
                       infoWindow: const InfoWindow(title: 'Agent en route'),
-                      icon: BitmapDescriptor.defaultMarkerWithHue(
-                          BitmapDescriptor.hueGreen),
+                      icon: MarkerIconCache().agentOnRouteMarker,
                     ),
                   },
                   polylines: {

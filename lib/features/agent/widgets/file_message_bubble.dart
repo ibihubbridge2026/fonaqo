@@ -40,7 +40,8 @@ class _FileMessageBubbleState extends State<FileMessageBubble> {
         top: 8,
       ),
       child: Column(
-        crossAxisAlignment: widget.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment:
+            widget.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           // Bulle principale
           GestureDetector(
@@ -62,12 +63,12 @@ class _FileMessageBubbleState extends State<FileMessageBubble> {
                   ),
                 ],
               ),
-              child: widget.isUploading 
+              child: widget.isUploading
                   ? _buildUploadingContent()
                   : _buildFileContent(),
             ),
           ),
-          
+
           // Taille du fichier
           if (widget.fileSize != null && !widget.isUploading)
             Padding(
@@ -102,9 +103,9 @@ class _FileMessageBubbleState extends State<FileMessageBubble> {
             size: 24,
           ),
         ),
-        
+
         const SizedBox(width: 12),
-        
+
         // Informations du fichier
         Expanded(
           child: Column(
@@ -130,7 +131,7 @@ class _FileMessageBubbleState extends State<FileMessageBubble> {
             ],
           ),
         ),
-        
+
         // Icône de téléchargement
         if (!widget.isUploading)
           Icon(
@@ -174,9 +175,9 @@ class _FileMessageBubbleState extends State<FileMessageBubble> {
             ],
           ),
         ),
-        
+
         const SizedBox(width: 12),
-        
+
         // Informations d'upload
         Expanded(
           child: Column(
@@ -208,7 +209,7 @@ class _FileMessageBubbleState extends State<FileMessageBubble> {
 
   IconData _getFileIcon() {
     final extension = widget.fileName.split('.').last.toLowerCase();
-    
+
     switch (extension) {
       case 'pdf':
         return Icons.picture_as_pdf;
@@ -238,7 +239,7 @@ class _FileMessageBubbleState extends State<FileMessageBubble> {
 
   Color _getFileIconColor() {
     final extension = widget.fileName.split('.').last.toLowerCase();
-    
+
     switch (extension) {
       case 'pdf':
         return Colors.red;
@@ -268,7 +269,7 @@ class _FileMessageBubbleState extends State<FileMessageBubble> {
 
   String _getFileTypeLabel() {
     final extension = widget.fileName.split('.').last.toLowerCase();
-    
+
     switch (extension) {
       case 'pdf':
         return 'Document PDF';
@@ -308,7 +309,7 @@ class _FileMessageBubbleState extends State<FileMessageBubble> {
 
   void _openFile() {
     if (widget.fileUrl == null) return;
-    
+
     // TODO: Implémenter l'ouverture du fichier
     // Pour l'instant, montrer un message
     ScaffoldMessenger.of(context).showSnackBar(

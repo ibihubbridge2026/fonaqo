@@ -152,6 +152,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9F9),
+      resizeToAvoidBottomInset: true,
       appBar: const CustomAppBar.detailStack(
         title: 'Informations personnelles',
         detailTitleWidget: Text(
@@ -160,63 +161,66 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         ),
       ),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              _AvatarEditor(
-                profileImage: _profileImage,
-                onPickImage: _pickImage,
-              ),
-              const SizedBox(height: 12),
-              _FieldCard(
-                label: 'Prénom',
-                controller: _firstName,
-                keyboardType: TextInputType.name,
-              ),
-              const SizedBox(height: 12),
-              _FieldCard(
-                label: 'Nom',
-                controller: _lastName,
-                keyboardType: TextInputType.name,
-              ),
-              const SizedBox(height: 12),
-              _FieldCard(
-                label: 'Email',
-                controller: _email,
-                keyboardType: TextInputType.emailAddress,
-                readOnly: true,
-              ),
-              const Spacer(),
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _saveProfile,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD400),
-                    foregroundColor: Colors.black,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.black,
-                          ),
-                        )
-                      : const Text(
-                          'ENREGISTRER',
-                          style: TextStyle(fontWeight: FontWeight.w900),
-                        ),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                _AvatarEditor(
+                  profileImage: _profileImage,
+                  onPickImage: _pickImage,
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                _FieldCard(
+                  label: 'Prénom',
+                  controller: _firstName,
+                  keyboardType: TextInputType.name,
+                ),
+                const SizedBox(height: 12),
+                _FieldCard(
+                  label: 'Nom',
+                  controller: _lastName,
+                  keyboardType: TextInputType.name,
+                ),
+                const SizedBox(height: 12),
+                _FieldCard(
+                  label: 'Email',
+                  controller: _email,
+                  keyboardType: TextInputType.emailAddress,
+                  readOnly: true,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isSaving ? null : _saveProfile,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFD400),
+                      foregroundColor: Colors.black,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
+                          )
+                        : const Text(
+                            'ENREGISTRER',
+                            style: TextStyle(fontWeight: FontWeight.w900),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -261,7 +265,20 @@ class _FieldCard extends StatelessWidget {
           labelStyle: TextStyle(
             color: readOnly ? Colors.grey[500] : Colors.black54,
           ),
-          border: InputBorder.none,
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(30),
+            borderSide: const BorderSide(color: Color(0xFFFFD400)),
+          ),
           suffixIcon: readOnly
               ? Icon(Icons.lock_outline, color: Colors.grey[400], size: 20)
               : null,
@@ -279,6 +296,9 @@ class _AvatarEditor extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = Provider.of<AuthProvider>(context, listen: false).currentUser;
+    final avatarUrl = user?.avatarUrl;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -308,16 +328,29 @@ class _AvatarEditor extends StatelessWidget {
                                 const Icon(Icons.person, color: Colors.black54),
                           ),
                         )
-                      : ClipOval(
-                          child: Image.asset(
-                            'assets/images/avatar/user.png',
-                            width: 60,
-                            height: 60,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.person, color: Colors.black54),
-                          ),
-                        ),
+                      : avatarUrl != null && avatarUrl.isNotEmpty
+                          ? ClipOval(
+                              child: Image.network(
+                                avatarUrl,
+                                width: 60,
+                                height: 60,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.person,
+                                    color: Colors.black54),
+                              ),
+                            )
+                          : ClipOval(
+                              child: Image.asset(
+                                'assets/images/avatar/user.png',
+                                width: 60,
+                                height: 60,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.person,
+                                    color: Colors.black54),
+                              ),
+                            ),
                 ),
                 Positioned(
                   bottom: 0,

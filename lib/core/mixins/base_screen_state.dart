@@ -200,13 +200,13 @@ mixin BaseScreenState<T extends StatefulWidget> on State<T> {
       return result;
     } catch (e) {
       final errorMsg = errorMessage ?? e.toString();
-      
+
       if (showErrorDialog) {
         _showErrorDialog(errorMsg);
       } else {
         setError(errorMsg);
       }
-      
+
       return null;
     } finally {
       setLoading(false);
