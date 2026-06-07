@@ -37,6 +37,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   UserModel? get currentUser => _currentUser;
+  String? get accessToken => _memoryCache.accessToken;
   bool get isAgent => _currentUser?.isAgent ?? false;
   bool get isClient => _currentUser?.isClient ?? false;
   bool get isVerified => _currentUser?.isVerified ?? false;
@@ -514,28 +515,9 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Vérifie si l'utilisateur est authentifié
+  /// Vérifie si l'utilisateur est authentifié (vérifie l'expiration du token)
   Future<void> checkAuth() async {
-    try {
-      await _memoryCache.loadFromStorage();
-      final token = _memoryCache.accessToken;
-      final userData = _memoryCache.userData;
-
-      if (token != null && userData != null) {
-        _currentUser = UserModel.fromJson(jsonDecode(userData));
-        _isAuthenticated = true;
-        notifyListeners();
-      } else {
-        _isAuthenticated = false;
-        _currentUser = null;
-        notifyListeners();
-      }
-    } catch (e) {
-      _logger.e('Erreur lors de la vérification de l\'authentification: $e');
-      _isAuthenticated = false;
-      _currentUser = null;
-      notifyListeners();
-    }
+    await _loadUserData();
   }
 
   /// Mot de passe oublié

@@ -18,7 +18,6 @@ class MemoryAuthCache {
   String? _accessToken;
   String? _refreshToken;
   String? _userData;
-  DateTime? _tokenExpiry;
 
   // Getters
   String? get accessToken => _accessToken;
@@ -89,20 +88,8 @@ class MemoryAuthCache {
     _accessToken = null;
     _refreshToken = null;
     _userData = null;
-    _tokenExpiry = null;
 
     await _secureStorage.deleteAll();
     _logger.d('🗑️ MemoryAuthCache et SecureStorage vidés');
-  }
-
-  /// Vérifie si le token est expiré (si l'expiry est définie)
-  bool isTokenExpired() {
-    if (_tokenExpiry == null) return false;
-    return DateTime.now().isAfter(_tokenExpiry!);
-  }
-
-  /// Définit la date d'expiration du token
-  void setTokenExpiry(DateTime expiry) {
-    _tokenExpiry = expiry;
   }
 }

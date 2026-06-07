@@ -7,79 +7,79 @@ import 'dart:convert';
 class MistralAiService {
   final Dio _dio;
   final Logger _logger = Logger();
-  
+
   // Configuration
   static const String _baseUrl = 'https://api.mistral.ai/v1';
   static const Duration _timeout = Duration(seconds: 30);
   static const int _maxRetries = 2;
-  
-  // Clé API Mistral (à configurer via environment variable ou fichier config)
-  final String _apiKey;
-  
+
   MistralAiService({required String apiKey})
-      : _apiKey = apiKey,
-        _dio = Dio(BaseOptions(
+      : _dio = Dio(BaseOptions(
           baseUrl: _baseUrl,
           connectTimeout: _timeout,
           receiveTimeout: _timeout,
           sendTimeout: _timeout,
           headers: {
-            'Authorization': 'Bearer $_apiKey',
+            'Authorization': 'Bearer $apiKey',
             'Content-Type': 'application/json',
           },
         ));
 
   /// Analyse une requête en langage naturel et extrait les informations structurées
-  /// 
+  ///
   /// [query] - La requête de l'utilisateur en langage naturel
   /// [categories] - Liste des catégories de services disponibles pour validation
-  /// 
+  ///
   /// Retourne un Map<String, dynamic> avec les données extraites par l'IA
   Future<Map<String, dynamic>> analyzeQuery({
     required String query,
     required List<String> categories,
   }) async {
     int retryCount = 0;
-    
+
     while (retryCount <= _maxRetries) {
       try {
-        _logger.i('🤖 Appel Mistral AI (tentative ${retryCount + 1}/${_maxRetries + 1})');
-        
+        _logger.i(
+            '🤖 Appel Mistral AI (tentative ${retryCount + 1}/${_maxRetries + 1})');
+
         final response = await _dio.post(
           '/chat/completions',
           data: _buildRequestBody(query, categories),
         );
-        
+
         if (response.statusCode == 200) {
           final result = _parseResponse(response.data);
           _logger.i('✅ Réponse Mistral reçue avec succès');
           return result;
         } else {
-          throw Exception('HTTP ${response.statusCode}: ${response.statusMessage}');
+          throw Exception(
+              'HTTP ${response.statusCode}: ${response.statusMessage}');
         }
       } on DioException catch (e) {
         retryCount++;
-        
+
         if (retryCount > _maxRetries) {
           _logger.e('❌ Échec après $_maxRetries tentatives: $e');
           throw _handleDioError(e);
         }
-        
+
         _logger.w('⚠️ Erreur Dio, retry $retryCount/$_maxRetries: $e');
-        await Future.delayed(Duration(seconds: retryCount)); // Backoff exponentiel
+        await Future.delayed(
+            Duration(seconds: retryCount)); // Backoff exponentiel
       } catch (e) {
         _logger.e('❌ Erreur inattendue: $e');
         rethrow;
       }
     }
-    
+
     throw Exception('Nombre maximum de tentatives dépassé');
   }
 
   /// Construit le corps de la requête pour l'API Mistral
-  Map<String, dynamic> _buildRequestBody(String query, List<String> categories) {
+  Map<String, dynamic> _buildRequestBody(
+      String query, List<String> categories) {
     final categoriesList = categories.map((c) => '"$c"').join(', ');
-    
+
     return {
       'model': 'mistral-small-latest', // Modèle léger et rapide
       'messages': [
@@ -155,7 +155,7 @@ Réponse attendue: {
 
       // Parser le JSON contenu dans la réponse
       final parsedJson = jsonDecode(content) as Map<String, dynamic>;
-      
+
       // Validation basique des champs requis
       if (!parsedJson.containsKey('intent')) {
         throw Exception('Réponse JSON sans champ "intent"');
@@ -175,11 +175,12 @@ Réponse attendue: {
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
         return Exception('Délai d\'attente dépassé. Vérifiez votre connexion.');
-      
+
       case DioExceptionType.badResponse:
         final statusCode = error.response?.statusCode;
         if (statusCode == 401) {
-          return Exception('Clé API Mistral invalide. Vérifiez votre configuration.');
+          return Exception(
+              'Clé API Mistral invalide. Vérifiez votre configuration.');
         } else if (statusCode == 429) {
           return Exception('Quota API Mistral dépassé. Réessayez plus tard.');
         } else if (statusCode == 400) {
@@ -187,16 +188,16 @@ Réponse attendue: {
         } else {
           return Exception('Erreur API Mistral: HTTP $statusCode');
         }
-      
+
       case DioExceptionType.cancel:
         return Exception('Requête annulée');
-      
+
       case DioExceptionType.connectionError:
         return Exception('Erreur de connexion. Vérifiez votre réseau.');
-      
+
       case DioExceptionType.unknown:
         return Exception('Erreur inconnue: ${error.message}');
-      
+
       default:
         return Exception('Erreur inattendue: ${error.type}');
     }

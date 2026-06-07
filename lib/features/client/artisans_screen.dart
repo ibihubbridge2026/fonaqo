@@ -3,7 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'models/artisan_model.dart';
 import 'repositories/artisan_repository.dart';
-import 'screens/agent_profile_screen.dart';
+import 'artisan_profile_screen.dart';
 
 class ArtisansScreen extends StatefulWidget {
   const ArtisansScreen({super.key});
@@ -181,10 +181,7 @@ class ArtisanCard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => AgentProfileScreen(
-              agentId: artisan.id.toString(),
-              agent: artisan.toJson(),
-            ),
+            builder: (context) => ArtisanProfileScreen(artisan: artisan),
           ),
         );
       },

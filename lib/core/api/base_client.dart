@@ -58,7 +58,8 @@ class BaseClient {
     // LoggingInterceptor désactivé en production pour améliorer les performances
     // Commenter la ligne suivante pour activer en développement
     // _dio.interceptors.add(_LoggingInterceptor(_logger));
-    _dio.interceptors.add(RetryUtils.createRetryInterceptor(logger: _logger));
+    _dio.interceptors
+        .add(RetryUtils.createRetryInterceptor(logger: _logger, dio: _dio));
   }
 
   /// Méthode GET

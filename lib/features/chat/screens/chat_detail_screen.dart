@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../../core/providers/auth_provider.dart';
 import '../../../widgets/custom_app_bar.dart';
 import '../../../core/services/chat_websocket_service.dart';
 import '../chat_repository.dart';
@@ -31,10 +33,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final ChatRepository _repository = ChatRepository();
   bool _isConnected = false;
   bool _isLoadingHistory = false;
+  String _currentUsername = '';
 
   @override
   void initState() {
     super.initState();
+    final auth = context.read<AuthProvider>();
+    _currentUsername =
+        auth.currentUser?.djangoUsername ?? auth.currentUser?.phoneNumber ?? '';
+    _wsService.setCurrentUsername(_currentUsername);
     _loadHistory();
     _connectWebSocket();
   }
@@ -73,8 +80,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             time: timeStr,
             senderId: msgData['sender']?.toString(),
             senderName: msgData['sender']?.toString(),
-            isMe: msgData['sender']?.toString() ==
-                'current_user', // TODO: Get from AuthProvider
+            isMe: msgData['sender']?.toString() == _currentUsername,
             timestamp: timestamp,
           ));
         }

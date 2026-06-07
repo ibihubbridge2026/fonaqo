@@ -8,7 +8,7 @@ class ChatRepository {
   /// Récupère toutes les conversations de l'utilisateur
   Future<List<Map<String, dynamic>>> fetchMyConversations() async {
     try {
-      final response = await _api.get('/chat/conversations/my_conversations/');
+      final response = await _api.get('chat/conversations/my_conversations/');
 
       if (response.statusCode == 200) {
         final data = response.data as List;
@@ -26,7 +26,7 @@ class ChatRepository {
       String missionId) async {
     try {
       final response = await _api.post(
-        '/chat/conversations/get_or_create/',
+        'chat/conversations/get_or_create/',
         data: {'mission_id': missionId},
       );
 
@@ -45,7 +45,7 @@ class ChatRepository {
       String conversationId) async {
     try {
       final response =
-          await _api.get('/chat/conversations/$conversationId/messages/');
+          await _api.get('chat/conversations/$conversationId/messages/');
 
       if (response.statusCode == 200) {
         final data = response.data as List;
@@ -68,7 +68,7 @@ class ChatRepository {
       };
 
       final response = await _api
-          .post('/chat/conversations/$conversationId/mark_read/', data: body);
+          .post('chat/conversations/$conversationId/mark_read/', data: body);
 
       return response.statusCode == 200;
     } catch (e) {
@@ -82,7 +82,7 @@ class ChatRepository {
       String conversationId, Map<String, dynamic> messageData) async {
     try {
       final response = await _api.post(
-          '/chat/conversations/$conversationId/send_message/',
+          'chat/conversations/$conversationId/send_message/',
           data: messageData);
 
       if (response.statusCode == 201) {
@@ -99,7 +99,7 @@ class ChatRepository {
   Future<bool> updateTypingStatus(String conversationId, bool isTyping) async {
     try {
       final response = await _api
-          .post('/chat/conversations/$conversationId/typing_status/', data: {
+          .post('chat/conversations/$conversationId/typing_status/', data: {
         'is_typing': isTyping,
       });
 
@@ -114,7 +114,7 @@ class ChatRepository {
   Future<bool> archiveConversation(String conversationId) async {
     try {
       final response = await _api
-          .post('/chat/conversations/$conversationId/archive/', data: {});
+          .post('chat/conversations/$conversationId/archive/', data: {});
 
       return response.statusCode == 200;
     } catch (e) {

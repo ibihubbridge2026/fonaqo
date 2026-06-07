@@ -152,12 +152,14 @@ class RetryUtils {
     Duration baseDelay = defaultBaseDelay,
     double backoffMultiplier = defaultBackoffMultiplier,
     Logger? logger,
+    Dio? dio,
   }) {
     return RetryInterceptor(
       maxRetries: maxRetries,
       baseDelay: baseDelay,
       backoffMultiplier: backoffMultiplier,
       logger: logger,
+      dio: dio,
     );
   }
 }
@@ -172,11 +174,14 @@ class RetryInterceptor extends Interceptor {
 
   final Logger? logger;
 
+  final Dio? dio;
+
   RetryInterceptor({
     this.maxRetries = RetryUtils.defaultMaxRetries,
     this.baseDelay = RetryUtils.defaultBaseDelay,
     this.backoffMultiplier = RetryUtils.defaultBackoffMultiplier,
     this.logger,
+    this.dio,
   });
 
   @override
@@ -220,9 +225,9 @@ class RetryInterceptor extends Interceptor {
     await Future.delayed(delay);
 
     try {
-      final dio = Dio();
+      final effectiveDio = dio ?? Dio();
 
-      final response = await dio.fetch(
+      final response = await effectiveDio.fetch(
         requestOptions,
       );
 

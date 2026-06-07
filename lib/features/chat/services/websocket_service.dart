@@ -41,7 +41,7 @@ class ChatWebSocketService {
 
     try {
       final auth = Provider.of<AuthProvider>(context, listen: false);
-      _accessToken = await auth.getAccessToken();
+      _accessToken = auth.accessToken;
 
       if (_accessToken == null) {
         _logger.w('No access token available');
