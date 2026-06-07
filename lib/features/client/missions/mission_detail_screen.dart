@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -26,6 +27,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
   MissionModel? _mission;
   bool _isLoading = true;
   bool _isChatLoading = false;
+  bool _isReleasingFunds = false;
   String? _errorMessage;
   String? _resolvedMissionId;
 
@@ -227,7 +229,9 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
-                                onPressed: () => _confirmReleaseFunds(context),
+                                onPressed: _isReleasingFunds
+                                    ? null
+                                    : () => _confirmReleaseFunds(context),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFF7C600),
                                   foregroundColor: const Color(0xFF121212),
@@ -237,13 +241,24 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                                     borderRadius: BorderRadius.circular(16),
                                   ),
                                 ),
-                                child: const Text(
-                                  'VALIDER ET LIBÉRER LES FONDS',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 14,
-                                  ),
-                                ),
+                                child: _isReleasingFunds
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                  Color(0xFF121212)),
+                                        ),
+                                      )
+                                    : const Text(
+                                        'VALIDER ET LIBÉRER LES FONDS',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w900,
+                                          fontSize: 14,
+                                        ),
+                                      ),
                               ),
                             ),
                           const SizedBox(height: 24),
@@ -317,15 +332,17 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
 
     // Ajouter le marqueur agent seulement si:
     // - La mission n'est pas pending
-    // - L'agent a des coordonnées valides
+    // - L'agent a des coordonnées valides (agentLatitude/agentLongitude)
     // - La mission n'est pas terminée/annulée (mode historique)
-    if (!isPending && hasAgentCoords && !_isMissionFinal()) {
+    final hasRealAgentCoords =
+        _mission?.agentLatitude != null && _mission?.agentLongitude != null;
+    if (!isPending && hasRealAgentCoords && !_isMissionFinal()) {
       markers.add(
         Marker(
           markerId: const MarkerId('agent'),
           position: LatLng(
-            _mission!.latitude! + 0.0037, // Offset simulé pour l'agent
-            _mission!.longitude! - 0.0020,
+            _mission!.agentLatitude!,
+            _mission!.agentLongitude!,
           ),
           infoWindow: InfoWindow(title: _mission!.agentName ?? 'Agent'),
           icon: _markerCache.clusterMarker,
@@ -340,8 +357,10 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
       bool hasAgentCoords, LatLng missionPosition) {
     // Afficher la polyline seulement si:
     // - La mission n'est pas pending
-    // - L'agent a des coordonnées valides
-    if (isPending || !hasAgentCoords) {
+    // - L'agent a des coordonnées valides (agentLatitude/agentLongitude)
+    final hasRealAgentCoords =
+        _mission?.agentLatitude != null && _mission?.agentLongitude != null;
+    if (isPending || !hasRealAgentCoords) {
       return {};
     }
 
@@ -353,12 +372,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
         points: [
           missionPosition,
           LatLng(
-            _mission!.latitude! + 0.0037,
-            _mission!.longitude! - 0.0020,
-          ),
-          LatLng(
-            _mission!.latitude! + 0.0050,
-            _mission!.longitude! - 0.0030,
+            _mission!.agentLatitude!,
+            _mission!.agentLongitude!,
           ),
         ],
       ),
@@ -414,8 +429,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
       borderColor = const Color(0xFFF7C600).withValues(alpha: 0.3);
       iconColor = const Color(0xFFF7C600);
       iconData = Icons.directions_car;
-      text =
-          '${_mission!.statusDisplay.toUpperCase()} - Arrivée estimée : 12 min';
+      text = _buildEtaText();
     }
 
     return Container(
@@ -524,12 +538,25 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     );
 
     if (confirmed == true && mounted) {
-      // TODO: Appeler l'API pour libérer les fonds
-      // Rediriger vers l'écran de notation
-      Navigator.pushNamed(context, AppRoutes.rating);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Fonds libérés !'), backgroundColor: Colors.green));
+      setState(() => _isReleasingFunds = true);
+      try {
+        await _missionRepository.releaseFunds(_resolvedMissionId!);
+        if (mounted) {
+          setState(() => _isReleasingFunds = false);
+          Navigator.pushNamed(context, AppRoutes.rating);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text('Fonds libérés !'), backgroundColor: Colors.green));
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isReleasingFunds = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur lors de la libération des fonds: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -551,36 +578,32 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
       ),
       child: Row(
         children: [
-          // Photo de l'agent avec CachedNetworkImage
+          // Photo de l'agent avec cascade de secours
           Stack(
             children: [
               CircleAvatar(
                 radius: 32,
                 backgroundColor: Colors.grey[200],
-                child: agentAvatarUrl != null && agentAvatarUrl.isNotEmpty
+                backgroundImage:
+                    agentAvatarUrl != null && agentAvatarUrl.isNotEmpty
+                        ? CachedNetworkImageProvider(agentAvatarUrl)
+                            as ImageProvider
+                        : null,
+                child: agentAvatarUrl == null || agentAvatarUrl.isEmpty
                     ? ClipOval(
-                        child: CachedNetworkImage(
-                          imageUrl: agentAvatarUrl,
+                        child: Image.asset(
+                          'assets/images/avatar/user.png',
                           width: 64,
                           height: 64,
                           fit: BoxFit.cover,
-                          placeholder: (context, url) => const Icon(
-                            Icons.person,
-                            color: Colors.grey,
-                            size: 32,
-                          ),
-                          errorWidget: (context, url, error) => const Icon(
+                          errorBuilder: (_, __, ___) => const Icon(
                             Icons.person,
                             color: Colors.grey,
                             size: 32,
                           ),
                         ),
                       )
-                    : const Icon(
-                        Icons.person,
-                        color: Colors.grey,
-                        size: 32,
-                      ),
+                    : null,
               ),
               // Badge vérifié bleu officiel
               Positioned(
@@ -647,18 +670,23 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                       size: 14,
                     ),
                     const SizedBox(width: 4),
-                    const Text(
-                      '4.8',
-                      style: TextStyle(
+                    Text(
+                      _mission?.agentRating != null
+                          ? _mission!.agentRating!.toStringAsFixed(1)
+                          : 'N/A',
+                      style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                         color: Color(0xFF121212),
                       ),
                     ),
                     const SizedBox(width: 8),
-                    const Text(
-                      '125 missions',
-                      style: TextStyle(
+                    Text(
+                      _mission?.agentCompletedMissions != null &&
+                              _mission!.agentCompletedMissions! > 0
+                          ? '${_mission!.agentCompletedMissions} missions'
+                          : 'Nouveau',
+                      style: const TextStyle(
                         color: Colors.grey,
                         fontSize: 12,
                       ),
@@ -986,6 +1014,54 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
         ],
       ),
     );
+  }
+
+  String _buildEtaText() {
+    if (_mission == null)
+      return '${_mission?.statusDisplay.toUpperCase() ?? ''} - ETA indisponible';
+
+    // Utiliser etaMinutes du modèle si disponible
+    if (_mission!.etaMinutes != null && _mission!.etaMinutes! > 0) {
+      return '${_mission!.statusDisplay.toUpperCase()} - Arrivée estimée : ${_mission!.etaMinutes} min';
+    }
+
+    // Calculer ETA basé sur distance GPS si possible
+    if (_mission!.agentLatitude != null &&
+        _mission!.agentLongitude != null &&
+        _mission!.latitude != null &&
+        _mission!.longitude != null) {
+      final distance = _calculateDistance(
+        _mission!.latitude!,
+        _mission!.longitude!,
+        _mission!.agentLatitude!,
+        _mission!.agentLongitude!,
+      );
+      // Estimation: 40 km/h en ville moyen
+      final estimatedMinutes = (distance / 40 * 60).round();
+      if (estimatedMinutes > 0) {
+        return '${_mission!.statusDisplay.toUpperCase()} - Arrivée estimée : $estimatedMinutes min';
+      }
+    }
+
+    return '${_mission!.statusDisplay.toUpperCase()} - ETA indisponible';
+  }
+
+  double _calculateDistance(
+      double lat1, double lng1, double lat2, double lng2) {
+    const double earthRadius = 6371; // km
+    final dLat = _degToRad(lat2 - lat1);
+    final dLng = _degToRad(lng2 - lng1);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(dLat / 2) *
+            math.cos(_degToRad(lat2)) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+    final c = 2 * math.asin(math.sqrt(a));
+    return earthRadius * c;
+  }
+
+  double _degToRad(double deg) {
+    return deg * (math.pi / 180);
   }
 
   Future<void> _handleChatButton() async {

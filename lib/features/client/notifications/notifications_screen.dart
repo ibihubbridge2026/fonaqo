@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
 import 'package:fonaco/core/api/base_client.dart';
+import 'package:fonaco/core/providers/notification_provider.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 
 /// Liste des notifications côté client (Requester).
@@ -18,6 +19,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   List<Map<String, dynamic>> _notifications = [];
   bool _loading = true;
   String? _error;
+  final NotificationProvider _notificationProvider = NotificationProvider();
 
   @override
   void initState() {
@@ -115,6 +117,35 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Icons.notifications_none;
   }
 
+  /// Gère le tap sur une notification avec mise à jour optimiste locale
+  Future<void> _handleNotificationTap(int index, String? notificationId) async {
+    if (notificationId == null) return;
+
+    final notif = _notifications[index];
+    final isRead = notif['is_read'] == true;
+
+    // Si déjà lue, ne rien faire
+    if (isRead) return;
+
+    // MISE À JOUR OPTIMISTE LOCALE (ZÉRO REFRESH)
+    setState(() {
+      _notifications[index]['is_read'] = true;
+    });
+
+    // Décrémenter le compteur global via NotificationProvider
+    _notificationProvider.markNotificationAsRead(notificationId);
+
+    // Appel API en arrière-plan (non bloquant)
+    try {
+      await _api.post('notifications/$notificationId/read/');
+      _logger.d('Notification $notificationId marquée comme lue via API');
+    } catch (e, st) {
+      _logger.e('Erreur marquage notification lue via API',
+          error: e, stackTrace: st);
+      // En cas d'erreur API, on garde l'état optimiste (l'utilisateur a vu la notification)
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -169,21 +200,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      children: _notifications.map((notif) {
+      children: _notifications.asMap().entries.map((entry) {
+        final index = entry.key;
+        final notif = entry.value;
         try {
           final title = notif['title']?.toString() ?? '';
           final body = notif['body']?.toString() ?? '';
           final timeAgo = notif['time_ago']?.toString() ?? '';
           final isRead = notif['is_read'] == true;
+          final notificationId = notif['id']?.toString();
           return _NotifTile(
             title: title,
             subtitle: body,
             time: timeAgo,
             icon: _iconForTitle(title),
             isRead: isRead,
-            onTap: () {
-              // TODO: Marquer comme lue via API
-            },
+            onTap: () => _handleNotificationTap(index, notificationId),
           );
         } catch (e, st) {
           _logger.e('Rendu d\'une notification a échoué — payload: $notif',
@@ -219,14 +251,17 @@ class _NotifTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color:
-              isRead ? Colors.white : const Color(0xFFFFD400).withOpacity(0.05),
+          color: isRead
+              ? Colors.white
+              : const Color(0xFFFFD400).withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(30),
           border: isRead
               ? null
-              : Border.all(color: const Color(0xFFFFD400).withOpacity(0.2)),
+              : Border.all(
+                  color: const Color(0xFFFFD400).withValues(alpha: 0.2)),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 14),
+            BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04), blurRadius: 14),
           ],
         ),
         child: Row(
@@ -235,7 +270,7 @@ class _NotifTile extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: const Color(0xFFFFD400).withOpacity(0.14),
+                color: const Color(0xFFFFD400).withValues(alpha: 0.14),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(icon, color: Colors.black),

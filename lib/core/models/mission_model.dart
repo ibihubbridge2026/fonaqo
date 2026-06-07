@@ -64,11 +64,17 @@ class MissionModel {
   final DateTime? updatedAt;
   final String? clientName;
   final String? agentName;
+  final String? agentPhone;
   final String? address;
   final String? pickupAddress;
   final String? destinationAddress;
   final String? category;
   final String? avatarUrl;
+  final double? agentRating;
+  final int? agentCompletedMissions;
+  final double? agentLatitude;
+  final double? agentLongitude;
+  final int? etaMinutes;
   final bool isVerified;
   final bool isConfidential;
   final bool isUrgent;
@@ -87,11 +93,17 @@ class MissionModel {
     this.updatedAt,
     this.clientName,
     this.agentName,
+    this.agentPhone,
     this.address,
     this.pickupAddress,
     this.destinationAddress,
     this.category,
     this.avatarUrl,
+    this.agentRating,
+    this.agentCompletedMissions,
+    this.agentLatitude,
+    this.agentLongitude,
+    this.etaMinutes,
     this.isVerified = false,
     this.isConfidential = false,
     this.isUrgent = false,
@@ -116,11 +128,17 @@ class MissionModel {
         updatedAt: _readDate(json['updated_at']),
         clientName: json['client_name']?.toString(),
         agentName: json['agent_name']?.toString(),
+        agentPhone: json['agent_phone']?.toString(),
         address: json['address']?.toString(),
         pickupAddress: json['pickup_address']?.toString(),
         destinationAddress: json['destination_address']?.toString(),
         category: json['category']?.toString(),
         avatarUrl: json['avatar_url']?.toString(),
+        agentRating: _readDouble(json['agent_rating']),
+        agentCompletedMissions: _readInt(json['agent_completed_missions']),
+        agentLatitude: _readDouble(json['agent_latitude']),
+        agentLongitude: _readDouble(json['agent_longitude']),
+        etaMinutes: _readInt(json['eta_minutes']),
         isVerified: _readBool(json['is_verified']),
         isConfidential: _readBool(json['is_confidential']),
         isUrgent: _readBool(json['is_urgent']),
@@ -143,6 +161,12 @@ class MissionModel {
         status: MissionStatus.UNKNOWN,
       );
     }
+  }
+
+  static int? _readInt(dynamic v) {
+    if (v == null) return null;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString());
   }
 
   static double? _readDouble(dynamic v) {
@@ -183,8 +207,16 @@ class MissionModel {
       if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
       if (clientName != null) 'client_name': clientName,
       if (agentName != null) 'agent_name': agentName,
+      if (agentPhone != null) 'agent_phone': agentPhone,
       if (address != null) 'address': address,
       if (category != null) 'category': category,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
+      if (agentRating != null) 'agent_rating': agentRating,
+      if (agentCompletedMissions != null)
+        'agent_completed_missions': agentCompletedMissions,
+      if (agentLatitude != null) 'agent_latitude': agentLatitude,
+      if (agentLongitude != null) 'agent_longitude': agentLongitude,
+      if (etaMinutes != null) 'eta_minutes': etaMinutes,
     };
   }
 
@@ -225,11 +257,17 @@ class MissionModel {
     DateTime? updatedAt,
     String? clientName,
     String? agentName,
+    String? agentPhone,
     String? address,
     String? pickupAddress,
     String? destinationAddress,
     String? category,
     double? clientRating,
+    double? agentRating,
+    int? agentCompletedMissions,
+    double? agentLatitude,
+    double? agentLongitude,
+    int? etaMinutes,
   }) {
     return MissionModel(
       id: id ?? this.id,
@@ -243,11 +281,18 @@ class MissionModel {
       updatedAt: updatedAt ?? this.updatedAt,
       clientName: clientName ?? this.clientName,
       agentName: agentName ?? this.agentName,
+      agentPhone: agentPhone ?? this.agentPhone,
       address: address ?? this.address,
       pickupAddress: pickupAddress ?? this.pickupAddress,
       destinationAddress: destinationAddress ?? this.destinationAddress,
       category: category ?? this.category,
       clientRating: clientRating ?? this.clientRating,
+      agentRating: agentRating ?? this.agentRating,
+      agentCompletedMissions:
+          agentCompletedMissions ?? this.agentCompletedMissions,
+      agentLatitude: agentLatitude ?? this.agentLatitude,
+      agentLongitude: agentLongitude ?? this.agentLongitude,
+      etaMinutes: etaMinutes ?? this.etaMinutes,
     );
   }
 
@@ -261,10 +306,11 @@ class MissionModel {
   String get timeAgo {
     if (createdAt == null) return '';
     final diff = DateTime.now().difference(createdAt!);
-    if (diff.inMinutes < 1) return 'maintenant';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} min';
-    if (diff.inHours < 24) return '${diff.inHours}h';
-    if (diff.inDays < 7) return '${diff.inDays}j';
+    if (diff.inMinutes < 1) return 'À l\'instant';
+    if (diff.inMinutes < 60) return 'Il y a ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'Il y a ${diff.inHours} h';
+    if (diff.inDays < 7)
+      return 'Il y a ${diff.inDays} jour${diff.inDays > 1 ? 's' : ''}';
     return '${createdAt!.day}/${createdAt!.month}/${createdAt!.year}';
   }
 

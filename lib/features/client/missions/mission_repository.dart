@@ -309,6 +309,16 @@ class MissionRepository {
     return MissionModel.fromJson(_extractObjectFromEnvelope(response.data));
   }
 
+  /// Libère les fonds au client après validation de la mission terminée.
+  Future<MissionModel> releaseFunds(String missionId) async {
+    final response =
+        await _baseClient.post('missions/$missionId/release_funds/');
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw Exception('Impossible de libérer les fonds');
+    }
+    return MissionModel.fromJson(_extractObjectFromEnvelope(response.data));
+  }
+
   /// Catégories de services (GET /services/categories/).
   Future<List<Map<String, dynamic>>> fetchServiceCategories() async {
     try {

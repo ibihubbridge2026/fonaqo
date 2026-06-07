@@ -150,6 +150,9 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
   }
 
   Widget _buildAnalysisSection(AiSearchProvider provider) {
+    final analysis = provider.analysisResult;
+    if (analysis == null) return const SizedBox.shrink();
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -170,18 +173,16 @@ class _AiSearchScreenState extends State<AiSearchScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            provider.analysisResult ?? '',
+            analysis.description,
             style: TextStyle(color: AppColors.onSurfaceVariant, fontSize: 15),
           ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: [
-              _buildChip(Icons.schedule, 'Demain Matin'),
-              _buildChip(Icons.location_on, 'Proche de vous'),
-              _buildChip(Icons.account_balance, 'Banque'),
-            ],
+            children: analysis.chips
+                .map((chip) => _buildChip(chip.icon, chip.label))
+                .toList(),
           ),
         ],
       ),

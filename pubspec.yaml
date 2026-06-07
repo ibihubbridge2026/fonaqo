@@ -30,7 +30,7 @@ dependencies:
   # =========================
   # AUDIO & VOIX
   # =========================
-  record: ^6.2.0
+  record: ^6.2.1
   audioplayers: ^6.1.0
   path_provider: ^2.1.5
   
@@ -71,7 +71,7 @@ dependencies:
   latlong2: ^0.9.1
   geolocator: ^13.0.4
   geocoding: ^3.0.0
-  permission_handler: ^11.4.0
+  permission_handler: ^12.0.3
   app_settings: ^5.2.0
 
   # =========================
@@ -117,6 +117,7 @@ dependencies:
   lottie: ^3.1.0
   tutorial_coach_mark: ^1.2.12
   rxdart: ^0.28.0
+  flutter_dotenv: ^6.0.1
 
 dev_dependencies:
   flutter_test:
@@ -129,6 +130,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - .env
     - assets/icon/
     - assets/images/slide/
     - assets/images/hero/

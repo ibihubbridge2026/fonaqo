@@ -14,7 +14,9 @@ class AgentsMapScreen extends StatefulWidget {
 class _AgentsMapScreenState extends State<AgentsMapScreen> {
   final MissionRepository _missionRepo = MissionRepository();
   final MapController _mapController = MapController();
+  final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _agents = [];
+  List<Map<String, dynamic>> _filteredAgents = [];
   bool _loading = true;
   String? _error;
   int _selectedAgentIndex = 0;
@@ -22,7 +24,33 @@ class _AgentsMapScreenState extends State<AgentsMapScreen> {
   @override
   void initState() {
     super.initState();
-    _loadAgents();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadAgents();
+    });
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      if (query.isEmpty) {
+        _filteredAgents = _agents;
+      } else {
+        _filteredAgents = _agents.where((agent) {
+          final name =
+              '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'
+                  .toLowerCase();
+          final specialty = (agent['specialty'] ?? '').toLowerCase();
+          return name.contains(query) || specialty.contains(query);
+        }).toList();
+      }
+    });
   }
 
   Future<void> _loadAgents() async {
@@ -42,6 +70,7 @@ class _AgentsMapScreenState extends State<AgentsMapScreen> {
 
       setState(() {
         _agents = agentsWithLocation;
+        _filteredAgents = agentsWithLocation;
         _loading = false;
       });
 
@@ -106,7 +135,7 @@ class _AgentsMapScreenState extends State<AgentsMapScreen> {
       );
     }
 
-    if (_agents.isEmpty) {
+    if (_filteredAgents.isEmpty) {
       return const Center(
         child: Text('Aucun agent trouvé avec localisation'),
       );
@@ -114,6 +143,36 @@ class _AgentsMapScreenState extends State<AgentsMapScreen> {
 
     return Column(
       children: [
+        // Search field
+        Container(
+          padding: const EdgeInsets.all(16),
+          color: Colors.white,
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Rechercher un agent...',
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFFFFD400)),
+              ),
+              disabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey[300]!),
+              ),
+              prefixIcon: const Icon(Icons.search),
+            ),
+          ),
+        ),
         // FlutterMap
         Expanded(
           flex: 2,
@@ -121,8 +180,8 @@ class _AgentsMapScreenState extends State<AgentsMapScreen> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: LatLng(
-                _agents[0]['latitude'],
-                _agents[0]['longitude'],
+                _filteredAgents[0]['latitude'],
+                _filteredAgents[0]['longitude'],
               ),
               initialZoom: 14.0,
               minZoom: 10.0,
@@ -137,12 +196,12 @@ class _AgentsMapScreenState extends State<AgentsMapScreen> {
                 userAgentPackageName: 'com.example.fonaco',
               ),
               MarkerLayer(
-                markers: _agents.map((agent) {
+                markers: _filteredAgents.map((agent) {
                   final agentId = agent['id']?.toString() ?? '';
                   final lat = agent['latitude'] as double;
                   final lng = agent['longitude'] as double;
-                  final index =
-                      _agents.indexWhere((a) => a['id']?.toString() == agentId);
+                  final index = _filteredAgents
+                      .indexWhere((a) => a['id']?.toString() == agentId);
 
                   return Marker(
                     point: LatLng(lat, lng),
@@ -212,9 +271,9 @@ class _AgentsMapScreenState extends State<AgentsMapScreen> {
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _agents.length,
+                  itemCount: _filteredAgents.length,
                   itemBuilder: (context, index) {
-                    final agent = _agents[index];
+                    final agent = _filteredAgents[index];
                     return Container(
                       width: 280,
                       margin: const EdgeInsets.only(right: 12),

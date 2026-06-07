@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:logger/logger.dart';
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/services/gps_websocket_service.dart';
+import 'package:fonaco/features/chat/chat_repository.dart';
 import 'package:fonaco/features/client/missions/mission_repository.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 import 'package:latlong2/latlong.dart';
@@ -25,11 +27,14 @@ class _MissionTrackingScreenState extends State<MissionTrackingScreen> {
   final MissionRepository _repo = MissionRepository();
   final GpsWebSocketService _gps = GpsWebSocketService();
   final MapController _mapController = MapController();
+  final ChatRepository _chatRepo = ChatRepository();
+  final Logger _logger = Logger();
 
   MissionModel? _mission;
   bool _loading = true;
   String? _error;
   bool _actionBusy = false;
+  bool _isChatLoading = false;
 
   @override
   void initState() {
@@ -70,7 +75,9 @@ class _MissionTrackingScreenState extends State<MissionTrackingScreen> {
     if (_gps.agentPosition != null) {
       try {
         _mapController.move(_gps.agentPosition!, _mapController.camera.zoom);
-      } catch (_) {}
+      } catch (e) {
+        _logger.w('Erreur déplacement caméra GPS', error: e);
+      }
     }
     setState(() {});
   }
@@ -173,8 +180,16 @@ class _MissionTrackingScreenState extends State<MissionTrackingScreen> {
             icon: const Icon(Icons.call, color: Colors.black),
             onPressed: () async {
               HapticFeedback.lightImpact();
-              // TODO: Replace with actual agent phone number from mission model
-              final phoneNumber = '+22900000000'; // Placeholder
+              final phoneNumber = _mission?.agentPhone ?? '';
+              if (phoneNumber.isEmpty) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Numéro de téléphone non disponible')),
+                  );
+                }
+                return;
+              }
               final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
               if (await canLaunchUrl(phoneUri)) {
                 await launchUrl(phoneUri);
@@ -187,6 +202,10 @@ class _MissionTrackingScreenState extends State<MissionTrackingScreen> {
                 }
               }
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.chat, color: Colors.black),
+            onPressed: _handleChatButton,
           ),
         ],
       ),
@@ -281,7 +300,7 @@ class _MissionTrackingScreenState extends State<MissionTrackingScreen> {
         shape: BoxShape.circle,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -364,6 +383,44 @@ class _MissionTrackingScreenState extends State<MissionTrackingScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleChatButton() async {
+    if (_mission == null) return;
+    setState(() => _isChatLoading = true);
+    try {
+      final conversation = await _chatRepo.getOrCreateConversation(
+        _mission!.id,
+      );
+      if (!mounted) return;
+      setState(() => _isChatLoading = false);
+      if (conversation != null) {
+        Navigator.pushNamed(
+          context,
+          AppRoutes.chatDetail,
+          arguments: {
+            'chatId': conversation['id']?.toString(),
+            'userName': _mission!.agentName ?? 'Agent',
+            'agentAvatar': _mission!.avatarUrl,
+            'missionId': _mission!.id,
+          },
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text('Impossible de créer la conversation')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isChatLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e')),
+        );
+      }
+    }
   }
 }
 

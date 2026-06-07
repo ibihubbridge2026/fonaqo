@@ -231,6 +231,19 @@ class NotificationProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Mark a single notification as read
+  Future<void> markNotificationAsRead(String notificationId) async {
+    try {
+      await _apiService.post('/notifications/$notificationId/read/');
+      _unreadNotifications =
+          (_unreadNotifications > 0) ? _unreadNotifications - 1 : 0;
+      await _saveToCache();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error marking notification as read: $e');
+    }
+  }
+
   /// Mark all notifications as read
   Future<void> markNotificationsAsRead() async {
     try {

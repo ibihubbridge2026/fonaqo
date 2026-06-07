@@ -7,6 +7,9 @@ class AgentModel {
   final int completedMissions;
   final String estimatedPrice;
   final bool isTopChoice;
+  final String? city;
+  final String? district;
+  final String? address;
 
   AgentModel({
     required this.id,
@@ -17,6 +20,9 @@ class AgentModel {
     required this.completedMissions,
     required this.estimatedPrice,
     this.isTopChoice = false,
+    this.city,
+    this.district,
+    this.address,
   });
 
   factory AgentModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +35,9 @@ class AgentModel {
       completedMissions: json['completed_missions'] ?? 0,
       estimatedPrice: json['estimated_price'] ?? '0 FCFA',
       isTopChoice: json['is_top_choice'] ?? false,
+      city: json['city']?.toString(),
+      district: json['district']?.toString(),
+      address: json['address']?.toString(),
     );
   }
 
@@ -42,6 +51,9 @@ class AgentModel {
       'completed_missions': completedMissions,
       'estimated_price': estimatedPrice,
       'is_top_choice': isTopChoice,
+      'city': city,
+      'district': district,
+      'address': address,
     };
   }
 }

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-
-import 'missions/mission_repository.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'models/artisan_model.dart';
+import 'repositories/artisan_repository.dart';
+import 'screens/agent_profile_screen.dart';
 
 class ArtisansScreen extends StatefulWidget {
   const ArtisansScreen({super.key});
@@ -10,8 +13,8 @@ class ArtisansScreen extends StatefulWidget {
 }
 
 class _ArtisansScreenState extends State<ArtisansScreen> {
-  final MissionRepository _repo = MissionRepository();
-  List<Map<String, dynamic>> _artisans = [];
+  final ArtisanRepository _repo = ArtisanRepository();
+  List<ArtisanModel> _artisans = [];
   bool _loading = true;
   String _searchQuery = '';
 
@@ -27,7 +30,7 @@ class _ArtisansScreenState extends State<ArtisansScreen> {
     });
 
     try {
-      final artisans = await _repo.fetchAgentSuggestions(limit: 20);
+      final artisans = await _repo.fetchArtisans(query: _searchQuery);
       if (!mounted) return;
       setState(() {
         _artisans = artisans;
@@ -37,67 +40,19 @@ class _ArtisansScreenState extends State<ArtisansScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        // Données fictives en cas d'erreur
-        _artisans = _getMockArtisans();
+        _artisans = [];
       });
     }
   }
 
-  List<Map<String, dynamic>> _getMockArtisans() {
-    return [
-      {
-        'username': 'Koffi',
-        'specialty': 'Électricité',
-        'location': 'Cotonou, Quartier Fidjrossè',
-        'experience': '10 ans d\'expérience',
-        'rating': 4.8,
-        'completed_missions': 156,
-        'estimated_price': '5,000 FCFA/h',
-        'is_top_choice': true,
-      },
-      {
-        'username': 'Moussa',
-        'specialty': 'Plomberie',
-        'location': 'Porto-Novo, Quartier Ganhi',
-        'experience': '15 ans d\'expérience',
-        'rating': 4.5,
-        'completed_missions': 203,
-        'estimated_price': '4,500 FCFA/h',
-        'is_top_choice': false,
-      },
-      {
-        'username': 'Adjoua',
-        'specialty': 'Maçonnerie',
-        'location': 'Cotonou, Quartier Gbedjromede',
-        'experience': '8 ans d\'expérience',
-        'rating': 4.9,
-        'completed_missions': 89,
-        'estimated_price': '6,000 FCFA/h',
-        'is_top_choice': true,
-      },
-      {
-        'username': 'Kouassi',
-        'specialty': 'Menuiserie',
-        'location': 'Ouidah, Quartier Djègbadji',
-        'experience': '12 ans d\'expérience',
-        'rating': 4.7,
-        'completed_missions': 134,
-        'estimated_price': '5,500 FCFA/h',
-        'is_top_choice': false,
-      },
-    ];
-  }
-
-  List<Map<String, dynamic>> get _filteredArtisans {
+  List<ArtisanModel> get _filteredArtisans {
     if (_searchQuery.isEmpty) return _artisans;
     final query = _searchQuery.toLowerCase();
     return _artisans.where((artisan) {
-      final name = (artisan['username'] as String?)?.toLowerCase() ?? '';
-      final specialty = (artisan['specialty'] as String?)?.toLowerCase() ?? '';
-      final location = (artisan['location'] as String?)?.toLowerCase() ?? '';
-      return name.contains(query) ||
-          specialty.contains(query) ||
-          location.contains(query);
+      return artisan.fullName.toLowerCase().contains(query) ||
+          artisan.specialty.toLowerCase().contains(query) ||
+          artisan.city.toLowerCase().contains(query) ||
+          artisan.district.toLowerCase().contains(query);
     }).toList();
   }
 
@@ -156,6 +111,8 @@ class _ArtisansScreenState extends State<ArtisansScreen> {
                           setState(() {
                             _searchQuery = value;
                           });
+                          // Recharger avec le nouveau filtre
+                          _loadArtisans();
                         },
                         decoration: InputDecoration(
                           hintText: 'Rechercher un artisan (ex: Plombier)...',
@@ -197,20 +154,7 @@ class _ArtisansScreenState extends State<ArtisansScreen> {
                             final artisan = _filteredArtisans[index];
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 16),
-                              child: ArtisanCard(
-                                name: artisan['username'] ?? 'Artisan',
-                                location: artisan['location'] ?? '',
-                                experience: artisan['experience'] ?? '',
-                                rating:
-                                    (artisan['rating'] as num?)?.toDouble() ??
-                                        0.0,
-                                completedMissions:
-                                    (artisan['completed_missions'] as int?) ??
-                                        0,
-                                estimatedPrice:
-                                    artisan['estimated_price'] ?? '',
-                                isTopChoice: artisan['is_top_choice'] == true,
-                              ),
+                              child: ArtisanCard(artisan: artisan),
                             );
                           },
                         ),
@@ -223,30 +167,26 @@ class _ArtisansScreenState extends State<ArtisansScreen> {
 }
 
 class ArtisanCard extends StatelessWidget {
-  final String name;
-  final String location;
-  final String experience;
-  final double rating;
-  final int completedMissions;
-  final String estimatedPrice;
-  final bool isTopChoice;
+  final ArtisanModel artisan;
 
   const ArtisanCard({
     super.key,
-    required this.name,
-    required this.location,
-    required this.experience,
-    this.rating = 0.0,
-    this.completedMissions = 0,
-    this.estimatedPrice = '',
-    this.isTopChoice = false,
+    required this.artisan,
   });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        // TODO: Navigation vers profil artisan
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AgentProfileScreen(
+              agentId: artisan.id.toString(),
+              agent: artisan.toJson(),
+            ),
+          ),
+        );
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -275,28 +215,29 @@ class ArtisanCard extends StatelessWidget {
                   width: 60,
                   height: 60,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        const Color(0xFFFFD400).withOpacity(0.3),
-                        const Color(0xFFFFD400).withOpacity(0.1),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
                     shape: BoxShape.circle,
+                    color: Colors.grey[200],
                   ),
-                  child: Center(
-                    child: Text(
-                      name[0].toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
+                  child: ClipOval(
+                    child: artisan.avatarUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: artisan.avatarUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              color: Colors.grey[200],
+                              child:
+                                  Icon(Icons.person, color: Colors.grey[400]),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              color: Colors.grey[200],
+                              child:
+                                  Icon(Icons.person, color: Colors.grey[400]),
+                            ),
+                          )
+                        : Icon(Icons.person, color: Colors.grey[400], size: 30),
                   ),
                 ),
-                if (isTopChoice)
+                if (artisan.premium)
                   Positioned(
                     top: 0,
                     right: 0,
@@ -324,14 +265,22 @@ class ArtisanCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        name,
+                        artisan.fullName,
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.black,
                         ),
                       ),
-                      if (isTopChoice) ...[
+                      if (artisan.certified) ...[
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.verified,
+                          size: 14,
+                          color: Colors.blue[600],
+                        ),
+                      ],
+                      if (artisan.premium) ...[
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -355,6 +304,15 @@ class ArtisanCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
+                  Text(
+                    artisan.specialty,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
                       Icon(
@@ -365,7 +323,7 @@ class ArtisanCard extends StatelessWidget {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          location,
+                          '${artisan.district}, ${artisan.city}',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
@@ -377,34 +335,33 @@ class ArtisanCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   // Rating étoiles
-                  if (rating > 0)
-                    Row(
-                      children: [
-                        ...List.generate(5, (index) {
-                          return Icon(
-                            index < rating.round()
-                                ? Icons.star
-                                : Icons.star_border,
-                            size: 12,
-                            color: const Color(0xFFFFD400),
-                          );
-                        }),
-                        const SizedBox(width: 4),
-                        Text(
-                          rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
-                    ),
-                  const SizedBox(height: 4),
-                  // Missions complétées et prix
                   Row(
                     children: [
-                      if (completedMissions > 0) ...[
+                      ...List.generate(5, (index) {
+                        return Icon(
+                          index < artisan.rating.round()
+                              ? Icons.star
+                              : Icons.star_border,
+                          size: 12,
+                          color: const Color(0xFFFFD400),
+                        );
+                      }),
+                      const SizedBox(width: 4),
+                      Text(
+                        artisan.rating.toStringAsFixed(1),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  // Missions complétées et expérience
+                  Row(
+                    children: [
+                      if (artisan.completedMissions > 0) ...[
                         Icon(
                           Icons.check_circle_outline,
                           color: Colors.green[600],
@@ -412,7 +369,7 @@ class ArtisanCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '$completedMissions missions',
+                          '✓ ${artisan.completedMissions} chantiers',
                           style: TextStyle(
                             fontSize: 11,
                             color: Colors.grey[600],
@@ -420,24 +377,14 @@ class ArtisanCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                       ],
-                      if (estimatedPrice.isNotEmpty)
-                        Text(
-                          estimatedPrice,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
+                      Text(
+                        '${artisan.yearsOfExperience} ans d\'expérience',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[500],
                         ),
+                      ),
                     ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    experience,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[500],
-                    ),
                   ),
                 ],
               ),

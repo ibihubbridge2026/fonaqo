@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/providers/favorites_provider.dart';
@@ -35,6 +36,7 @@ class _HomeContentState extends State<HomeContent>
   Timer? _heroTimer;
   final MissionRepository _missionRepo = MissionRepository();
   final CacheService _cacheService = CacheService();
+  final Logger _logger = Logger();
 
   List<MissionModel> _missions = [];
   List<Map<String, dynamic>> _suggestedAgents = [];
@@ -92,7 +94,7 @@ class _HomeContentState extends State<HomeContent>
 
   void _loadFromCache() {
     try {
-      print('📦 Chargement depuis le cache...');
+      _logger.d('Chargement depuis le cache...');
       // Charger les missions depuis le cache
       final cachedMissionsJson =
           _cacheService.getCachedJsonResponse('dashboard_missions');
@@ -108,11 +110,12 @@ class _HomeContentState extends State<HomeContent>
               _missions = missionsList;
               // Ne pas mettre _dashLoading à false ici - attendre l'API ou un délai minimum
             });
-            print('✅ ${missionsList.length} missions chargées depuis le cache');
+            _logger
+                .d('${missionsList.length} missions chargées depuis le cache');
           }
         }
       } else {
-        print('⚠️ Cache missions vide ou invalide');
+        _logger.w('Cache missions vide ou invalide');
       }
 
       // Charger les agents depuis le cache
@@ -129,14 +132,14 @@ class _HomeContentState extends State<HomeContent>
             setState(() {
               _suggestedAgents = agentsList;
             });
-            print('✅ ${agentsList.length} agents chargés depuis le cache');
+            _logger.d('${agentsList.length} agents chargés depuis le cache');
           }
         }
       } else {
-        print('⚠️ Cache agents vide ou invalide');
+        _logger.w('Cache agents vide ou invalide');
       }
     } catch (e) {
-      print('❌ Erreur chargement cache: $e');
+      _logger.e('Erreur chargement cache', error: e);
       // Erreur de cache, continuer avec API
     }
   }
@@ -146,16 +149,16 @@ class _HomeContentState extends State<HomeContent>
     try {
       final missions = await _missionRepo.fetchMissionsList();
 
-      print('📡 Missions reçues depuis API: ${missions.length}');
+      _logger.d('Missions reçues depuis API: ${missions.length}');
       for (var m in missions) {
-        print('  - ${m.title} (status: ${m.status})');
+        _logger.d('  - ${m.title} (status: ${m.status})');
       }
 
       // Pour l'instant, nous n'utilisons pas la localisation
       // TODO: Ajouter la localisation à UserModel et utiliser les coordonnées utilisateur
       final agents = await _missionRepo.fetchAgentSuggestions();
 
-      print('📡 Agents reçus depuis API: ${agents.length}');
+      _logger.d('Agents reçus depuis API: ${agents.length}');
 
       // Mettre à jour le cache
       try {
@@ -187,7 +190,7 @@ class _HomeContentState extends State<HomeContent>
         _dashError = null;
       });
     } catch (e) {
-      print('❌ Erreur chargement API: $e');
+      _logger.e('Erreur chargement API', error: e);
       if (!mounted) return;
       setState(() {
         _dashError = e.toString();
@@ -270,6 +273,12 @@ class _HomeContentState extends State<HomeContent>
               shell.setIndex(1);
               shell.openCreateMission();
             }
+          },
+        ),
+        const SizedBox(height: 12),
+        VocalCreateMissionButton(
+          onPressed: () {
+            Navigator.pushNamed(context, AppRoutes.createMissionVocal);
           },
         ),
         SectionTitleStrip(
@@ -686,7 +695,7 @@ class MissionReassuranceBanner extends StatelessWidget {
 
 /// Bouton primaire création de mission.
 class PrimaryCreateMissionPanel extends StatelessWidget {
-  /// Callback déclenchée lorsque l’utilisateur veut créer une mission.
+  /// Callback déclenchée lorsque l'utilisateur veut créer une mission.
   final VoidCallback? onPressed;
 
   const PrimaryCreateMissionPanel({super.key, this.onPressed});
@@ -710,6 +719,38 @@ class PrimaryCreateMissionPanel extends StatelessWidget {
             borderRadius: BorderRadius.circular(15),
           ),
           elevation: 0,
+        ),
+      ),
+    );
+  }
+}
+
+/// Bouton création de mission par vocal.
+class VocalCreateMissionButton extends StatelessWidget {
+  final VoidCallback? onPressed;
+
+  const VocalCreateMissionButton({super.key, this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.mic_none_rounded, size: 22),
+        label: const Text(
+          'Créer par message vocal 🎙️',
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.3),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFF7C600).withValues(alpha: 0.9),
+          foregroundColor: Colors.black,
+          minimumSize: const Size(double.infinity, 50),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15),
+          ),
+          elevation: 2,
+          shadowColor: const Color(0xFFF7C600).withValues(alpha: 0.3),
         ),
       ),
     );

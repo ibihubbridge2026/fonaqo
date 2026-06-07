@@ -1,8 +1,8 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../../widgets/custom_app_bar.dart';
+import '../../../core/services/chat_websocket_service.dart';
+import '../chat_repository.dart';
 import '../models/chat_message.dart';
 
 /// Écran de détail d'une conversation
@@ -26,53 +26,120 @@ class ChatDetailScreen extends StatefulWidget {
 
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _messageController = TextEditingController();
-  static final Map<String, List<ChatMessage>> _chatHistory = {};
+  final List<ChatMessage> _messages = [];
+  final ChatWebSocketService _wsService = ChatWebSocketService();
+  final ChatRepository _repository = ChatRepository();
+  bool _isConnected = false;
+  bool _isLoadingHistory = false;
 
-  /// Génère un ID de conversation unique basé sur les participants
-  String _generateChatId() {
-    // Si un missionId est disponible, l'utiliser comme base
-    if (widget.missionId != null) {
-      return 'mission_${widget.missionId}';
-    }
-
-    // Si le chatId contient déjà un missionId, l'utiliser directement
-    if (widget.chatId.startsWith('mission_')) {
-      return widget.chatId;
-    }
-
-    // Sinon, utiliser le chatId fourni qui devrait être unique
-    return widget.chatId;
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+    _connectWebSocket();
   }
 
-  List<ChatMessage> get _messages {
-    final chatId = _generateChatId();
-    if (!_chatHistory.containsKey(chatId)) {
-      // Créer une conversation vide pour chaque chat unique
-      _chatHistory[chatId] = [];
+  @override
+  void dispose() {
+    _wsService.disconnect();
+    _messageController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadHistory() async {
+    if (widget.chatId.isEmpty) {
+      print('ERROR: Cannot load history - chatId is empty');
+      return;
     }
-    return _chatHistory[chatId]!;
+
+    setState(() {
+      _isLoadingHistory = true;
+    });
+
+    try {
+      final messagesData =
+          await _repository.fetchConversationMessages(widget.chatId);
+      setState(() {
+        _messages.clear();
+        for (final msgData in messagesData) {
+          final timestamp = msgData['created_at'] != null
+              ? DateTime.parse(msgData['created_at'])
+              : DateTime.now();
+          final timeStr =
+              '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+          _messages.add(ChatMessage(
+            id: msgData['id']?.toString() ?? '',
+            text: msgData['content']?.toString() ?? '',
+            time: timeStr,
+            senderId: msgData['sender']?.toString(),
+            senderName: msgData['sender']?.toString(),
+            isMe: msgData['sender']?.toString() ==
+                'current_user', // TODO: Get from AuthProvider
+            timestamp: timestamp,
+          ));
+        }
+        _isLoadingHistory = false;
+      });
+
+      // Marquer messages comme lus
+      await _repository.markMessagesAsRead(widget.chatId, markAll: true);
+    } catch (e) {
+      print('ERROR: Failed to load message history: $e');
+      setState(() {
+        _isLoadingHistory = false;
+      });
+    }
+  }
+
+  Future<void> _connectWebSocket() async {
+    if (widget.missionId == null) {
+      print('ERROR: Cannot connect WebSocket - missionId is null');
+      return;
+    }
+
+    try {
+      await _wsService.connect(widget.missionId!);
+      setState(() {
+        _isConnected = true;
+      });
+
+      // Écouter les messages
+      _wsService.messageStream.listen((message) {
+        final now = message.timestamp;
+        final timeStr =
+            '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+        setState(() {
+          _messages.add(ChatMessage(
+            id: message.id,
+            text: message.content,
+            time: timeStr,
+            senderId: message.sender,
+            senderName: message.sender,
+            isMe: message.isMe,
+            timestamp: message.timestamp,
+          ));
+        });
+      });
+    } catch (e) {
+      print('ERROR: WebSocket connection failed: $e');
+    }
   }
 
   void _sendMessage() {
     final text = _messageController.text.trim();
     if (text.isEmpty) return;
 
-    final chatId = _generateChatId();
-    setState(() {
-      _chatHistory[chatId]!.add(ChatMessage.fromUser(
-        text: text,
-        chatId: chatId,
-        senderId: 'current_user', // TODO: Get from AuthProvider
-        senderName: 'Moi', // TODO: Get from AuthProvider
-      ));
-    });
+    if (!_isConnected) {
+      print('ERROR: Cannot send message - WebSocket not connected');
+      return;
+    }
 
-    _messageController.clear();
-
-    // Faire défiler vers le bas pour voir le nouveau message
-    Future.delayed(const Duration(milliseconds: 100), () {
-      // Scroll to bottom logic would go here if we had a scroll controller
-    });
+    try {
+      _wsService.sendMessage(text);
+      _messageController.clear();
+    } catch (e) {
+      print('ERROR: Failed to send message: $e');
+    }
   }
 
   @override
@@ -117,16 +184,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       ),
       body: Column(
         children: [
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-                return _buildMessageBubble(message);
-              },
+          if (_isLoadingHistory)
+            const Center(child: CircularProgressIndicator())
+          else if (_messages.isEmpty)
+            const Center(child: Text('Aucun message'))
+          else
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _messages.length,
+                itemBuilder: (context, index) {
+                  final message = _messages[index];
+                  return _buildMessageBubble(message);
+                },
+              ),
             ),
-          ),
 
           // Zone de saisie
           Container(

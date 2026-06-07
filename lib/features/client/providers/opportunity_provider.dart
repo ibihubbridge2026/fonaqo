@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import '../models/opportunity_model.dart';
 import '../../../core/services/api_service.dart';
 
 /// Provider pour gérer les Opportunités (Services)
 class OpportunityProvider extends ChangeNotifier {
   final ApiService _apiService = ApiService();
+  final Logger _logger = Logger();
 
   List<OpportunityModel> _opportunities = [];
   bool _isLoading = false;
@@ -37,7 +39,7 @@ class OpportunityProvider extends ChangeNotifier {
     } catch (e) {
       _error =
           "Impossible de charger les opportunités. Vérifiez votre connexion.";
-      print("Erreur OpportunityProvider: $e");
+      _logger.e("Erreur chargement opportunités", error: e);
     } finally {
       _isLoading = false;
       notifyListeners();

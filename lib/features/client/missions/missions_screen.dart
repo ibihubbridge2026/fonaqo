@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 
 import 'package:fonaco/core/models/mission_model.dart';
@@ -27,6 +28,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
   final MissionRepository _repo = MissionRepository();
   final ScrollController _scrollController = ScrollController();
   final CacheService _cacheService = CacheService();
+  final Logger _logger = Logger();
   List<MissionModel> _missions = [];
   bool _loading = true;
   bool _isFetching = false; // garde-fou réel (concurrence)
@@ -105,16 +107,16 @@ class _MissionsScreenState extends State<MissionsScreen> {
   Future<void> _loadMissions() async {
     // SÉCURITÉ : Éviter les fetchs concurrents (et non pas l'état UI initial)
     if (_isFetching) {
-      debugPrint('⚠️ _loadMissions: Déjà en cours, skip');
+      _logger.d('_loadMissions: Déjà en cours, skip');
       return;
     }
     _isFetching = true;
 
     final auth = Provider.of<AuthProvider>(context, listen: false);
-    debugPrint('🔐 Auth check: isAuthenticated=${auth.isAuthenticated}');
+    _logger.d('Auth check: isAuthenticated=${auth.isAuthenticated}');
 
     if (!auth.isAuthenticated) {
-      debugPrint('🔒 Utilisateur non authentifié, skip missions load');
+      _logger.d('Utilisateur non authentifié, skip missions load');
       if (mounted) {
         setState(() {
           _loading = false;
@@ -169,25 +171,25 @@ class _MissionsScreenState extends State<MissionsScreen> {
               _missions = missionsList;
               _loading = false;
             });
+            _logger
+                .d('Missions chargées depuis le cache: ${missionsList.length}');
           }
-          debugPrint(
-              '📦 Missions chargées depuis le cache: ${missionsList.length}');
         }
       }
     } catch (e) {
-      debugPrint('⚠️ Erreur lecture cache missions: $e');
+      _logger.w('Erreur lecture cache missions: $e');
     }
   }
 
   Future<void> _loadMissionsFromApi() async {
-    debugPrint('📡 Chargement des missions depuis l\'API...');
+    _logger.d('Chargement des missions depuis l\'API...');
 
     try {
       final missions = await _repo.fetchMissionsList(
         page: 1,
         pageSize: 10,
       );
-      debugPrint('✅ Missions reçues: ${missions.length}');
+      _logger.d('Missions reçues: ${missions.length}');
 
       // Désactivé: Vérifier les missions terminées non notées
       // Le modal ne devrait s'afficher que lors d'une action utilisateur spécifique
@@ -200,9 +202,9 @@ class _MissionsScreenState extends State<MissionsScreen> {
             jsonEncode({
               'data': missions.map((m) => m.toJson()).toList(),
             }));
-        debugPrint('📦 Missions mises en cache');
+        _logger.d('Missions mises en cache');
       } catch (e) {
-        debugPrint('⚠️ Erreur mise en cache missions: $e');
+        _logger.w('Erreur mise en cache missions: $e');
       }
 
       if (!mounted) return;
@@ -213,8 +215,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
         _error = null;
       });
     } catch (e, st) {
-      debugPrint('❌ Erreur chargement missions: $e');
-      debugPrint('📋 Stack trace: $st');
+      _logger.e('Erreur chargement missions', error: e, stackTrace: st);
 
       if (!mounted) return;
       setState(() {
@@ -224,8 +225,6 @@ class _MissionsScreenState extends State<MissionsScreen> {
       });
     } finally {
       _isFetching = false;
-      debugPrint(
-          '🏁 _loadMissions terminé (loading=$_loading, error=$_error, missions=${_missions.length})');
     }
   }
 

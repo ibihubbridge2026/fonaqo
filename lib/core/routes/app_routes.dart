@@ -68,4 +68,7 @@ abstract final class AppRoutes {
 
   /// Agents favoris
   static const String favoriteAgents = '/favorite-agents';
+
+  /// Création de mission par vocal
+  static const String createMissionVocal = '/create-mission-vocal';
 }

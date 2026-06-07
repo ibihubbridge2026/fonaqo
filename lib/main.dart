@@ -44,6 +44,7 @@ import 'features/events/event_detail_screen.dart';
 
 import 'features/client/missions/mission_detail_screen.dart';
 import 'features/client/missions/missions_screen.dart';
+import 'features/client/missions/screens/create_mission_vocal_screen.dart';
 import 'features/client/screens/favorite_agents_screen.dart';
 
 import 'features/map/agents_map_screen.dart';
@@ -316,6 +317,8 @@ class FonacoApp extends StatelessWidget {
                     showCreateMissionListenable: ValueNotifier(false),
                   ),
               AppRoutes.agentsMap: (context) => const AgentsMapScreen(),
+              AppRoutes.createMissionVocal: (context) =>
+                  const CreateMissionVocalScreen(),
               '/agent-profile': (context) {
                 final args = ModalRoute.of(context)?.settings.arguments
                     as Map<String, dynamic>?;
