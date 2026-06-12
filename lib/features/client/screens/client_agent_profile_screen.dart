@@ -28,6 +28,35 @@ class ClientAgentProfileScreen extends StatelessWidget {
     this.isOnline = false,
   });
 
+  factory ClientAgentProfileScreen.fromRouteArguments(
+    Map<String, dynamic>? args,
+  ) {
+    final agent = args?['agent'] as Map<String, dynamic>? ?? {};
+    final agentId =
+        args?['agentId']?.toString() ?? agent['id']?.toString() ?? '';
+    final name =
+        '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
+    final displayName = name.isEmpty ? 'Agent' : name;
+    final expertiseTags = (agent['expertise_tags'] as List<dynamic>?)
+            ?.map((tag) => tag.toString())
+            .toList() ??
+        const <String>[];
+    final role = agent['specialty']?.toString() ??
+        (expertiseTags.isNotEmpty ? expertiseTags.first : 'Agent Fonaqo');
+    final rating = (agent['rating'] as num?)?.toDouble();
+
+    return ClientAgentProfileScreen(
+      agentId: agentId,
+      name: displayName,
+      role: role,
+      avatarUrl: agent['avatar_url']?.toString(),
+      expertiseTags: expertiseTags,
+      rating: rating,
+      isVerified: agent['is_verified'] == true,
+      isOnline: agent['is_online'] == true,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

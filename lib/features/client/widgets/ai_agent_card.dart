@@ -10,8 +10,6 @@ class AiAgentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(

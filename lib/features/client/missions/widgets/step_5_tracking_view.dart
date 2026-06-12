@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:fonaco/core/constants/app_constants.dart';
 import 'package:fonaco/core/utils/marker_icon_cache.dart';
 
 class Step5TrackingView extends StatelessWidget {
@@ -40,8 +41,11 @@ class Step5TrackingView extends StatelessWidget {
               children: [
                 // Google Maps
                 GoogleMap(
-                  initialCameraPosition: const CameraPosition(
-                    target: LatLng(5.3363, -4.0260), // Abidjan
+                  initialCameraPosition: CameraPosition(
+                    target: LatLng(
+                      AppConstants.defaultLatitude,
+                      AppConstants.defaultLongitude,
+                    ),
                     zoom: 14,
                   ),
                   zoomGesturesEnabled: true,
@@ -54,14 +58,20 @@ class Step5TrackingView extends StatelessWidget {
                     // Position client
                     Marker(
                       markerId: const MarkerId('client'),
-                      position: const LatLng(5.3363, -4.0260),
+                      position: LatLng(
+                        AppConstants.defaultLatitude,
+                        AppConstants.defaultLongitude,
+                      ),
                       infoWindow: const InfoWindow(title: 'Votre position'),
                       icon: MarkerIconCache().missionMarker,
                     ),
                     // Position agent
                     Marker(
                       markerId: const MarkerId('agent'),
-                      position: const LatLng(5.3400, -4.0280),
+                      position: LatLng(
+                        AppConstants.defaultLatitude + 0.002,
+                        AppConstants.defaultLongitude + 0.002,
+                      ),
                       infoWindow: const InfoWindow(title: 'Agent en route'),
                       icon: MarkerIconCache().agentOnRouteMarker,
                     ),
@@ -71,10 +81,19 @@ class Step5TrackingView extends StatelessWidget {
                       polylineId: const PolylineId('route'),
                       color: const Color(0xFFFFD400),
                       width: 4,
-                      points: const [
-                        LatLng(5.3363, -4.0260),
-                        LatLng(5.3380, -4.0270),
-                        LatLng(5.3400, -4.0280),
+                      points: [
+                        LatLng(
+                          AppConstants.defaultLatitude,
+                          AppConstants.defaultLongitude,
+                        ),
+                        LatLng(
+                          AppConstants.defaultLatitude + 0.001,
+                          AppConstants.defaultLongitude + 0.001,
+                        ),
+                        LatLng(
+                          AppConstants.defaultLatitude + 0.002,
+                          AppConstants.defaultLongitude + 0.002,
+                        ),
                       ],
                     ),
                   },

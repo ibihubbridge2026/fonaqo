@@ -1,12 +1,8 @@
 /// Constantes globales de l'application
 class AppConstants {
-  // Coordonnées GPS par défaut (Abidjan, Côte d'Ivoire)
-  static const double defaultLatitude = 5.3363;
-  static const double defaultLongitude = -4.0260;
-
-  // Coordonnées alternatives (Abidjan centre)
-  static const double abidjanCenterLatitude = 6.3725;
-  static const double abidjanCenterLongitude = 2.4318;
+  // Coordonnées GPS par défaut (Cotonou, Bénin)
+  static const double defaultLatitude = 6.3703;
+  static const double defaultLongitude = 2.3912;
 
   // Rayon de recherche par défaut en km
   static const double defaultSearchRadiusKm = 10.0;

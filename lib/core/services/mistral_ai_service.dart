@@ -107,7 +107,7 @@ Ta tâche est d'analyser la requête d'un utilisateur et d'extraire les informat
 
 {
   "intent": "catégorie exacte parmi: [$categories]",
-  "location": "ville ou quartier mentionné (ex: Cocody, Marcory, Plateau)",
+  "location": "ville ou quartier mentionné (ex: Ganhi, Akpakpa, Cadjehoun)",
   "time": "moment mentionné (ex: demain matin, ce soir, cette semaine)",
   "urgency": "true si urgent, false sinon",
   "description": "résumé court du besoin en français",
@@ -122,14 +122,14 @@ RÈGLES IMPORTANTES:
 5. "urgency" doit être un booléen (true/false)
 6. "keywords" est une liste de 3-5 mots-clés pertinents
 
-Exemple de requête: "J'ai besoin de quelqu'un pour faire la queue à la banque demain matin à Cocody"
+Exemple de requête: "J'ai besoin de quelqu'un pour faire la queue à la banque demain matin à Ganhi"
 Réponse attendue: {
   "intent": "banque",
-  "location": "Cocody",
+  "location": "Ganhi",
   "time": "demain matin",
   "urgency": false,
   "description": "Besoin d'agent pour faire la queue à la banque",
-  "keywords": ["banque", "queue", "Cocody"]
+  "keywords": ["banque", "queue", "Ganhi"]
 }
 ''';
   }

@@ -13,6 +13,7 @@ import 'package:fonaco/core/providers/mission_provider.dart';
 import 'package:fonaco/core/providers/wallet_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/services/dashboard_refresh_service.dart';
+import 'package:fonaco/core/services/mission_audio_cleanup.dart';
 import 'package:fonaco/core/services/feexpay_service.dart';
 import 'package:fonaco/core/services/feedback_service.dart';
 import 'package:fonaco/core/services/location_service.dart';
@@ -376,7 +377,9 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
       );
       if (!paid || !mounted) return;
     } else {
+      if (!context.mounted) return;
       final wallet = context.read<WalletProvider>();
+      final navigator = Navigator.of(context);
       await wallet.fetchBalance();
       if (!mounted) return;
       if (!wallet.canAfford(totalRequired)) {
@@ -403,10 +406,11 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
           ),
         );
         if (goRecharge == true && mounted) {
-          await Navigator.pushNamed(context, AppRoutes.wallet);
+          await navigator.pushNamed(AppRoutes.wallet);
         }
         return;
       }
+      if (!mounted) return;
       final pinOk = await verifyTransactionPinIfRequired(context);
       if (!pinOk || !mounted) return;
     }
@@ -414,8 +418,8 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
     setState(() => _submitting = true);
     try {
       final serviceFee = _fonnaqoFee + _optionsCost;
-      final missionLat = _destLat ?? _gpsLat ?? AppConstants.abidjanCenterLatitude;
-      final missionLng = _destLng ?? _gpsLng ?? AppConstants.abidjanCenterLongitude;
+      final missionLat = _destLat ?? _gpsLat ?? AppConstants.defaultLatitude;
+      final missionLng = _destLng ?? _gpsLng ?? AppConstants.defaultLongitude;
 
       final created = await _repo.createMission(
         MissionCreatePayload(
@@ -454,6 +458,9 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
 
       if (!mounted) return;
       MainShellScope.maybeOf(context)?.closeCreateMission();
+
+      await MissionAudioCleanup.purgeTemporaryRecordings();
+      if (!mounted) return;
 
       await Navigator.of(context).push(
         MaterialPageRoute(

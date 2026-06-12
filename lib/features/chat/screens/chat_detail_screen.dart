@@ -110,6 +110,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       await _chatProvider.connectWebSocket(context, missionId: missionId);
     }
 
+    if (!mounted) return;
+
     await _chatProvider.selectConversation(
       room,
       context,
@@ -200,6 +202,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
     controller.dispose();
     if (amount == null) return;
+    if (!mounted) return;
     final senderId = context.read<AuthProvider>().currentUser?.id;
     await _chatProvider.sendNegotiationProposal(amount, senderId: senderId);
     _scrollToBottom();
@@ -276,6 +279,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         NegotiationStatus.accepted,
       );
       await context.read<WalletProvider>().fetchBalance();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Tarif accepté et appliqué'),
@@ -308,6 +312,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       imageQuality: 75,
     );
     if (file == null) return;
+    if (!mounted) return;
     final senderId = context.read<AuthProvider>().currentUser?.id;
     await _chatProvider.sendMediaMessage(
       type: MessageType.image,
@@ -326,6 +331,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final file = result.files.first;
     final path = file.path;
     if (path == null) return;
+    if (!mounted) return;
     final senderId = context.read<AuthProvider>().currentUser?.id;
     await _chatProvider.sendMediaMessage(
       type: MessageType.file,
@@ -385,6 +391,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       final path = await _audioRecorder.stop();
       _stopRecordingTimer();
       if (path == null) return;
+      if (!mounted) return;
       final file = File(path);
       final senderId = context.read<AuthProvider>().currentUser?.id;
       await _chatProvider.sendMediaMessage(

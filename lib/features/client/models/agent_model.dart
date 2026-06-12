@@ -26,15 +26,36 @@ class AgentModel {
   });
 
   factory AgentModel.fromJson(Map<String, dynamic> json) {
+    return AgentModel.fromApiMap(json);
+  }
+
+  /// Map renvoyé par `accounts/agents/nearby/` ou `suggestions/`.
+  factory AgentModel.fromApiMap(Map<String, dynamic> json) {
+    final fn = json['first_name']?.toString() ?? '';
+    final ln = json['last_name']?.toString() ?? '';
+    final composed = '$fn $ln'.trim();
+    final name = (json['name']?.toString().trim().isNotEmpty == true)
+        ? json['name'].toString()
+        : (composed.isEmpty ? 'Agent' : composed);
+    final tags = (json['expertise_tags'] as List<dynamic>?)
+            ?.map((t) => t.toString())
+            .toList() ??
+        const <String>[];
+    final reliability = (json['reliability_score'] as num?)?.toDouble();
+    final rating = (json['rating'] as num?)?.toDouble() ??
+        (reliability != null ? (reliability / 20).clamp(1.0, 5.0) : 4.5);
+
     return AgentModel(
-      id: json['id'] ?? '',
-      name: json['name'] ?? 'Agent',
-      avatarUrl: json['avatar_url'] ?? '',
-      rating: (json['rating'] ?? 4.5).toDouble(),
-      specialty: json['specialty'] ?? 'Service général',
-      completedMissions: json['completed_missions'] ?? 0,
-      estimatedPrice: json['estimated_price'] ?? '0 FCFA',
-      isTopChoice: json['is_top_choice'] ?? false,
+      id: json['id']?.toString() ?? '',
+      name: name,
+      avatarUrl: json['avatar_url']?.toString() ?? '',
+      rating: rating,
+      specialty: json['specialty']?.toString() ??
+          (tags.isNotEmpty ? tags.first : 'Service général'),
+      completedMissions: (json['completed_missions'] as num?)?.toInt() ?? 0,
+      estimatedPrice: json['estimated_price']?.toString() ?? 'Sur devis',
+      isTopChoice:
+          json['is_top_choice'] == true || (reliability ?? 0) >= 90,
       city: json['city']?.toString(),
       district: json['district']?.toString(),
       address: json['address']?.toString(),

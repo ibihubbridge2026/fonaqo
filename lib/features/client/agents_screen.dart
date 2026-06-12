@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
 import 'package:fonaco/core/constants/app_constants.dart';
+import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/providers/favorites_provider.dart';
 import 'package:fonaco/core/utils/marker_icon_cache.dart';
@@ -1055,12 +1056,13 @@ class AgentListTile extends StatelessWidget {
                 height: 32,
                 child: ElevatedButton(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'Profil agent bientôt disponible',
-                        ),
-                      ),
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.agentProfile,
+                      arguments: {
+                        'agentId': agent['id']?.toString() ?? '',
+                        'agent': agent,
+                      },
                     );
                   },
                   style: ElevatedButton.styleFrom(

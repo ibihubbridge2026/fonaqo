@@ -69,9 +69,6 @@ abstract final class AppRoutes {
   /// Agents favoris
   static const String favoriteAgents = '/favorite-agents';
 
-  /// Création de mission par vocal (route conservée mais écran désactivé côté main.dart)
-  static const String createMissionVocal = '/create-mission-vocal';
-
   /// Portefeuille client
   static const String wallet = '/wallet';
 

@@ -30,7 +30,7 @@ import 'features/auth/register_screen.dart';
 
 import 'features/onboarding/onboarding_screen.dart';
 
-import 'features/client/screens/agent_profile_screen.dart' as agents;
+import 'features/client/screens/client_agent_profile_screen.dart';
 
 import 'widgets/main_wrapper.dart';
 import 'widgets/auth_guard.dart';
@@ -46,7 +46,6 @@ import 'features/litiges/litige_screen.dart';
 import 'features/client/missions/mission_detail_screen.dart';
 import 'features/client/missions/missions_screen.dart';
 import 'features/ai/screens/ai_assistant_screen.dart';
-// import 'features/client/missions/screens/create_mission_vocal_screen.dart';
 import 'features/client/screens/favorite_agents_screen.dart';
 
 
@@ -247,27 +246,11 @@ class FonacoApp extends StatelessWidget {
               AppRoutes.missionsAvailable: (context) => MissionsScreen(
                     showCreateMissionListenable: ValueNotifier(false),
                   ),
-              // Route vocale désactivée (deep links / notifications) tant que la feature est en pause.
-              AppRoutes.createMissionVocal: (context) => const Scaffold(
-                    body: Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text(
-                          'La création de mission vocale est temporairement indisponible.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 16),
-                        ),
-                      ),
-                    ),
-                  ),
               AppRoutes.agentProfile: (context) {
                 final args = ModalRoute.of(context)?.settings.arguments
                     as Map<String, dynamic>?;
 
-                return agents.AgentProfileScreen(
-                  agentId: args?['agentId']?.toString() ?? '',
-                  agent: args?['agent'],
-                );
+                return ClientAgentProfileScreen.fromRouteArguments(args);
               },
             },
           );

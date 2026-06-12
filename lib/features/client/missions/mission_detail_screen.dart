@@ -13,6 +13,7 @@ import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/utils/marker_icon_cache.dart';
 import 'package:fonaco/core/api/base_client.dart';
+import 'package:fonaco/core/constants/app_constants.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/providers/mission_provider.dart';
 import 'package:fonaco/core/services/mission_audio_cleanup.dart';
@@ -141,6 +142,10 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
   }
 
   Future<void> _confirmCancelMission() async {
+    if (!context.mounted) return;
+    final missionProvider = context.read<MissionProvider>();
+    final messenger = ScaffoldMessenger.of(context);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => FonDialog.alert(
@@ -164,7 +169,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
       ),
     );
 
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !context.mounted) return;
 
     setState(() => _isCancelling = true);
     try {
@@ -176,14 +181,14 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
         _mission = updated;
         _isCancelling = false;
       });
-      context.read<MissionProvider>().upsertMission(updated);
-      ScaffoldMessenger.of(context).showSnackBar(
+      missionProvider.upsertMission(updated);
+      messenger.showSnackBar(
         const SnackBar(content: Text('Mission annulée')),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => _isCancelling = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Erreur : $e'),
           backgroundColor: Colors.red,
@@ -451,9 +456,9 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
   }
 
   Widget _buildGoogleMap() {
-    // Coordonnées par défaut (Abidjan)
-    final missionLat = _mission?.latitude ?? 5.3363;
-    final missionLng = _mission?.longitude ?? -4.0260;
+    // Coordonnées par défaut (Cotonou)
+    final missionLat = _mission?.latitude ?? AppConstants.defaultLatitude;
+    final missionLng = _mission?.longitude ?? AppConstants.defaultLongitude;
     final missionPosition = LatLng(missionLat, missionLng);
 
     // Déterminer le mode de la carte selon le statut
@@ -730,6 +735,11 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
   }
 
   Future<void> _confirmReleaseFunds(BuildContext context) async {
+    if (!context.mounted) return;
+    final missionProvider = context.read<MissionProvider>();
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -746,38 +756,35 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
       ),
     );
 
-    if (confirmed == true && mounted) {
-      setState(() => _isReleasingFunds = true);
-      try {
-        final updated =
-            await _missionRepository.releaseFunds(_resolvedMissionId!);
-        if (mounted) {
-          setState(() {
-            _isReleasingFunds = false;
-            _mission = updated;
-          });
-          context.read<MissionProvider>().upsertMission(updated);
-          await MissionAudioCleanup.purgeTemporaryRecordings();
-          if (!mounted) return;
-          Navigator.pushNamed(
-            context,
-            AppRoutes.rating,
-            arguments: {'missionId': _resolvedMissionId},
-          );
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-              content: Text('Fonds libérés !'), backgroundColor: Colors.green));
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() => _isReleasingFunds = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erreur lors de la libération des fonds: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
+    if (confirmed != true || !context.mounted) return;
+
+    setState(() => _isReleasingFunds = true);
+    try {
+      final updated =
+          await _missionRepository.releaseFunds(_resolvedMissionId!);
+      if (!mounted) return;
+      setState(() {
+        _isReleasingFunds = false;
+        _mission = updated;
+      });
+      missionProvider.upsertMission(updated);
+      await MissionAudioCleanup.purgeTemporaryRecordings();
+      if (!mounted) return;
+      navigator.pushNamed(
+        AppRoutes.rating,
+        arguments: {'missionId': _resolvedMissionId},
+      );
+      messenger.showSnackBar(const SnackBar(
+          content: Text('Fonds libérés !'), backgroundColor: Colors.green));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isReleasingFunds = false);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la libération des fonds: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -1260,8 +1267,9 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
   }
 
   String _buildEtaText() {
-    if (_mission == null)
+    if (_mission == null) {
       return '${_mission?.statusDisplay.toUpperCase() ?? ''} - ETA indisponible';
+    }
 
     // Utiliser etaMinutes du modèle si disponible
     if (_mission!.etaMinutes != null && _mission!.etaMinutes! > 0) {
@@ -1309,24 +1317,27 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
 
   Future<void> _handleChatButton() async {
     if (_mission == null || _resolvedMissionId == null) return;
+    if (!context.mounted) return;
+
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    final currentUserId =
+        Provider.of<AuthProvider>(context, listen: false).currentUser?.id;
 
     setState(() => _isChatLoading = true);
 
     try {
-      // Créer ou récupérer la conversation pour cette mission
       final conversation = await _chatRepository.getOrCreateConversation(
         _resolvedMissionId!,
       );
 
-      if (conversation != null && mounted) {
+      if (!mounted) return;
+
+      if (conversation != null) {
         final data = conversation['data'] is Map
             ? Map<String, dynamic>.from(conversation['data'] as Map)
             : conversation;
         final conversationId = data['id']?.toString();
-
-        // Extraire le nom de l'autre utilisateur depuis la conversation
-        final auth = Provider.of<AuthProvider>(context, listen: false);
-        final currentUserId = auth.currentUser?.id;
 
         String userName = 'Utilisateur';
         final client = data['client'] as Map<String, dynamic>?;
@@ -1339,8 +1350,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
         }
 
         if (conversationId != null) {
-          Navigator.pushNamed(
-            context,
+          navigator.pushNamed(
             AppRoutes.chatDetail,
             arguments: {
               'conversationId': conversationId,
@@ -1351,8 +1361,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
         } else {
           throw Exception('Conversation ID not found in response');
         }
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      } else {
+        messenger.showSnackBar(
           const SnackBar(
             content: Text('Impossible de créer la conversation'),
             backgroundColor: Colors.red,
@@ -1360,14 +1370,13 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de l\'ouverture du chat: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de l\'ouverture du chat: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() => _isChatLoading = false);

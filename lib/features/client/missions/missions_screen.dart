@@ -420,16 +420,6 @@ class _MissionsScreenState extends State<MissionsScreen> {
                                 elevation: 0,
                               ),
                             ),
-                            // Bouton vocal désactivé temporairement (voir home_content.dart).
-                            // const SizedBox(width: 10),
-                            // OutlinedButton.icon(
-                            //   onPressed: () => Navigator.pushNamed(
-                            //     context,
-                            //     AppRoutes.createMissionVocal,
-                            //   ),
-                            //   icon: const Icon(Icons.mic, size: 18),
-                            //   label: const Text("VOCAL"),
-                            // ),
                             const SizedBox(width: 10),
                             _CategoryChip(
                               label: "Toutes",
