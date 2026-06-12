@@ -18,12 +18,29 @@ class MemoryAuthCache {
   String? _accessToken;
   String? _refreshToken;
   String? _userData;
+  Future<void>? _hydrationFuture;
 
   // Getters
   String? get accessToken => _accessToken;
   String? get refreshToken => _refreshToken;
   String? get userData => _userData;
   bool get isLoaded => _accessToken != null;
+
+  /// Garantit que les tokens sont en mémoire (lecture SecureStorage si besoin).
+  Future<void> ensureLoaded() {
+    if (_accessToken != null && _accessToken!.isNotEmpty) {
+      return Future.value();
+    }
+    return _hydrationFuture ??= _hydrateFromStorage();
+  }
+
+  Future<void> _hydrateFromStorage() async {
+    try {
+      await loadFromStorage();
+    } finally {
+      _hydrationFuture = null;
+    }
+  }
 
   /// Charge les données depuis SecureStorage vers la mémoire
   /// À appeler au démarrage de l'application
@@ -88,6 +105,7 @@ class MemoryAuthCache {
     _accessToken = null;
     _refreshToken = null;
     _userData = null;
+    _hydrationFuture = null;
 
     await _secureStorage.deleteAll();
     _logger.d('🗑️ MemoryAuthCache et SecureStorage vidés');

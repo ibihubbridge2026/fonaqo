@@ -9,8 +9,12 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:logger/logger.dart';
 
 import '../api/base_client.dart';
+import '../api/token_refresh_result.dart';
 import '../models/user_model.dart';
+import '../routes/app_routes.dart';
 import '../services/notification_service.dart';
+
+export '../api/base_client.dart' show ApiException, ApiErrorType;
 
 /// Provider pour gérer l'état d'authentification
 class AuthProvider extends ChangeNotifier {
@@ -41,6 +45,10 @@ class AuthProvider extends ChangeNotifier {
   bool get isAgent => _currentUser?.isAgent ?? false;
   bool get isClient => _currentUser?.isClient ?? false;
   bool get isVerified => _currentUser?.isVerified ?? false;
+  bool get needsPhoneCompletion {
+    final phone = _currentUser?.phoneNumber;
+    return phone == null || phone.trim().isEmpty;
+  }
 
   // =========================
   // CONSTRUCTOR
@@ -78,11 +86,29 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void handleTokenExpired() {
-    _logger.w('Déconnexion automatique : token expiré');
+  /// Appelé uniquement quand le refresh token est révoqué/expiré côté serveur.
+  Future<void> handleTokenExpired() async {
+    if (!_isAuthenticated) return;
+    _logger.w('Session révoquée — déconnexion propre');
+
+    await _memoryCache.clear();
+    await _secureStorage.deleteAll();
     _clearUserDataAndNotify();
-    _memoryCache.clear();
     _setError('Votre session a expiré. Veuillez vous reconnecter.');
+
+    final nav = FeedbackService.navigatorKey?.currentState;
+    if (nav != null) {
+      nav.pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
+      final ctx = FeedbackService.navigatorKey?.currentContext;
+      if (ctx != null && ctx.mounted) {
+        FeedbackService.show(
+          ctx,
+          message: 'Votre session a expiré. Veuillez vous reconnecter.',
+          type: FeedbackType.warning,
+          duration: const Duration(seconds: 5),
+        );
+      }
+    }
   }
 
   /// Nettoie les données utilisateur et notifie les listeners
@@ -173,28 +199,11 @@ class AuthProvider extends ChangeNotifier {
       final data = response.data['data'];
       await _saveAuthData(data);
       return true;
+    } on ApiException catch (e) {
+      _setError(e.message);
+      return false;
     } on DioException catch (e) {
-      _logger.e(
-          '🔴 Erreur Dio LOGIN: ${e.response?.statusCode} - ${e.response?.data}');
-
-      // Gestion spécifique des erreurs Dio
-      String errorMessage = 'Erreur de connexion';
-      if (e.response?.statusCode == 400) {
-        errorMessage = _extractApiErrors(e.response?.data ?? {});
-      } else if (e.response?.statusCode == 401) {
-        errorMessage = 'Identifiants incorrects';
-      } else if (e.type == DioExceptionType.connectionError) {
-        errorMessage =
-            'Serveur indisponible. Vérifiez votre connexion internet.';
-      } else if (e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.sendTimeout ||
-          e.type == DioExceptionType.connectionTimeout) {
-        errorMessage = 'Délai d\'attente dépassé. Réessayez dans un instant.';
-      } else {
-        errorMessage = 'Erreur réseau: ${e.message}';
-      }
-
-      _setError(errorMessage);
+      _setError(_messageFromDio(e));
       return false;
     } catch (e) {
       _logger.e('🔴 Erreur inattendue LOGIN: $e');
@@ -222,23 +231,11 @@ class AuthProvider extends ChangeNotifier {
       final data = response.data['data'];
       await _saveAuthData(data);
       return true;
+    } on ApiException catch (e) {
+      _setError(e.message);
+      return false;
     } on DioException catch (e) {
-      _logger.e(
-          'Erreur REGISTER: ${e.response?.statusCode} - ${e.response?.data}');
-
-      String errorMessage = 'Erreur d\'inscription';
-      if (e.response?.statusCode == 400) {
-        errorMessage = _extractApiErrors(e.response?.data ?? {});
-      } else if (e.type == DioExceptionType.connectionError) {
-        errorMessage =
-            'Serveur indisponible. Vérifiez votre connexion internet.';
-      } else if (e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.sendTimeout ||
-          e.type == DioExceptionType.connectionTimeout) {
-        errorMessage = 'Délai d\'attente dépassé. Réessayez dans un instant.';
-      }
-
-      _setError(errorMessage);
+      _setError(_messageFromDio(e, fallback: 'Erreur d\'inscription'));
       return false;
     } catch (e) {
       _logger.e('Erreur REGISTER: $e');
@@ -303,20 +300,35 @@ class AuthProvider extends ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        final userData = response.data['data']['user'];
+        final data = response.data['data'];
+        Map<String, dynamic>? userData;
+        if (data is Map && data['user'] is Map) {
+          userData = Map<String, dynamic>.from(data['user'] as Map);
+        } else if (data is Map && data['phone_number'] != null) {
+          final current = _currentUser?.toJson() ?? <String, dynamic>{};
+          current['phone_number'] = data['phone_number'];
+          userData = current;
+        }
 
-        // Mettre à jour les données utilisateur localement
-        await _secureStorage.write(key: _userKey, value: jsonEncode(userData));
-
-        // Recharger les données utilisateur pour mettre à jour l'état
-        await _loadUserData();
+        if (userData != null) {
+          await _memoryCache.saveUserData(jsonEncode(userData));
+          await _secureStorage.write(
+            key: _userKey,
+            value: jsonEncode(userData),
+          );
+          _currentUser = UserModel.fromJson(userData);
+          notifyListeners();
+        }
 
         _logger.i('📱 Numéro de téléphone mis à jour avec succès');
         return true;
       } else {
-        _setError('Erreur lors de la mise à jour du numéro de téléphone');
+        _setError(_extractApiErrors(response.data));
         return false;
       }
+    } on ApiException catch (e) {
+      _setError(e.message);
+      return false;
     } catch (e) {
       _logger.e('Erreur updatePhoneNumber: $e');
       _setError('Une erreur est survenue: ${e.toString()}');
@@ -357,17 +369,29 @@ class AuthProvider extends ChangeNotifier {
     _currentUser = UserModel.fromJson(userData);
     _isAuthenticated = true;
 
-    await NotificationService().sendTokenToBackend(accessToken);
+    await NotificationService().initialize();
+    if (accessToken is String && accessToken.isNotEmpty) {
+      await NotificationService().sendTokenToBackend(accessToken);
+    }
     notifyListeners();
   }
 
   Future<bool> refreshToken() async {
+    final result = await _refreshTokenWithResult();
+    if (result == TokenRefreshResult.sessionRevoked) {
+      await handleTokenExpired();
+    }
+    return result == TokenRefreshResult.success;
+  }
+
+  Future<TokenRefreshResult> _refreshTokenWithResult() async {
     try {
+      await _memoryCache.ensureLoaded();
       final storedRefreshToken = _memoryCache.refreshToken;
 
       if (storedRefreshToken == null || storedRefreshToken.isEmpty) {
         _logger.w('Refresh token manquant');
-        return false;
+        return TokenRefreshResult.sessionRevoked;
       }
 
       final response = await _baseClient.post(
@@ -378,16 +402,28 @@ class AuthProvider extends ChangeNotifier {
       if (response.statusCode == 200) {
         final newAccessToken = response.data['access'];
         if (newAccessToken != null) {
-          // Mettre à jour MemoryAuthCache ET SecureStorage
           await _memoryCache.updateAccessToken(newAccessToken);
           _logger.i('✅ Access token rafraîchi avec succès');
-          return true;
+          return TokenRefreshResult.success;
         }
       }
-      return false;
+      if (response.statusCode == 401) {
+        return TokenRefreshResult.sessionRevoked;
+      }
+      return TokenRefreshResult.failed;
+    } on DioException catch (e) {
+      if (BaseClient.isNetworkErrorPublic(e)) {
+        _logger.w('Refresh token — panne réseau, session conservée');
+        return TokenRefreshResult.networkError;
+      }
+      if (e.response?.statusCode == 401) {
+        return TokenRefreshResult.sessionRevoked;
+      }
+      _logger.e('Erreur rafraîchissement token: $e');
+      return TokenRefreshResult.failed;
     } catch (e) {
       _logger.e('Erreur rafraîchissement token: $e');
-      return false;
+      return TokenRefreshResult.failed;
     }
   }
 
@@ -441,13 +477,17 @@ class AuthProvider extends ChangeNotifier {
             }
           }
 
-          // Si refresh échoue ou token toujours expiré, logout complet
-          _logger
-              .w('🚨 Refresh échoué ou token toujours expiré - logout complet');
-          await _memoryCache.clear();
-          await _secureStorage.deleteAll();
-          _currentUser = null;
-          _isAuthenticated = false;
+          // Refresh échoué : conserver la session locale (déconnexion = bouton uniquement).
+          _logger.w(
+              '⚠️ Refresh échoué au démarrage — session locale conservée');
+          try {
+            _currentUser = UserModel.fromJson(jsonDecode(userDataString));
+            _isAuthenticated = true;
+          } catch (e) {
+            _logger.e('❌ Erreur parsing utilisateur: $e');
+            _currentUser = null;
+            _isAuthenticated = false;
+          }
           notifyListeners();
           return;
         }
@@ -460,9 +500,8 @@ class AuthProvider extends ChangeNotifier {
           _logger.i('📍 Session valide (token non expiré)');
         } catch (e) {
           _logger.e('❌ Erreur parsing utilisateur: $e');
-          await _memoryCache.clear();
+          _isAuthenticated = _memoryCache.accessToken != null;
           _currentUser = null;
-          _isAuthenticated = false;
         }
       } else {
         _logger.w('⚠️ Aucun token ou user data trouvé');
@@ -472,11 +511,8 @@ class AuthProvider extends ChangeNotifier {
 
       notifyListeners();
     } catch (e) {
-      _logger.e('❌ Erreur critique chargement utilisateur: $e');
-      await _memoryCache.clear();
-      await _secureStorage.deleteAll();
-      _currentUser = null;
-      _isAuthenticated = false;
+      _logger.e('❌ Erreur chargement utilisateur: $e');
+      _isAuthenticated = _memoryCache.accessToken != null;
       notifyListeners();
     }
   }
@@ -515,9 +551,39 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Vérifie si l'utilisateur est authentifié (vérifie l'expiration du token)
+  /// Vérifie si l'utilisateur est authentifié (expiration JWT + validation serveur).
   Future<void> checkAuth() async {
     await _loadUserData();
+    if (!_isAuthenticated) return;
+
+    try {
+      final response = await _baseClient.get('accounts/profile/');
+      if (response.statusCode == 200) {
+        final userData = response.data['data'];
+        if (userData is Map) {
+          final map = Map<String, dynamic>.from(userData);
+          _currentUser = UserModel.fromJson(map);
+          final encoded = jsonEncode(map);
+          await _secureStorage.write(key: _userKey, value: encoded);
+          await _memoryCache.saveUserData(encoded);
+          notifyListeners();
+        }
+      }
+    } on ApiException catch (e) {
+      if (e.type == ApiErrorType.unauthorized) {
+        await refreshToken();
+      }
+    } catch (e) {
+      _logger.w('Vérification profil serveur ignorée: $e');
+    }
+
+    if (_isAuthenticated) {
+      await NotificationService().initialize();
+      final token = accessToken;
+      if (token != null) {
+        await NotificationService().sendTokenToBackend(token);
+      }
+    }
   }
 
   /// Mot de passe oublié
@@ -608,5 +674,23 @@ class AuthProvider extends ChangeNotifier {
 
     // Fallback sur le message général
     return message ?? 'Erreur de validation';
+  }
+
+  String _messageFromDio(DioException e, {String fallback = 'Erreur de connexion'}) {
+    if (e.response?.statusCode == 400) {
+      return _extractApiErrors(e.response?.data ?? {});
+    }
+    if (e.response?.statusCode == 401) {
+      return 'Identifiants incorrects';
+    }
+    if (e.type == DioExceptionType.connectionError) {
+      return 'Serveur indisponible. Vérifiez votre connexion internet.';
+    }
+    if (e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
+        e.type == DioExceptionType.connectionTimeout) {
+      return 'Délai d\'attente dépassé. Réessayez dans un instant.';
+    }
+    return e.message ?? fallback;
   }
 }

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/auth_provider.dart';
-import '../../core/routes/app_routes.dart';
+import '../../core/utils/auth_navigation.dart';
 import '../../core/models/country_model.dart';
 import '../../core/services/location_service.dart';
 import '../auth/widgets/phone_input_card.dart';
@@ -44,6 +44,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _register() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Le numéro de téléphone est obligatoire')),
+      );
+      return;
+    }
+    if (_passwordController.text.trim().length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Le mot de passe doit contenir au moins 8 caractères'),
+        ),
+      );
+      return;
+    }
+
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -75,9 +91,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         final success = await authProvider.register(registerData);
 
         if (success && mounted) {
-          // Demander la localisation après une inscription réussie
           await _requestLocationAfterRegistration();
-          Navigator.pushReplacementNamed(context, AppRoutes.mainShell);
+          await navigateAfterAuth(context, authProvider);
         } else if (mounted && authProvider.errorMessage != null) {
           // Show error in SnackBar
           ScaffoldMessenger.of(context).showSnackBar(
@@ -370,10 +385,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           final success = await authProvider.signInWithGoogle();
 
                           if (success && mounted) {
-                            Navigator.pushReplacementNamed(
-                              context,
-                              AppRoutes.mainShell,
-                            );
+                            await navigateAfterAuth(context, authProvider);
                           }
                         },
                         icon: const FaIcon(
@@ -525,6 +537,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
       controller: controller,
       obscureText: isPass && _isObscure,
       keyboardType: type,
+      validator: isPass
+          ? (v) {
+              if (v == null || v.trim().length < 8) {
+                return 'Au moins 8 caractères';
+              }
+              return null;
+            }
+          : type == TextInputType.emailAddress
+              ? (v) {
+                  if (v != null &&
+                      v.trim().isNotEmpty &&
+                      !v.contains('@')) {
+                    return 'Email invalide';
+                  }
+                  return null;
+                }
+              : null,
       style: const TextStyle(fontSize: 15),
       decoration: InputDecoration(
         hintText: hint,

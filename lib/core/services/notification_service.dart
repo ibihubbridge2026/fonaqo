@@ -327,20 +327,7 @@ class NotificationService {
         ),
       );
 
-      // 2. Envoyer vers le profil utilisateur (nouveau - spécification API)
-      await _baseClient.patch(
-        'accounts/profile/',
-        data: {
-          'fcm_token': token,
-        },
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer $accessToken',
-          },
-        ),
-      );
-
-      _logger.i('Token FCM enregistré sur le backend et le profil');
+      _logger.i('Token FCM enregistré sur le backend');
     } catch (e) {
       _logger.e('Erreur envoi token FCM au backend: $e');
     }

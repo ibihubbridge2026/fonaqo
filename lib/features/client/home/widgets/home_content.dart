@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/providers/favorites_provider.dart';
+import 'package:fonaco/core/providers/mission_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/services/cache_service.dart';
+import 'package:fonaco/core/widgets/agent_avatar.dart';
 import 'package:fonaco/core/widgets/skeleton_loading.dart';
 import 'package:fonaco/widgets/main_wrapper.dart';
 import 'package:provider/provider.dart';
@@ -51,10 +54,13 @@ class _HomeContentState extends State<HomeContent>
     _heroTimer = Timer.periodic(const Duration(seconds: 4), _onHeroTick);
     // Lazy loading: delay data loading until after first frame
     Future.microtask(() => _loadDashboard());
-    // Initialiser le provider de favoris
+    // Initialiser le provider de favoris avec l'userId
+    final auth = Provider.of<AuthProvider>(context, listen: false);
     final favoritesProvider =
         Provider.of<FavoritesProvider>(context, listen: false);
-    favoritesProvider.init();
+    if (auth.currentUser?.id != null) {
+      favoritesProvider.init(auth.currentUser!.id);
+    }
   }
 
   void _toggleFavoriteAgent(String agentId) {
@@ -99,7 +105,7 @@ class _HomeContentState extends State<HomeContent>
       final cachedMissionsJson =
           _cacheService.getCachedJsonResponse('dashboard_missions');
       if (cachedMissionsJson != null &&
-          _cacheService.isJsonCacheValid('dashboard_missions')) {
+          _cacheService.isJsonCacheValid('dashboard_missions', maxAgeMinutes: 2)) {
         final cachedData = jsonDecode(cachedMissionsJson);
         if (cachedData is Map && cachedData['data'] is List) {
           final missionsList = (cachedData['data'] as List)
@@ -122,7 +128,7 @@ class _HomeContentState extends State<HomeContent>
       final cachedAgentsJson =
           _cacheService.getCachedJsonResponse('dashboard_agents');
       if (cachedAgentsJson != null &&
-          _cacheService.isJsonCacheValid('dashboard_agents')) {
+          _cacheService.isJsonCacheValid('dashboard_agents', maxAgeMinutes: 2)) {
         final cachedData = jsonDecode(cachedAgentsJson);
         if (cachedData is Map && cachedData['data'] is List) {
           final agentsList = (cachedData['data'] as List)
@@ -209,8 +215,8 @@ class _HomeContentState extends State<HomeContent>
     );
   }
 
-  List<MissionModel> _ongoingMissions() {
-    final ongoing = _missions
+  List<MissionModel> _ongoingMissionsFrom(List<MissionModel> source) {
+    final ongoing = source
         .where(
           (m) =>
               m.status == MissionStatus.PENDING ||
@@ -276,11 +282,12 @@ class _HomeContentState extends State<HomeContent>
           },
         ),
         const SizedBox(height: 12),
-        VocalCreateMissionButton(
-          onPressed: () {
-            Navigator.pushNamed(context, AppRoutes.createMissionVocal);
-          },
-        ),
+        // Désactivé temporairement — réactivation prévue prochainement.
+        // VocalCreateMissionButton(
+        //   onPressed: () {
+        //     Navigator.pushNamed(context, AppRoutes.createMissionVocal);
+        //   },
+        // ),
         SectionTitleStrip(
           title: 'Missions en cours',
           onSeeAllPressed: shell == null ? null : () => shell.setIndex(1),
@@ -301,7 +308,16 @@ class _HomeContentState extends State<HomeContent>
                 style: TextStyle(color: Colors.red[700], fontSize: 13),
               ),
             ),
-          OngoingMissionStrip(missions: _ongoingMissions()),
+          Consumer<MissionProvider>(
+            builder: (context, missionProvider, _) {
+              final source = missionProvider.missions.isNotEmpty
+                  ? missionProvider.missions
+                  : _missions;
+              return OngoingMissionStrip(
+                missions: _ongoingMissionsFrom(source),
+              );
+            },
+          ),
         ],
         const SizedBox(height: 25),
         SectionTitleStrip(
@@ -335,7 +351,9 @@ class _HomeContentState extends State<HomeContent>
         else
           QuickHistoryEntries(missions: _historyMissions()),
         const SizedBox(height: 25),
-        const ReportLitigeCardPanel(),
+        // Section litige uniquement si l'utilisateur a créé au moins une mission
+        if (!_dashLoading && _missions.isNotEmpty)
+          const ReportLitigeCardPanel(),
         SizedBox(height: bottomReserve),
       ],
     );
@@ -1124,7 +1142,12 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
       display.add({
         'name': name.isEmpty ? 'Agent' : name,
         'role': raw['specialty']?.toString() ?? 'Agent terrain',
-        'image': 'assets/images/avatar/user.png',
+        'avatar_url': raw['avatar_url']?.toString(),
+        'rating': parseAgentRating(
+          raw['reliability_score'] ?? raw['rating'],
+        ),
+        'is_verified': raw['is_verified'] == true,
+        'is_online': raw['is_online'] == true,
         'expertise_tags': expertiseTags,
         'agent_id': raw['id']?.toString() ?? '',
       });
@@ -1143,7 +1166,10 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
           return AgentCard(
             name: agent['name']!,
             role: agent['role']!,
-            imagePath: agent['image']!,
+            avatarUrl: agent['avatar_url']?.toString(),
+            rating: agent['rating'] as double?,
+            isVerified: agent['is_verified'] == true,
+            isOnline: agent['is_online'] == true,
             expertiseTags: (agent['expertise_tags'] as List<dynamic>?)
                     ?.map((e) => e.toString())
                     .toList() ??
@@ -1160,9 +1186,14 @@ class _AgentSuggestionSliderState extends State<AgentSuggestionSlider> {
 
 /// Carte individuelle d'un agent avec badge de certification.
 class AgentCard extends StatelessWidget {
+  static const String _fallbackAvatarAsset = 'assets/images/avatar/user.png';
+
   final String name;
   final String role;
-  final String imagePath;
+  final String? avatarUrl;
+  final double? rating;
+  final bool isVerified;
+  final bool isOnline;
   final List<String> expertiseTags;
   final String agentId;
   final bool isFavorite;
@@ -1172,7 +1203,10 @@ class AgentCard extends StatelessWidget {
     super.key,
     required this.name,
     required this.role,
-    required this.imagePath,
+    this.avatarUrl,
+    this.rating,
+    this.isVerified = false,
+    this.isOnline = false,
     this.expertiseTags = const [],
     required this.agentId,
     required this.isFavorite,
@@ -1205,19 +1239,7 @@ class AgentCard extends StatelessWidget {
                 radius: 32,
                 backgroundColor: Colors.grey[200],
                 child: ClipOval(
-                  child: Image.asset(
-                    imagePath,
-                    width: 64,
-                    height: 64,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) {
-                      return const Icon(
-                        Icons.person,
-                        color: Colors.black54,
-                        size: 32,
-                      );
-                    },
-                  ),
+                  child: _buildAvatarImage(),
                 ),
               ),
               // Badge de vérification style "Facebook/Blue Check"
@@ -1267,34 +1289,6 @@ class AgentCard extends StatelessWidget {
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 4),
-          // Tags d'expertise
-          if (expertiseTags.isNotEmpty)
-            Wrap(
-              spacing: 4,
-              runSpacing: 2,
-              alignment: WrapAlignment.center,
-              children: expertiseTags.take(2).map((tag) {
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFD400).withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    tag,
-                    style: const TextStyle(
-                      fontSize: 9,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF715D00),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
           const SizedBox(height: 6),
           // Petit bouton profil
           GestureDetector(
@@ -1306,11 +1300,11 @@ class AgentCard extends StatelessWidget {
                     agentId: agentId,
                     name: name,
                     role: role,
-                    imagePath: imagePath,
+                    avatarUrl: avatarUrl,
                     expertiseTags: expertiseTags,
-                    rating: 4.5,
-                    isVerified: true,
-                    isOnline: true,
+                    rating: rating,
+                    isVerified: isVerified,
+                    isOnline: isOnline,
                   ),
                 ),
               );
@@ -1332,6 +1326,47 @@ class AgentCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarImage() {
+    final url = avatarUrl?.trim();
+    if (url != null && url.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: url,
+        width: 64,
+        height: 64,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => Image.asset(
+          _fallbackAvatarAsset,
+          width: 64,
+          height: 64,
+          fit: BoxFit.cover,
+        ),
+        errorWidget: (_, __, ___) => Image.asset(
+          _fallbackAvatarAsset,
+          width: 64,
+          height: 64,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.person,
+            color: Colors.black54,
+            size: 32,
+          ),
+        ),
+      );
+    }
+
+    return Image.asset(
+      _fallbackAvatarAsset,
+      width: 64,
+      height: 64,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => const Icon(
+        Icons.person,
+        color: Colors.black54,
+        size: 32,
       ),
     );
   }

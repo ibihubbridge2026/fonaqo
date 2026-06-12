@@ -118,7 +118,7 @@ class MessageBubble extends StatelessWidget {
       message.content ?? '',
       style: TextStyle(
         fontSize: 15,
-        color: isMe ? Colors.white : Colors.black87,
+        color: Colors.black87,
         height: 1.4,
       ),
     );
@@ -229,7 +229,7 @@ class MessageBubble extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
-                    color: isMe ? Colors.white : Colors.black87,
+                    color: Colors.black87,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -289,7 +289,7 @@ class MessageBubble extends StatelessWidget {
           _formatTime(message.timestamp),
           style: TextStyle(
             fontSize: 11,
-            color: isMe ? Colors.white70 : Colors.black54,
+            color: Colors.grey.shade600,
           ),
         ),
         if (isMe) ...[
@@ -303,22 +303,22 @@ class MessageBubble extends StatelessWidget {
   Widget _buildMessageStatus() {
     switch (message.status) {
       case MessageStatus.sending:
-        return const SizedBox(
+        return SizedBox(
           width: 14,
           height: 14,
           child: CircularProgressIndicator(
             strokeWidth: 1.5,
-            valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+            color: Colors.grey.shade500,
           ),
         );
       case MessageStatus.sent:
-        return const Icon(Icons.check, size: 14, color: Colors.white70);
+        return Icon(Icons.check, size: 14, color: Colors.grey.shade600);
       case MessageStatus.delivered:
-        return const Icon(Icons.done_all, size: 14, color: Colors.white70);
+        return Icon(Icons.done_all, size: 14, color: Colors.grey.shade600);
       case MessageStatus.read:
-        return const Icon(Icons.done_all, size: 14, color: Colors.blue);
+        return const Icon(Icons.done_all, size: 14, color: Color(0xFF53BDEB));
       case MessageStatus.failed:
-        return const Icon(Icons.error_outline, size: 14, color: Colors.red);
+        return Icon(Icons.error_outline, size: 14, color: Colors.red.shade600);
     }
   }
 
@@ -331,7 +331,7 @@ class MessageBubble extends StatelessWidget {
   }
 
   Color _getBubbleColor() {
-    return isMe ? const Color(0xFFE7FFDB) : Colors.white;
+    return isMe ? const Color(0xFFD9FDD3) : Colors.white;
   }
 
   BorderRadius _getBorderRadius() {

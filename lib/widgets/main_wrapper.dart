@@ -3,6 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../core/providers/auth_provider.dart';
+import '../core/providers/mission_provider.dart';
+import '../core/providers/notification_provider.dart';
+import '../core/providers/wallet_provider.dart';
+import '../core/services/connectivity_sync_service.dart';
 import '../features/client/home/home_screen.dart';
 import '../features/client/missions/missions_screen.dart';
 import '../features/client/profile/profile_screen.dart';
@@ -79,6 +83,34 @@ class _MainWrapperState extends State<MainWrapper> {
   void initState() {
     super.initState();
     _requestLocationPermission();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<WalletProvider>(context, listen: false).fetchBalance();
+      Provider.of<NotificationProvider>(context, listen: false)
+          .reconnectAfterAuth();
+      _startConnectivitySync();
+    });
+  }
+
+  void _startConnectivitySync() {
+    ConnectivitySyncService.instance.start(
+      onReconnect: () async {
+        if (!mounted) return;
+        final auth = context.read<AuthProvider>();
+        if (!auth.isAuthenticated) return;
+
+        await Future.wait([
+          context.read<MissionProvider>().fetchMissions(),
+          context.read<WalletProvider>().fetchBalance(),
+        ], eagerError: false);
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    ConnectivitySyncService.instance.stop();
+    _showCreateMission.dispose();
+    super.dispose();
   }
 
   Future<void> _requestLocationPermission() async {

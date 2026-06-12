@@ -123,54 +123,47 @@ extension TransactionStatusExtension on TransactionStatus {
   }
 }
 
-/// Solde du wallet
+/// Solde du wallet — correspond au WalletSerializer backend (balance, escrow_balance).
 class WalletBalance {
-  final String userId;
+  final String id;
   final double availableBalance;
-  final double pendingBalance;
-  final double totalEarned;
-  final double totalSpent;
-  final String currency;
+  final double escrowBalance;
   final DateTime updatedAt;
 
   WalletBalance({
-    required this.userId,
+    required this.id,
     required this.availableBalance,
-    required this.pendingBalance,
-    required this.totalEarned,
-    required this.totalSpent,
-    required this.currency,
+    required this.escrowBalance,
     required this.updatedAt,
   });
 
-  /// Crée depuis JSON
+  /// Crée depuis JSON (champs backend : balance, escrow_balance).
   factory WalletBalance.fromJson(Map<String, dynamic> json) {
+    final data = (json['data'] is Map<String, dynamic>)
+        ? json['data'] as Map<String, dynamic>
+        : json;
     return WalletBalance(
-      userId: json['user_id'] as String,
-      availableBalance: (json['available_balance'] as num).toDouble(),
-      pendingBalance: (json['pending_balance'] as num).toDouble(),
-      totalEarned: (json['total_earned'] as num).toDouble(),
-      totalSpent: (json['total_spent'] as num).toDouble(),
-      currency: json['currency'] as String,
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      id: (data['id'] ?? '').toString(),
+      availableBalance: (data['balance'] as num? ?? 0).toDouble(),
+      escrowBalance: (data['escrow_balance'] as num? ?? 0).toDouble(),
+      updatedAt: data['updated_at'] != null
+          ? DateTime.tryParse(data['updated_at'].toString()) ?? DateTime.now()
+          : DateTime.now(),
     );
   }
 
   /// Convertit en JSON
   Map<String, dynamic> toJson() {
     return {
-      'user_id': userId,
-      'available_balance': availableBalance,
-      'pending_balance': pendingBalance,
-      'total_earned': totalEarned,
-      'total_spent': totalSpent,
-      'currency': currency,
+      'id': id,
+      'balance': availableBalance,
+      'escrow_balance': escrowBalance,
       'updated_at': updatedAt.toIso8601String(),
     };
   }
 
-  /// Solde total (disponible + en attente)
-  double get totalBalance => availableBalance + pendingBalance;
+  /// Solde total (disponible + séquestre)
+  double get totalBalance => availableBalance + escrowBalance;
 }
 
 /// Filtres pour les transactions

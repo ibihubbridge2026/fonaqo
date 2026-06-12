@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/models/country_model.dart' as country_model;
 import '../../core/providers/auth_provider.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/utils/auth_navigation.dart';
 import '../../core/services/feedback_service.dart';
 import '../../core/services/location_service.dart';
 import 'widgets/input_card.dart';
@@ -63,26 +64,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (success && mounted) {
-      // Vérifier si l'utilisateur a un numéro de téléphone
       final authProvider = context.read<AuthProvider>();
-      final currentUser = authProvider.currentUser;
-
-      if (currentUser?.phoneNumber == null ||
-          currentUser!.phoneNumber!.isEmpty) {
-        // Rediriger vers l'écran de complétion de profil
-        Navigator.pushReplacementNamed(
-          context,
-          AppRoutes.completeProfile,
-        );
-      } else {
-        // Rediriger vers le mainShell si le profil est complet
-        Navigator.pushReplacementNamed(
-          context,
-          AppRoutes.mainShell,
-        );
-      }
-
-      // Demander la localisation en arrière-plan après redirection (non bloquant)
+      await navigateAfterAuth(context, authProvider);
       _requestLocationAfterLogin();
     }
   }
@@ -378,12 +361,8 @@ class _LoginScreenState extends State<LoginScreen> {
                         final success = await authProvider.signInWithGoogle();
 
                         if (success && mounted) {
-                          // Demander la localisation après une connexion Google réussie
                           await _requestLocationAfterLogin();
-                          Navigator.pushReplacementNamed(
-                            context,
-                            AppRoutes.mainShell,
-                          );
+                          await navigateAfterAuth(context, authProvider);
                         }
                       },
                       icon: const FaIcon(

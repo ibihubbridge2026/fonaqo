@@ -4,12 +4,22 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:dio/dio.dart';
+import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
+import 'package:provider/provider.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/utils/marker_icon_cache.dart';
+import 'package:fonaco/core/api/base_client.dart';
+import 'package:fonaco/core/providers/auth_provider.dart';
+import 'package:fonaco/core/providers/mission_provider.dart';
+import 'package:fonaco/core/services/mission_audio_cleanup.dart';
+import 'package:fonaco/core/widgets/fon_dialog.dart';
 import 'package:fonaco/features/chat/chat_repository.dart';
 import 'mission_repository.dart';
+import 'widgets/mission_invoice_card.dart';
 
 class MissionDetailScreen extends StatefulWidget {
   final String? missionId;
@@ -20,7 +30,8 @@ class MissionDetailScreen extends StatefulWidget {
   State<MissionDetailScreen> createState() => _MissionDetailScreenState();
 }
 
-class _MissionDetailScreenState extends State<MissionDetailScreen> {
+class _MissionDetailScreenState extends State<MissionDetailScreen>
+    with WidgetsBindingObserver {
   final MissionRepository _missionRepository = MissionRepository();
   final ChatRepository _chatRepository = ChatRepository();
   final MarkerIconCache _markerCache = MarkerIconCache();
@@ -28,16 +39,33 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
   bool _isLoading = true;
   bool _isChatLoading = false;
   bool _isReleasingFunds = false;
+  bool _isCancelling = false;
   String? _errorMessage;
   String? _resolvedMissionId;
 
   @override
   void initState() {
     super.initState();
-    // Utilise un post-frame callback pour gérer les deux modes d'initialisation
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeMission();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed &&
+        _resolvedMissionId != null &&
+        _mission != null &&
+        !_isMissionFinal()) {
+      _loadMissionDetails();
+    }
   }
 
   void _initializeMission() {
@@ -72,6 +100,11 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
           _mission = missionData;
           _isLoading = false;
         });
+        context.read<MissionProvider>().upsertMission(missionData);
+        if (missionData.status == MissionStatus.COMPLETED ||
+            missionData.status == MissionStatus.CANCELLED) {
+          MissionAudioCleanup.purgeTemporaryRecordings();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -99,6 +132,64 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     if (_mission == null) return false;
     return _mission!.status == MissionStatus.COMPLETED ||
         _mission!.status == MissionStatus.CANCELLED;
+  }
+
+  bool get _canCancelMission {
+    if (_mission == null) return false;
+    return _mission!.status == MissionStatus.ACCEPTED ||
+        _mission!.status == MissionStatus.IN_PROGRESS;
+  }
+
+  Future<void> _confirmCancelMission() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => FonDialog.alert(
+        title: const Text('Annuler la mission'),
+        content: const Text(
+          "Attention, l'annulation d'une mission en cours entraîne un "
+          'dédommagement obligatoire de 20% pour l\'agent. Confirmer ?',
+        ),
+        actions: [
+          TextButton(
+            style: FonDialog.secondaryActionStyle(),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Non'),
+          ),
+          ElevatedButton(
+            style: FonDialog.primaryActionStyle(),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Confirmer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isCancelling = true);
+    try {
+      final updated =
+          await _missionRepository.cancelMission(_resolvedMissionId!);
+      await MissionAudioCleanup.purgeTemporaryRecordings();
+      if (!mounted) return;
+      setState(() {
+        _mission = updated;
+        _isCancelling = false;
+      });
+      context.read<MissionProvider>().upsertMission(updated);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mission annulée')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isCancelling = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur : $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -198,6 +289,41 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                           // Mini-profil agent enrichi
                           if (_hasAgentAccepted()) _buildAgentMiniProfile(),
                           const SizedBox(height: 20),
+                          if (_hasAgentAccepted())
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 16),
+                              child: SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: _resolvedMissionId == null
+                                      ? null
+                                      : () {
+                                          Navigator.pushNamed(
+                                            context,
+                                            AppRoutes.missionTracking,
+                                            arguments: {
+                                              'missionId': _resolvedMissionId,
+                                            },
+                                          );
+                                        },
+                                  icon: const Icon(Icons.gps_fixed, size: 18),
+                                  label: const Text('Suivi GPS en direct'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF121212),
+                                    side: const BorderSide(
+                                      color: Color(0xFFFFD400),
+                                      width: 2,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 14,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           // Badge de statut
                           _buildStatusBadge(),
                           const SizedBox(height: 16),
@@ -261,7 +387,51 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
                                       ),
                               ),
                             ),
+                          const SizedBox(height: 16),
+                          if (_mission!.status == MissionStatus.COMPLETED)
+                            MissionInvoiceCard(
+                              mission: _mission!,
+                              clientEmail: _mission!.clientEmail ??
+                                  context.read<AuthProvider>().currentUser?.email,
+                              agentEmail: _mission!.agentEmail,
+                              onDownload: _downloadInvoice,
+                            ),
                           const SizedBox(height: 24),
+                          if (_mission!.status == MissionStatus.DISPUTED)
+                            _buildDisputeStatusCard(),
+                          if (_canCancelMission)
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: _isCancelling
+                                    ? null
+                                    : _confirmCancelMission,
+                                icon: _isCancelling
+                                    ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.cancel_outlined),
+                                label: const Text(
+                                  'Annuler la mission',
+                                  style: TextStyle(fontWeight: FontWeight.w800),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: Colors.red.shade700,
+                                  side: BorderSide(color: Colors.red.shade300),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (_canCancelMission) const SizedBox(height: 16),
                           // Section litige
                           if (_mission!.status != MissionStatus.DISPUTED &&
                               _mission!.status != MissionStatus.CANCELLED)
@@ -486,7 +656,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
           if (_mission!.agentName != null)
             _buildDetailRow('Agent', _mission!.agentName!),
           if (_mission!.isUrgent) _buildDetailRow('Urgence', 'Oui'),
-          if (_mission!.isConfidential) _buildDetailRow('Confidentiel', 'Oui'),
+          if (_mission!.isConfidential)
+            _buildDetailRow('Agent interne', 'Oui'),
         ],
       ),
     );
@@ -520,6 +691,44 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     );
   }
 
+  Future<void> _downloadInvoice() async {
+    if (_resolvedMissionId == null) return;
+
+    try {
+      final baseClient = BaseClient();
+      final response = await baseClient.get(
+        'missions/$_resolvedMissionId/invoice/',
+        options: Options(responseType: ResponseType.bytes),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final bytes = response.data as List<int>;
+        await Printing.layoutPdf(
+          onLayout: (PdfPageFormat format) async => Uint8List.fromList(bytes),
+          name: 'facture_$_resolvedMissionId',
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Erreur lors du téléchargement de la facture'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _confirmReleaseFunds(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -540,10 +749,21 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     if (confirmed == true && mounted) {
       setState(() => _isReleasingFunds = true);
       try {
-        await _missionRepository.releaseFunds(_resolvedMissionId!);
+        final updated =
+            await _missionRepository.releaseFunds(_resolvedMissionId!);
         if (mounted) {
-          setState(() => _isReleasingFunds = false);
-          Navigator.pushNamed(context, AppRoutes.rating);
+          setState(() {
+            _isReleasingFunds = false;
+            _mission = updated;
+          });
+          context.read<MissionProvider>().upsertMission(updated);
+          await MissionAudioCleanup.purgeTemporaryRecordings();
+          if (!mounted) return;
+          Navigator.pushNamed(
+            context,
+            AppRoutes.rating,
+            arguments: {'missionId': _resolvedMissionId},
+          );
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
               content: Text('Fonds libérés !'), backgroundColor: Colors.green));
         }
@@ -936,6 +1156,29 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
     );
   }
 
+  Widget _buildDisputeStatusCard() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: const Text(
+        'Le traitement du litige est en cours veuillez patienter nous vous '
+        'reviendrons dans 24 h ouvréé au maximum avec la decision final',
+        style: TextStyle(
+          color: Colors.black87,
+          fontSize: 14,
+          height: 1.45,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   Widget _buildLitigeSection() {
     return Container(
       width: double.infinity,
@@ -1076,12 +1319,34 @@ class _MissionDetailScreenState extends State<MissionDetailScreen> {
       );
 
       if (conversation != null && mounted) {
-        final conversationId = conversation['id']?.toString();
+        final data = conversation['data'] is Map
+            ? Map<String, dynamic>.from(conversation['data'] as Map)
+            : conversation;
+        final conversationId = data['id']?.toString();
+
+        // Extraire le nom de l'autre utilisateur depuis la conversation
+        final auth = Provider.of<AuthProvider>(context, listen: false);
+        final currentUserId = auth.currentUser?.id;
+
+        String userName = 'Utilisateur';
+        final client = data['client'] as Map<String, dynamic>?;
+        final agent = data['agent'] as Map<String, dynamic>?;
+
+        if (client != null && client['id'] != currentUserId) {
+          userName = client['username'] ?? client['first_name'] ?? 'Client';
+        } else if (agent != null && agent['id'] != currentUserId) {
+          userName = agent['username'] ?? agent['first_name'] ?? 'Agent';
+        }
+
         if (conversationId != null) {
           Navigator.pushNamed(
             context,
             AppRoutes.chatDetail,
-            arguments: {'conversationId': conversationId},
+            arguments: {
+              'conversationId': conversationId,
+              'userName': userName,
+              'missionId': _resolvedMissionId,
+            },
           );
         } else {
           throw Exception('Conversation ID not found in response');

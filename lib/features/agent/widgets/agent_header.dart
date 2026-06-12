@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/providers/notification_provider.dart';
 import '../../../core/services/cache_service.dart';
 import '../../chat/screens/chat_list_screen.dart';
 import '../screens/agent_notifications_screen.dart';
@@ -76,9 +77,11 @@ class AgentHeader extends StatelessWidget implements PreferredSizeWidget {
                   ),
                 );
               },
-              child: AgentNotificationBadge(
-                count: 3,
-                child: _buildIconButton(Icons.notifications_none_outlined),
+              child: Consumer<NotificationProvider>(
+                builder: (context, notif, _) => AgentNotificationBadge(
+                  count: notif.unreadNotifications,
+                  child: _buildIconButton(Icons.notifications_none_outlined),
+                ),
               ),
             ),
           ],

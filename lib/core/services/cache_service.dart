@@ -13,6 +13,7 @@ class CacheService {
   static const String _profileBoxName = 'profile';
   static const String _settingsBoxName = 'settings';
   static const String _cacheBoxName = 'cache';
+  static const String _onboardingBoxName = 'onboarding_cache';
 
   // Clés de cache
   static const String _lastSyncKey = 'last_sync_timestamp';
@@ -39,6 +40,7 @@ class CacheService {
       await Hive.openBox(_profileBoxName);
       await Hive.openBox(_settingsBoxName);
       await Hive.openBox(_cacheBoxName);
+      await Hive.openBox(_onboardingBoxName);
 
       _isInitialized = true;
       _logger.i('✅ CacheService initialisé avec succès');
@@ -73,9 +75,16 @@ class CacheService {
         return [];
       }
       final box = Hive.box(_missionsBoxName);
-      return List<Map<String, dynamic>>.from(
-        box.get('available_missions', defaultValue: []),
-      );
+      final raw = box.get('available_missions', defaultValue: []);
+      if (raw is! List) return [];
+      return raw
+          .map((e) {
+            if (e is Map<String, dynamic>) return e;
+            if (e is Map) return Map<String, dynamic>.from(e);
+            return <String, dynamic>{};
+          })
+          .where((m) => m.isNotEmpty)
+          .toList();
     } catch (e) {
       _logger.e('❌ Erreur lecture cache missions: $e');
       return [];
@@ -110,8 +119,23 @@ class CacheService {
     }
   }
 
-  /// Vérifie si le cache JSON est valide (moins de 5 minutes)
-  bool isJsonCacheValid(String key, {int maxAgeMinutes = 5}) {
+  /// Invalide le cache dashboard (missions + agents suggestions).
+  Future<void> invalidateDashboardCache() async {
+    try {
+      if (!_isInitialized) return;
+      final box = Hive.box(_cacheBoxName);
+      for (final key in ['dashboard_missions', 'dashboard_agents']) {
+        await box.delete('json_$key');
+        await box.delete('json_${key}_timestamp');
+      }
+      _logger.i('🧹 Cache dashboard invalidé');
+    } catch (e) {
+      _logger.e('❌ Erreur invalidation cache dashboard: $e');
+    }
+  }
+
+  /// Vérifie si le cache JSON est valide (défaut : 2 minutes pour le dashboard).
+  bool isJsonCacheValid(String key, {int maxAgeMinutes = 2}) {
     try {
       final box = Hive.box(_cacheBoxName);
       final timestamp = box.get('json_${key}_timestamp');
@@ -141,7 +165,11 @@ class CacheService {
   Map<String, dynamic>? getCachedMission(String missionId) {
     try {
       final box = Hive.box(_missionsBoxName);
-      return box.get('mission_$missionId');
+      final raw = box.get('mission_$missionId');
+      if (raw == null) return null;
+      if (raw is Map<String, dynamic>) return raw;
+      if (raw is Map) return Map<String, dynamic>.from(raw);
+      return null;
     } catch (e) {
       _logger.e('❌ Erreur lecture cache mission: $e');
       return null;
@@ -165,7 +193,11 @@ class CacheService {
   Map<String, dynamic>? getCachedProfile() {
     try {
       final box = Hive.box(_profileBoxName);
-      return box.get('user_profile');
+      final raw = box.get('user_profile');
+      if (raw == null) return null;
+      if (raw is Map<String, dynamic>) return raw;
+      if (raw is Map) return Map<String, dynamic>.from(raw);
+      return null;
     } catch (e) {
       _logger.e('❌ Erreur lecture cache profil: $e');
       return null;
@@ -239,7 +271,11 @@ class CacheService {
   Map<String, dynamic>? getLastKnownLocation() {
     try {
       final box = Hive.box(_cacheBoxName);
-      return box.get(_userLocationKey);
+      final raw = box.get(_userLocationKey);
+      if (raw == null) return null;
+      if (raw is Map<String, dynamic>) return raw;
+      if (raw is Map) return Map<String, dynamic>.from(raw);
+      return null;
     } catch (e) {
       _logger.e('❌ Erreur lecture localisation: $e');
       return null;
@@ -287,6 +323,26 @@ class CacheService {
     }
   }
 
+  // ==================== ONBOARDING ====================
+
+  Future<void> setOnboardingComplete(bool isComplete) async {
+    final box = Hive.box(_onboardingBoxName);
+    await box.put('onboarding_complete', isComplete);
+  }
+
+  bool isOnboardingComplete() {
+    if (!_isInitialized) return false;
+    return Hive.box(_onboardingBoxName)
+        .get('onboarding_complete', defaultValue: false) as bool;
+  }
+
+  /// Vérifie si le cache missions est récent (< [maxAgeMinutes]).
+  bool isCacheValid({int maxAgeMinutes = 5}) {
+    final lastSync = getLastSyncTime();
+    if (lastSync == null) return false;
+    return DateTime.now().difference(lastSync).inMinutes < maxAgeMinutes;
+  }
+
   // ==================== NETTOYAGE ====================
 
   /// Efface tout le cache
@@ -321,26 +377,29 @@ class CacheService {
 
   // ==================== FAVORIS AGENTS ====================
 
-  /// Sauvegarde la liste des agents favoris
-  Future<void> saveFavoriteAgents(List<String> agentIds) async {
+  /// Sauvegarde la liste des agents favoris pour un utilisateur spécifique
+  Future<void> saveFavoriteAgents(List<String> agentIds, String userId) async {
     try {
       final box = Hive.box(_cacheBoxName);
-      await box.put('favorite_agents', agentIds);
-      _logger.i('❤️ ${agentIds.length} agents favoris sauvegardés');
+      final key = 'favorite_agents_$userId';
+      await box.put(key, agentIds);
+      _logger.i(
+          '❤️ ${agentIds.length} agents favoris sauvegardés pour user $userId');
     } catch (e) {
       _logger.e('❌ Erreur sauvegarde favoris: $e');
     }
   }
 
-  /// Récupère la liste des agents favoris
-  List<String> getFavoriteAgents() {
+  /// Récupère la liste des agents favoris pour un utilisateur spécifique
+  List<String> getFavoriteAgents(String userId) {
     try {
       if (!_isInitialized) {
         _logger.w('⚠️ CacheService non initialisé');
         return [];
       }
       final box = Hive.box(_cacheBoxName);
-      final favorites = box.get('favorite_agents', defaultValue: <String>[]);
+      final key = 'favorite_agents_$userId';
+      final favorites = box.get(key, defaultValue: <String>[]);
       if (favorites is List) {
         return favorites.map((e) => e.toString()).toList();
       }
@@ -351,43 +410,43 @@ class CacheService {
     }
   }
 
-  /// Ajoute un agent aux favoris
-  Future<void> addFavoriteAgent(String agentId) async {
+  /// Ajoute un agent aux favoris pour un utilisateur spécifique
+  Future<void> addFavoriteAgent(String agentId, String userId) async {
     try {
-      final favorites = getFavoriteAgents();
+      final favorites = getFavoriteAgents(userId);
       if (!favorites.contains(agentId)) {
         favorites.add(agentId);
-        await saveFavoriteAgents(favorites);
-        _logger.i('❤️ Agent $agentId ajouté aux favoris');
+        await saveFavoriteAgents(favorites, userId);
+        _logger.i('❤️ Agent $agentId ajouté aux favoris pour user $userId');
       }
     } catch (e) {
       _logger.e('❌ Erreur ajout favori: $e');
     }
   }
 
-  /// Retire un agent des favoris
-  Future<void> removeFavoriteAgent(String agentId) async {
+  /// Retire un agent des favoris pour un utilisateur spécifique
+  Future<void> removeFavoriteAgent(String agentId, String userId) async {
     try {
-      final favorites = getFavoriteAgents();
+      final favorites = getFavoriteAgents(userId);
       favorites.remove(agentId);
-      await saveFavoriteAgents(favorites);
-      _logger.i('💔 Agent $agentId retiré des favoris');
+      await saveFavoriteAgents(favorites, userId);
+      _logger.i('💔 Agent $agentId retiré des favoris pour user $userId');
     } catch (e) {
       _logger.e('❌ Erreur retrait favori: $e');
     }
   }
 
-  /// Vérifie si un agent est dans les favoris
-  bool isAgentFavorite(String agentId) {
-    return getFavoriteAgents().contains(agentId);
+  /// Vérifie si un agent est dans les favoris pour un utilisateur spécifique
+  bool isAgentFavorite(String agentId, String userId) {
+    return getFavoriteAgents(userId).contains(agentId);
   }
 
-  /// Bascule le statut de favori d'un agent
-  Future<void> toggleFavoriteAgent(String agentId) async {
-    if (isAgentFavorite(agentId)) {
-      await removeFavoriteAgent(agentId);
+  /// Bascule le statut de favori d'un agent pour un utilisateur spécifique
+  Future<void> toggleFavoriteAgent(String agentId, String userId) async {
+    if (isAgentFavorite(agentId, userId)) {
+      await removeFavoriteAgent(agentId, userId);
     } else {
-      await addFavoriteAgent(agentId);
+      await addFavoriteAgent(agentId, userId);
     }
   }
 
@@ -434,6 +493,71 @@ class CacheService {
       }
     } catch (e) {
       _logger.e('❌ Erreur ajout mission notée: $e');
+    }
+  }
+
+  // ==================== MISSIONS ARCHIVÉES ====================
+
+  String _archivedMissionsKey(String userId) => 'archived_missions_$userId';
+
+  /// IDs des missions archivées localement pour un utilisateur.
+  List<String> getArchivedMissionIds(String userId) {
+    try {
+      if (!_isInitialized || userId.isEmpty) return [];
+      final box = Hive.box(_cacheBoxName);
+      final raw = box.get(_archivedMissionsKey(userId), defaultValue: <String>[]);
+      if (raw is List) return raw.map((e) => e.toString()).toList();
+      return [];
+    } catch (e) {
+      _logger.e('❌ Erreur lecture missions archivées: $e');
+      return [];
+    }
+  }
+
+  Future<bool> _ensureInitialized() async {
+    if (_isInitialized) return true;
+    try {
+      await init();
+      return _isInitialized;
+    } catch (e) {
+      _logger.e('❌ Impossible d\'initialiser le cache: $e');
+      return false;
+    }
+  }
+
+  Future<bool> archiveMission(String userId, String missionId) async {
+    try {
+      if (userId.isEmpty || missionId.isEmpty) return false;
+      if (!await _ensureInitialized()) return false;
+
+      final ids = getArchivedMissionIds(userId);
+      if (ids.contains(missionId)) return true;
+
+      ids.add(missionId);
+      final box = Hive.box(_cacheBoxName);
+      await box.put(_archivedMissionsKey(userId), ids);
+      _logger.i('📁 Mission $missionId archivée');
+      return true;
+    } catch (e) {
+      _logger.e('❌ Erreur archivage mission: $e');
+      return false;
+    }
+  }
+
+  Future<bool> unarchiveMission(String userId, String missionId) async {
+    try {
+      if (userId.isEmpty || missionId.isEmpty) return false;
+      if (!await _ensureInitialized()) return false;
+
+      final ids = getArchivedMissionIds(userId)
+        ..removeWhere((id) => id == missionId);
+      final box = Hive.box(_cacheBoxName);
+      await box.put(_archivedMissionsKey(userId), ids);
+      _logger.i('📂 Mission $missionId désarchivée');
+      return true;
+    } catch (e) {
+      _logger.e('❌ Erreur désarchivage mission: $e');
+      return false;
     }
   }
 }

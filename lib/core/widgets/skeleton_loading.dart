@@ -29,6 +29,17 @@ class SkeletonLoading {
       },
     );
   }
+
+  /// Skeleton pour la liste des conversations (onglet Messages).
+  static Widget conversationList({int itemCount = 6}) {
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      itemCount: itemCount,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (_, __) => const _ConversationRowSkeleton(),
+    );
+  }
 }
 
 /// Skeleton pour une carte de mission
@@ -228,6 +239,59 @@ class _DashboardCardSkeleton extends StatelessWidget {
           _SkeletonBlock(
             width: 0.8,
             height: 16,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Skeleton d'une ligne de conversation (avatar + nom + aperçu).
+class _ConversationRowSkeleton extends StatelessWidget {
+  const _ConversationRowSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+      ),
+      child: Row(
+        children: [
+          _SkeletonCircle(diameter: 52),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SkeletonBlock(
+                        width: 0.55,
+                        height: 14,
+                        borderRadius: 8,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _SkeletonBlock(
+                      width: 36,
+                      height: 10,
+                      borderRadius: 6,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                _SkeletonBlock(
+                  width: 0.75,
+                  height: 12,
+                  borderRadius: 8,
+                ),
+              ],
+            ),
           ),
         ],
       ),

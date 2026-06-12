@@ -36,7 +36,10 @@ class _MissionsScreenState extends State<MissionsScreen> {
   int _currentPage = 1;
   bool _hasMore = true;
   String? _error;
-  String _filter = 'all'; // 'all', 'ongoing', 'completed', 'cancelled'
+  String _filter = 'all'; // 'all', 'ongoing', 'completed', 'cancelled', 'archived'
+  String _searchQuery = '';
+  Set<String> _archivedIds = {};
+  int _createMissionSession = 0;
 
   @override
   void initState() {
@@ -48,7 +51,10 @@ class _MissionsScreenState extends State<MissionsScreen> {
       _error = null;
     });
     // Charger les missions avec un délai pour éviter les problèmes de timing
-    Future.microtask(() => _loadMissions());
+    Future.microtask(() async {
+      await _loadArchivedIds();
+      await _loadMissions();
+    });
     // Écouter les changements pour rafraîchir la liste quand on quitte le mode création
     widget.showCreateMissionListenable.addListener(_onCreateModeChanged);
   }
@@ -77,7 +83,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
     });
 
     try {
-      final newMissions = await _repo.fetchMissionsList(
+      final result = await _repo.fetchMissionsPage(
         page: _currentPage + 1,
         pageSize: 10,
       );
@@ -86,9 +92,9 @@ class _MissionsScreenState extends State<MissionsScreen> {
 
       setState(() {
         _currentPage++;
-        _missions.addAll(newMissions);
+        _missions.addAll(result.missions);
         _isLoadingMore = false;
-        _hasMore = newMissions.length >= 10;
+        _hasMore = result.hasMore;
       });
     } catch (e) {
       if (!mounted) return;
@@ -98,8 +104,75 @@ class _MissionsScreenState extends State<MissionsScreen> {
     }
   }
 
+  Future<void> _loadArchivedIds() async {
+    final userId =
+        Provider.of<AuthProvider>(context, listen: false).currentUser?.id ?? '';
+    if (userId.isEmpty) return;
+
+    if (!_cacheService.isInitialized) {
+      try {
+        await _cacheService.init();
+      } catch (e) {
+        _logger.w('Cache non initialisé pour archivage: $e');
+        return;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _archivedIds = _cacheService.getArchivedMissionIds(userId).toSet();
+    });
+  }
+
+  Future<void> _archiveMission(String missionId) async {
+    final userId =
+        Provider.of<AuthProvider>(context, listen: false).currentUser?.id ?? '';
+    if (userId.isEmpty) return;
+
+    final ok = await _cacheService.archiveMission(userId, missionId);
+    if (!mounted) return;
+
+    if (ok) {
+      setState(() => _archivedIds.add(missionId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mission archivée')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible d\'archiver la mission. Réessayez.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _unarchiveMission(String missionId) async {
+    final userId =
+        Provider.of<AuthProvider>(context, listen: false).currentUser?.id ?? '';
+    if (userId.isEmpty) return;
+
+    final ok = await _cacheService.unarchiveMission(userId, missionId);
+    if (!mounted) return;
+
+    if (ok) {
+      setState(() => _archivedIds.remove(missionId));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Mission retirée des archives')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Impossible de désarchiver. Réessayez.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   void _onCreateModeChanged() {
     if (!widget.showCreateMissionListenable.value) {
+      setState(() => _createMissionSession++);
       _loadMissions();
     }
   }
@@ -185,11 +258,13 @@ class _MissionsScreenState extends State<MissionsScreen> {
     _logger.d('Chargement des missions depuis l\'API...');
 
     try {
-      final missions = await _repo.fetchMissionsList(
+      final result = await _repo.fetchMissionsPage(
         page: 1,
         pageSize: 10,
       );
-      _logger.d('Missions reçues: ${missions.length}');
+      final missions = result.missions;
+      _logger
+          .d('Missions reçues: ${missions.length}, hasMore: ${result.hasMore}');
 
       // Désactivé: Vérifier les missions terminées non notées
       // Le modal ne devrait s'afficher que lors d'une action utilisateur spécifique
@@ -211,9 +286,10 @@ class _MissionsScreenState extends State<MissionsScreen> {
       setState(() {
         _missions = missions;
         _loading = false;
-        _hasMore = missions.length >= 10;
+        _hasMore = result.hasMore;
         _error = null;
       });
+      await _loadArchivedIds();
     } catch (e, st) {
       _logger.e('Erreur chargement missions', error: e, stackTrace: st);
 
@@ -221,18 +297,25 @@ class _MissionsScreenState extends State<MissionsScreen> {
       setState(() {
         _error = "Erreur de connexion aux missions: ${e.toString()}";
         _loading = false;
-        _missions = [];
       });
     } finally {
       _isFetching = false;
     }
   }
 
+  bool _isArchived(String id) => _archivedIds.contains(id);
+
   /// Logique de filtrage des missions
   List<MissionModel> get _filteredMissions {
+    if (_filter == 'archived') {
+      return _missions.where((m) => _isArchived(m.id)).toList();
+    }
+
+    final visible = _missions.where((m) => !_isArchived(m.id));
+
     switch (_filter) {
       case 'ongoing':
-        return _missions
+        return visible
             .where((m) =>
                 m.status == MissionStatus.PENDING ||
                 m.status == MissionStatus.ACCEPTED ||
@@ -241,18 +324,34 @@ class _MissionsScreenState extends State<MissionsScreen> {
                 m.status == MissionStatus.IN_PROGRESS)
             .toList();
       case 'completed':
-        return _missions
+        return visible
             .where((m) => m.status == MissionStatus.COMPLETED)
             .toList();
       case 'cancelled':
-        return _missions
+        return visible
             .where((m) =>
                 m.status == MissionStatus.CANCELLED ||
                 m.status == MissionStatus.DISPUTED)
             .toList();
       default:
-        return _missions;
+        return visible.toList();
     }
+  }
+
+  List<MissionModel> get _displayMissions {
+    final base = _filteredMissions;
+    final q = _searchQuery.trim().toLowerCase();
+    if (q.isEmpty) return base;
+    return base.where((m) {
+      final title = m.title.toLowerCase();
+      final desc = m.description.toLowerCase();
+      final cat = (m.category ?? '').toLowerCase();
+      final addr = (m.address ?? '').toLowerCase();
+      return title.contains(q) ||
+          desc.contains(q) ||
+          cat.contains(q) ||
+          addr.contains(q);
+    }).toList();
   }
 
   @override
@@ -261,9 +360,11 @@ class _MissionsScreenState extends State<MissionsScreen> {
       valueListenable: widget.showCreateMissionListenable,
       builder: (context, isCreating, _) {
         if (isCreating) {
-          return const Padding(
-            padding: EdgeInsets.fromLTRB(12, 4, 12, 8),
-            child: CreateMissionScreen(),
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+            child: CreateMissionScreen(
+              key: ValueKey('create-mission-$_createMissionSession'),
+            ),
           );
         }
 
@@ -275,7 +376,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
           );
         }
 
-        final filtered = _filteredMissions;
+        final filtered = _displayMissions;
 
         return RefreshIndicator(
           onRefresh: _loadMissions,
@@ -319,6 +420,16 @@ class _MissionsScreenState extends State<MissionsScreen> {
                                 elevation: 0,
                               ),
                             ),
+                            // Bouton vocal désactivé temporairement (voir home_content.dart).
+                            // const SizedBox(width: 10),
+                            // OutlinedButton.icon(
+                            //   onPressed: () => Navigator.pushNamed(
+                            //     context,
+                            //     AppRoutes.createMissionVocal,
+                            //   ),
+                            //   icon: const Icon(Icons.mic, size: 18),
+                            //   label: const Text("VOCAL"),
+                            // ),
                             const SizedBox(width: 10),
                             _CategoryChip(
                               label: "Toutes",
@@ -342,7 +453,54 @@ class _MissionsScreenState extends State<MissionsScreen> {
                               onTap: () =>
                                   setState(() => _filter = 'cancelled'),
                             ),
+                            _CategoryChip(
+                              label: "Archivées",
+                              isActive: _filter == 'archived',
+                              onTap: () =>
+                                  setState(() => _filter = 'archived'),
+                            ),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        onChanged: (v) => setState(() => _searchQuery = v),
+                        decoration: InputDecoration(
+                          hintText: 'Rechercher une mission…',
+                          hintStyle: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontSize: 14,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search_rounded,
+                            color: Colors.grey.shade600,
+                            size: 22,
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 0,
+                            horizontal: 12,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE8E8E8),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFE8E8E8),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFFFD400),
+                              width: 1.5,
+                            ),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 18),
@@ -392,6 +550,10 @@ class _MissionsScreenState extends State<MissionsScreen> {
                           price: mission.price,
                           heroTag: 'mission_${mission.id}',
                           missionStatus: mission.status,
+                          showArchiveAction: _filter != 'archived',
+                          showUnarchiveAction: _filter == 'archived',
+                          onArchive: () => _archiveMission(mission.id),
+                          onUnarchive: () => _unarchiveMission(mission.id),
                           onTap: () => Navigator.pushNamed(
                             context,
                             AppRoutes.missionDetail,
@@ -520,6 +682,10 @@ class MissionCard extends StatelessWidget {
   final VoidCallback? onTap;
   final String? heroTag;
   final MissionStatus? missionStatus;
+  final bool showArchiveAction;
+  final bool showUnarchiveAction;
+  final VoidCallback? onArchive;
+  final VoidCallback? onUnarchive;
 
   const MissionCard(
       {super.key,
@@ -530,43 +696,48 @@ class MissionCard extends StatelessWidget {
       this.price,
       this.onTap,
       this.heroTag,
-      this.missionStatus});
+      this.missionStatus,
+      this.showArchiveAction = false,
+      this.showUnarchiveAction = false,
+      this.onArchive,
+      this.onUnarchive});
 
   @override
   Widget build(BuildContext context) {
-    final cardContent = InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 15),
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Colonne Gauche: Icône de mission
-            const Icon(
-              Icons.assignment_outlined,
-              color: Colors.black54,
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            // Colonne Droite: Toutes les informations
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Titre (2 lignes max avec ellipsis)
-                  Text(
+    final hasArchiveAction = showArchiveAction && onArchive != null;
+    final hasUnarchiveAction = showUnarchiveAction && onUnarchive != null;
+
+    Widget cardBody = Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.fromLTRB(15, 15, 15, 15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.assignment_outlined,
+            color: Colors.black54,
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: EdgeInsets.only(
+                    right: (hasArchiveAction || hasUnarchiveAction) ? 28 : 0,
+                  ),
+                  child: Text(
                     title,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
@@ -576,38 +747,70 @@ class MissionCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
-                  // Ligne 2: Type | Montant
-                  Text(
-                    '$type | ${price != null ? '${price!.toInt()} FCFA' : ''}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                      color: Colors.black,
-                    ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$type | ${price != null ? '${price!.toInt()} FCFA' : ''}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: Colors.black,
                   ),
-                  const SizedBox(height: 4),
-                  // Ligne 3: Date relative et Statut
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        time,
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 11,
-                        ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      time,
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 11,
                       ),
-                      _StatusBadge(
-                          status: status, missionStatus: missionStatus),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                    _StatusBadge(
+                      status: status,
+                      missionStatus: missionStatus,
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
+    );
+
+    Widget cardContent = Stack(
+      clipBehavior: Clip.none,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: cardBody,
+        ),
+        if (hasArchiveAction)
+          Positioned(
+            top: 4,
+            right: 4,
+            child: _MissionArchiveButton(
+              icon: Icons.archive_outlined,
+              tooltip: 'Archiver',
+              onPressed: onArchive!,
+            ),
+          ),
+        if (hasUnarchiveAction)
+          Positioned(
+            top: 4,
+            right: 4,
+            child: _MissionArchiveButton(
+              icon: Icons.unarchive_outlined,
+              tooltip: 'Retirer des archives',
+              onPressed: onUnarchive!,
+            ),
+          ),
+      ],
     );
 
     if (heroTag != null) {
@@ -621,6 +824,43 @@ class MissionCard extends StatelessWidget {
     }
 
     return cardContent;
+  }
+}
+
+class _MissionArchiveButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  const _MissionArchiveButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.92),
+      borderRadius: BorderRadius.circular(10),
+      elevation: 1,
+      shadowColor: Colors.black26,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(10),
+        child: Tooltip(
+          message: tooltip,
+          child: Padding(
+            padding: const EdgeInsets.all(7),
+            child: Icon(
+              icon,
+              size: 24,
+              color: Colors.grey.shade700,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

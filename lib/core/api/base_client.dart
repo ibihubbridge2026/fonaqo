@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logger/logger.dart';
@@ -6,6 +8,7 @@ import 'package:logger/logger.dart';
 import '../config/api_config.dart';
 import '../services/memory_auth_cache.dart';
 import '../utils/retry_utils.dart';
+import 'token_refresh_result.dart';
 
 /// Client HTTP centralisé pour toutes les appels API
 /// Utilise Dio avec intercepteurs pour authentification et logging
@@ -286,6 +289,10 @@ class BaseClient {
 
   /// Getter pour accéder à l'instance Dio directement si besoin
   Dio get dio => _dio;
+
+  /// Détecte une erreur réseau (hors expiration de session).
+  static bool isNetworkErrorPublic(DioException err) =>
+      _AuthInterceptor.isNetworkError(err);
 }
 
 /// Intercepteur pour ajouter le token JWT aux requêtes
@@ -333,23 +340,38 @@ class _AuthInterceptor extends Interceptor {
       return;
     }
 
-    // Lire le token depuis MemoryAuthCache (pas de SecureStorage)
+    // Hydrater depuis SecureStorage si la mémoire est vide (évite les 401 intempestifs).
+    await _memoryCache.ensureLoaded();
     final token = _memoryCache.accessToken;
     _logger.d(
-        '🔑 Token lu depuis mémoire: ${token != null ? "Présent (${token.length} chars)" : "ABSENT"} pour ${options.path}');
+        '🔑 Token lu: ${token != null ? "Présent (${token.length} chars)" : "ABSENT"} pour ${options.path}');
 
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
       _logger.d('✅ Header Authorization ajouté');
     } else {
-      _logger.w('⚠️ Token absent ou vide, header non ajouté');
+      _logger.w('⚠️ Token absent après hydratation pour ${options.path}');
     }
     handler.next(options);
   }
 
+  static bool isNetworkError(DioException err) {
+    return err.type == DioExceptionType.connectionTimeout ||
+        err.type == DioExceptionType.sendTimeout ||
+        err.type == DioExceptionType.receiveTimeout ||
+        err.type == DioExceptionType.connectionError ||
+        err.error is SocketException;
+  }
+
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
-    // FILTRAGE STRICT : Seules les vraies erreurs 401 déclenchent la déconnexion
+    // Panne réseau : conserver la session, propager l'erreur sans déconnexion.
+    if (isNetworkError(err)) {
+      _logger.d(
+          '📴 Erreur réseau sur ${err.requestOptions.path} — session conservée');
+      return handler.next(err);
+    }
+
     final isExact401 = err.response?.statusCode == 401;
     final isNotPublicPath = !_isPublicPath(err.requestOptions.path);
     final hasResponse = err.response != null;
@@ -362,9 +384,7 @@ class _AuthInterceptor extends Interceptor {
       final refreshAttempt =
           err.requestOptions.extra['refresh_attempt'] as int? ?? 0;
       if (refreshAttempt >= 1) {
-        _logger.w('🚨 Refresh déjà tenté pour cette requête, déconnexion');
-        await _memoryCache.clear();
-        onTokenExpired?.call();
+        _logger.w('🚨 Refresh déjà tenté pour cette requête — rejet sans déconnexion');
         return handler.reject(err);
       }
       err.requestOptions.extra['refresh_attempt'] = refreshAttempt + 1;
@@ -396,22 +416,32 @@ class _AuthInterceptor extends Interceptor {
             }
           }
         }
-        // Si échec après attente, continuer vers logout
       } else {
         // Premier 401: lancer le refresh
         _isRefreshing = true;
         _refreshCompleter = Completer<void>();
 
         _logger.w('🔄 401 reçu — tentative de rafraîchissement du token JWT');
-        final refreshed = await _tryRefreshToken();
+        final refreshResult = await _tryRefreshToken();
 
         // Notifier tous les requêtes en attente
         _refreshCompleter!.complete();
         _isRefreshing = false;
         _refreshCompleter = null;
 
-        if (refreshed) {
-          // Réessayer la requête originale avec le nouveau token
+        if (refreshResult == TokenRefreshResult.sessionRevoked) {
+          _logger.e('🚨 Refresh token révoqué/expiré — déconnexion requise');
+          onTokenExpired?.call();
+          return handler.reject(err);
+        }
+
+        if (refreshResult == TokenRefreshResult.networkError) {
+          _logger.w(
+              '📴 Refresh impossible (réseau) — requête rejetée, session conservée');
+          return handler.reject(err);
+        }
+
+        if (refreshResult == TokenRefreshResult.success) {
           final newToken = _memoryCache.accessToken;
           if (newToken != null) {
             err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
@@ -427,14 +457,8 @@ class _AuthInterceptor extends Interceptor {
         }
       }
 
-      // Si le rafraîchissement échoue, SEULEMENT là on déconnecte
-      _logger.w('🚨 JWT expiré ou invalide : DÉCONNEXION confirmée');
-      _logger.w('📍 Suppression du stockage token et appel de onTokenExpired');
-      await _secureStorage.delete(key: _tokenKey);
-      await _secureStorage.delete(key: _refreshTokenKey);
-      await _secureStorage.delete(key: 'user_data');
-      onTokenExpired?.call();
-      return; // Important : ne pas appeler handler.next(err) après déconnexion
+      _logger.w('⚠️ Refresh échoué — requête rejetée, session conservée');
+      return handler.reject(err);
     }
 
     // Pour toutes les autres erreurs (404, 500, réseau, etc.), on ne fait rien de spécial
@@ -448,22 +472,21 @@ class _AuthInterceptor extends Interceptor {
     handler.next(err);
   }
 
-  /// Tente de rafraîchir le token JWT
-  Future<bool> _tryRefreshToken() async {
+  /// Tente de rafraîchir le token JWT.
+  Future<TokenRefreshResult> _tryRefreshToken() async {
     try {
+      await _memoryCache.ensureLoaded();
       final refreshToken = _memoryCache.refreshToken;
       if (refreshToken == null || refreshToken.isEmpty) {
-        _logger.w('Refresh token absent ou vide, déconnexion requise');
-        return false;
+        _logger.w('Refresh token absent après hydratation');
+        return TokenRefreshResult.sessionRevoked;
       }
 
       final dio = Dio(BaseOptions(
         baseUrl: ApiConfig.baseUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 10),
-        headers: {
-          'No-Auth': 'True'
-        }, // Évite l'interception par l'auth interceptor
+        headers: {'No-Auth': 'True'},
       ));
 
       final response = await dio.post(
@@ -475,21 +498,36 @@ class _AuthInterceptor extends Interceptor {
         final newAccessToken = response.data['access'] as String?;
         if (newAccessToken == null || newAccessToken.isEmpty) {
           _logger.e('Access token absent dans la réponse de refresh');
-          return false;
+          return TokenRefreshResult.failed;
         }
-        // Nettoyer le token pour éviter les caractères parasites (#, espaces, etc.)
         final cleanToken = newAccessToken
             .trim()
             .replaceAll('#', '')
             .replaceAll(RegExp(r'\s'), '');
         await _memoryCache.updateAccessToken(cleanToken);
         _logger.i('Token JWT rafraîchi avec succès');
-        return true;
+        return TokenRefreshResult.success;
       }
+
+      if (response.statusCode == 401) {
+        return TokenRefreshResult.sessionRevoked;
+      }
+      return TokenRefreshResult.failed;
+    } on DioException catch (e) {
+      if (isNetworkError(e)) {
+        _logger.w('Refresh token — panne réseau: ${e.type}');
+        return TokenRefreshResult.networkError;
+      }
+      if (e.response?.statusCode == 401) {
+        _logger.e('Refresh token rejeté par le serveur (401)');
+        return TokenRefreshResult.sessionRevoked;
+      }
+      _logger.e('Échec du rafraîchissement du token: $e');
+      return TokenRefreshResult.failed;
     } catch (e) {
       _logger.e('Échec du rafraîchissement du token: $e');
+      return TokenRefreshResult.failed;
     }
-    return false;
   }
 }
 

@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:fonaco/core/api/base_client.dart';
+import 'package:fonaco/features/client/missions/screens/vocal_validation_screen.dart';
 
 /// Écran de création de mission par vocal - Flux "Zéro Clavier"
 class CreateMissionVocalScreen extends StatefulWidget {
@@ -25,6 +26,7 @@ class _CreateMissionVocalScreenState extends State<CreateMissionVocalScreen>
   bool _isRecording = false;
   bool _isProcessing = false;
   bool _hasRecorded = false;
+  bool _isStopping = false;
   String? _audioPath;
   String? _transcription;
 
@@ -98,15 +100,19 @@ class _CreateMissionVocalScreenState extends State<CreateMissionVocalScreen>
   }
 
   Future<void> _stopRecording() async {
+    if (!_isRecording || _isStopping) return;
+    _isStopping = true;
     try {
       final path = await _audioRecorder.stop();
       setState(() {
         _isRecording = false;
         _hasRecorded = true;
         _audioPath = path;
+        _isStopping = false;
       });
       await _sendAudioToBackend();
     } catch (e) {
+      setState(() => _isStopping = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -134,7 +140,7 @@ class _CreateMissionVocalScreenState extends State<CreateMissionVocalScreen>
       });
 
       final response = await _api.post(
-        '/api/v1/missions/parse-vocal/',
+        'missions/parse-vocal/',
         data: formData,
       );
 
@@ -148,6 +154,33 @@ class _CreateMissionVocalScreenState extends State<CreateMissionVocalScreen>
           _transcription = data['transcription'] as String?;
           _isProcessing = false;
         });
+        if ((_missingFields == null || _missingFields!.isEmpty) && mounted) {
+          _navigateToValidation();
+        }
+      } else {
+        final errorMsg = () {
+          final body = response.data;
+          if (body is Map)
+            return body['error']?.toString() ?? body['message']?.toString();
+          return null;
+        }();
+        final code = response.statusCode;
+        String userMessage;
+        if (code == 422) {
+          userMessage = errorMsg ??
+              'Audio incompréhensible, parlez plus clairement et réessayez.';
+        } else if (code == 503) {
+          userMessage = errorMsg ??
+              'Service de transcription indisponible. Réessayez plus tard.';
+        } else {
+          userMessage = errorMsg ?? 'Erreur serveur ($code). Réessayez.';
+        }
+        setState(() => _isProcessing = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(userMessage), backgroundColor: Colors.red),
+          );
+        }
       }
     } catch (e) {
       setState(() => _isProcessing = false);
@@ -170,56 +203,24 @@ class _CreateMissionVocalScreenState extends State<CreateMissionVocalScreen>
       _currentFieldIndex++;
     });
 
-    // Vérifier si tous les champs sont remplis
+    // Vérifier si tous les champs sont remplis → naviguer vers l'écran de validation
     if (_currentFieldIndex >= (_missingFields?.length ?? 0)) {
-      _createMission();
+      _navigateToValidation();
     }
   }
 
-  Future<void> _createMission() async {
-    setState(() => _isProcessing = true);
-
-    try {
-      // Construire le payload pour la création de mission
-      final payload = {
-        'title': _extractedData?['title'] ?? 'Mission vocale',
-        'description': _extractedData?['description'] ?? _transcription ?? '',
-        'address': _extractedData?['address'] ?? 'Abidjan',
-        'latitude': _extractedData?['latitude'] ?? 5.36,
-        'longitude': _extractedData?['longitude'] ?? -3.99,
-        'price': _extractedData?['budget'] ?? 10000,
-        'service_fee': (_extractedData?['budget'] ?? 10000) * 0.1,
-        'requires_procuration': false,
-        'is_urgent': _extractedData?['scheduled_date'] == 'ASAP',
-        'is_confidential': false,
-        'purchase_amount': 0,
-        'service_amount': _extractedData?['budget'] ?? 10000,
-        'recurrence': 'once',
-      };
-
-      final response = await _api.post('missions/', data: payload);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Mission créée avec succès !'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      setState(() => _isProcessing = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Erreur création mission: $e'),
-              backgroundColor: Colors.red),
-        );
-      }
+  void _navigateToValidation() {
+    if (_extractedData == null) return;
+    final data = Map<String, dynamic>.from(_extractedData!);
+    if ((data['description'] as String?)?.isEmpty ?? true) {
+      data['description'] = _transcription ?? '';
     }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VocalValidationScreen(extractedData: data),
+      ),
+    );
   }
 
   @override
@@ -548,7 +549,7 @@ class _CreateMissionVocalScreenState extends State<CreateMissionVocalScreen>
         ),
         const SizedBox(height: 32),
         ElevatedButton.icon(
-          onPressed: _createMission,
+          onPressed: _navigateToValidation,
           icon: const Icon(Icons.rocket_launch, size: 24),
           label: const Text(
             '🚀 Lancer la recherche d\'un artisan',

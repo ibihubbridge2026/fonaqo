@@ -12,7 +12,7 @@ class WalletRepository {
   /// Récupère le solde du wallet
   Future<WalletBalance?> getBalance() async {
     try {
-      final response = await _api.get('/wallet/balance/');
+      final response = await _api.get('wallets/balance/');
 
       if (response.statusCode == 200) {
         return WalletBalance.fromJson(response.data as Map<String, dynamic>);
@@ -42,7 +42,7 @@ class WalletRepository {
       }
 
       final response =
-          await _api.get('/wallet/transactions/', queryParameters: params);
+          await _api.get('wallets/transactions/', queryParameters: params);
 
       if (response.statusCode == 200) {
         final data = response.data['results'] as List;
@@ -62,7 +62,7 @@ class WalletRepository {
   /// Récupère une transaction par ID
   Future<WalletTransaction?> getTransaction(String transactionId) async {
     try {
-      final response = await _api.get('/wallet/transactions/$transactionId/');
+      final response = await _api.get('wallets/transactions/$transactionId/');
 
       if (response.statusCode == 200) {
         return WalletTransaction.fromJson(
@@ -76,6 +76,39 @@ class WalletRepository {
     }
   }
 
+  /// Recharge le portefeuille (dépôt test / mobile money simulé).
+  Future<double?> deposit({
+    required double amount,
+    String paymentMethod = 'mobile_money',
+    String? paymentReference,
+  }) async {
+    try {
+      final response = await _api.post(
+        'wallets/deposit/',
+        data: {
+          'amount': amount,
+          'payment_method': paymentMethod,
+          if (paymentReference != null) 'payment_reference': paymentReference,
+        },
+      );
+
+      if (response.statusCode == 201) {
+        final data = response.data;
+        if (data is Map<String, dynamic>) {
+          final payload = data['data'];
+          final inner = payload is Map<String, dynamic> ? payload : data;
+          final balance = inner['new_balance'];
+          if (balance is num) return balance.toDouble();
+        }
+        return null;
+      }
+      return null;
+    } catch (e) {
+      _logger.e('Error depositing to wallet: $e');
+      rethrow;
+    }
+  }
+
   /// Demande un retrait
   Future<bool> requestWithdrawal({
     required double amount,
@@ -84,7 +117,7 @@ class WalletRepository {
   }) async {
     try {
       final response = await _api.post(
-        '/wallet/withdraw/',
+        'wallets/withdraw/',
         data: {
           'amount': amount,
           'payment_method': paymentMethod,
@@ -123,7 +156,7 @@ class WalletRepository {
       }
 
       final response = await _api.get(
-        '/wallet/export/pdf/',
+        'wallets/export/pdf/',
         queryParameters: params,
       );
 
@@ -163,7 +196,7 @@ class WalletRepository {
       }
 
       final response = await _api.get(
-        '/wallet/export/csv/',
+        'wallets/export/csv/',
         queryParameters: params,
       );
 
@@ -199,7 +232,7 @@ class WalletRepository {
       }
 
       final response =
-          await _api.get('/wallet/statistics/', queryParameters: params);
+          await _api.get('wallets/statistics/', queryParameters: params);
 
       if (response.statusCode == 200) {
         return response.data as Map<String, dynamic>;

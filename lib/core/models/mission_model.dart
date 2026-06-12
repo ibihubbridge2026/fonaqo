@@ -78,6 +78,12 @@ class MissionModel {
   final bool isVerified;
   final bool isConfidential;
   final bool isUrgent;
+  final bool isVocalDescription;
+  final double? serviceFee;
+  final double? serviceAmount;
+  final double? purchaseAmount;
+  final String? agentEmail;
+  final String? clientEmail;
   final List<String>? tags;
   final double? clientRating;
 
@@ -107,6 +113,12 @@ class MissionModel {
     this.isVerified = false,
     this.isConfidential = false,
     this.isUrgent = false,
+    this.isVocalDescription = false,
+    this.serviceFee,
+    this.serviceAmount,
+    this.purchaseAmount,
+    this.agentEmail,
+    this.clientEmail,
     this.tags,
     this.clientRating,
   });
@@ -132,7 +144,8 @@ class MissionModel {
         address: json['address']?.toString(),
         pickupAddress: json['pickup_address']?.toString(),
         destinationAddress: json['destination_address']?.toString(),
-        category: json['category']?.toString(),
+        category: json['category']?.toString() ??
+            _firstTagName(json['tags']),
         avatarUrl: json['avatar_url']?.toString(),
         agentRating: _readDouble(json['agent_rating']),
         agentCompletedMissions: _readInt(json['agent_completed_missions']),
@@ -142,6 +155,12 @@ class MissionModel {
         isVerified: _readBool(json['is_verified']),
         isConfidential: _readBool(json['is_confidential']),
         isUrgent: _readBool(json['is_urgent']),
+        isVocalDescription: _readBool(json['is_vocal_description']),
+        serviceFee: _readDouble(json['service_fee']),
+        serviceAmount: _readDouble(json['service_amount']),
+        purchaseAmount: _readDouble(json['purchase_amount']),
+        agentEmail: json['agent_email']?.toString(),
+        clientEmail: json['client_email']?.toString(),
         tags: _readStringList(json['tags']),
         clientRating: _readDouble(json['client_rating']),
       );
@@ -190,6 +209,13 @@ class MissionModel {
   static List<String>? _readStringList(dynamic v) {
     if (v == null) return null;
     if (v is List) return v.map((e) => e.toString()).toList();
+    return null;
+  }
+
+  static String? _firstTagName(dynamic tags) {
+    if (tags is List && tags.isNotEmpty) {
+      return tags.first.toString();
+    }
     return null;
   }
 

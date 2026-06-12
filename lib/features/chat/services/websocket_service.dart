@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:flutter/foundation.dart';
-import 'package:fonaco/core/utils/app_logger.dart';
-import 'package:fonaco/core/providers/auth_provider.dart';
-import 'package:provider/provider.dart';
-import 'package:flutter/material.dart';
 
-/// Service WebSocket pour le chat en temps réel
-/// Gère la connexion, la reconnexion automatique et les événements
+import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+
+import 'package:fonaco/core/config/api_config.dart' as core_cfg;
+import 'package:fonaco/core/utils/app_logger.dart';
+
+/// Service WebSocket mission-scoped — aligné sur Django `ws/chat/<mission_id>/`.
 class ChatWebSocketService {
   static final ChatWebSocketService _instance =
       ChatWebSocketService._internal();
@@ -16,40 +16,50 @@ class ChatWebSocketService {
   ChatWebSocketService._internal();
 
   final AppLogger _logger = AppLogger();
+  final _uuid = const Uuid();
   WebSocketChannel? _channel;
   Timer? _reconnectTimer;
   Timer? _heartbeatTimer;
   bool _isConnected = false;
   bool _isManuallyDisconnected = false;
-  String? _currentConversationId;
+  String? _currentMissionId;
   String? _accessToken;
+  String? _lastMessageId;
 
-  // Callbacks pour les événements
   final StreamController<ChatEvent> _eventController =
       StreamController.broadcast();
   Stream<ChatEvent> get events => _eventController.stream;
 
-  // Configuration
   static const Duration _reconnectDelay = Duration(seconds: 3);
   static const Duration _heartbeatInterval = Duration(seconds: 30);
   static const int _maxReconnectAttempts = 10;
   int _reconnectAttempts = 0;
 
-  /// Connecte au WebSocket
-  Future<void> connect(BuildContext context) async {
-    if (_isConnected) return;
+  String? get currentMissionId => _currentMissionId;
+  bool get isConnected => _isConnected;
+
+  /// Connecte au WebSocket d'une mission.
+  Future<void> connect({
+    required String missionId,
+    required String accessToken,
+  }) async {
+    if (missionId.isEmpty || accessToken.isEmpty) {
+      _logger.w('Cannot connect: missing missionId or token');
+      return;
+    }
+
+    if (_isConnected && _currentMissionId == missionId) return;
+
+    if (_isConnected && _currentMissionId != missionId) {
+      disconnect();
+    }
+
+    _currentMissionId = missionId;
+    _accessToken = accessToken;
 
     try {
-      final auth = Provider.of<AuthProvider>(context, listen: false);
-      _accessToken = auth.accessToken;
-
-      if (_accessToken == null) {
-        _logger.w('No access token available');
-        return;
-      }
-
       final wsUrl = Uri.parse(
-        'ws://${ApiConfig.wsHost}/ws/chat/?token=$_accessToken',
+        '${core_cfg.ApiConfig.wsBaseUrl}/ws/chat/$missionId/?token=$accessToken',
       );
 
       _logger.i('Connecting to WebSocket: $wsUrl');
@@ -68,191 +78,144 @@ class ChatWebSocketService {
       _isConnected = true;
       _eventController.add(ChatEvent('connected', null));
       _startHeartbeat();
-
-      _logger.i('WebSocket connected successfully');
     } catch (e) {
       _logger.e('WebSocket connection error: $e');
       _scheduleReconnect();
     }
   }
 
-  /// Déconnecte du WebSocket
   void disconnect() {
     _isManuallyDisconnected = true;
     _reconnectTimer?.cancel();
     _heartbeatTimer?.cancel();
     _channel?.sink.close();
+    _channel = null;
     _isConnected = false;
-    _logger.i('WebSocket disconnected manually');
+    _currentMissionId = null;
   }
 
-  /// Joint une conversation spécifique
-  void joinConversation(String conversationId) {
-    if (!_isConnected) {
-      _logger.w('Cannot join conversation: not connected');
-      return;
-    }
-
-    _currentConversationId = conversationId;
-    _send({
-      'type': 'join_conversation',
-      'conversation_id': conversationId,
-    });
-    _logger.i('Joined conversation: $conversationId');
-  }
-
-  /// Quitte la conversation actuelle
-  void leaveConversation() {
-    if (_currentConversationId == null) return;
-
-    _send({
-      'type': 'leave_conversation',
-      'conversation_id': _currentConversationId,
-    });
-    _currentConversationId = null;
-    _logger.i('Left conversation');
-  }
-
-  /// Envoie un message
-  void sendMessage({
-    required String conversationId,
+  String sendMessage({
     required String content,
-    required String messageType,
-    Map<String, dynamic>? metadata,
+    String messageType = 'text',
+    double? proposedPrice,
   }) {
+    final clientMsgId = _uuid.v4();
     if (!_isConnected) {
       _logger.w('Cannot send message: not connected');
-      return;
+      return clientMsgId;
     }
-
     _send({
       'type': 'message',
-      'conversation_id': conversationId,
+      'client_message_id': clientMsgId,
       'content': content,
       'message_type': messageType,
-      'metadata': metadata,
+      if (proposedPrice != null) 'proposed_price': proposedPrice,
     });
+    return clientMsgId;
   }
 
-  /// Envoie un indicateur de typing
-  void sendTypingStatus(String conversationId, bool isTyping) {
+  void sendTypingStatus(bool isTyping) {
     if (!_isConnected) return;
-
-    _send({
-      'type': 'typing',
-      'conversation_id': conversationId,
-      'is_typing': isTyping,
-    });
+    _send({'type': isTyping ? 'typing_start' : 'typing_stop'});
   }
 
-  /// Marque des messages comme lus
-  void markAsRead(String conversationId, List<String> messageIds) {
+  void markAsRead(List<String> messageIds, {bool conversationOpen = true}) {
     if (!_isConnected) return;
-
     _send({
-      'type': 'read_receipt',
-      'conversation_id': conversationId,
+      'type': 'mark_read',
       'message_ids': messageIds,
+      'conversation_open': conversationOpen,
     });
   }
 
-  /// Envoie des données brutes
+  void requestCatchup(String? lastMessageId) {
+    if (!_isConnected) return;
+    _send({
+      'type': 'catchup',
+      if (lastMessageId != null) 'last_message_id': lastMessageId,
+    });
+  }
+
   void _send(Map<String, dynamic> data) {
     try {
       _channel?.sink.add(jsonEncode(data));
-      _logger.d('Sent: ${data['type']}');
     } catch (e) {
       _logger.e('Error sending message: $e');
     }
   }
 
-  /// Gère les messages reçus
   void _onMessage(dynamic message) {
     try {
       final data = jsonDecode(message as String) as Map<String, dynamic>;
       final type = data['type'] as String;
+      _reconnectAttempts = 0;
 
-      _logger.d('Received: $type');
+      if (type == 'message' || type == 'catchup_result') {
+        final msg = data['message'] as Map<String, dynamic>?;
+        if (msg != null) {
+          final id = msg['id']?.toString();
+          if (id != null) _lastMessageId = id;
+        }
+        final msgs = data['messages'] as List<dynamic>?;
+        if (msgs != null && msgs.isNotEmpty) {
+          _lastMessageId = (msgs.last as Map)['id']?.toString();
+        }
+      }
 
       _eventController.add(ChatEvent(type, data));
-
-      // Réinitialiser le compteur de reconnexion sur message reçu
-      _reconnectAttempts = 0;
     } catch (e) {
       _logger.e('Error parsing message: $e');
     }
   }
 
-  /// Gère les erreurs
   void _onError(error) {
     _logger.e('WebSocket error: $error');
     _isConnected = false;
-    if (!_isManuallyDisconnected) {
-      _scheduleReconnect();
-    }
+    if (!_isManuallyDisconnected) _scheduleReconnect();
   }
 
-  /// Gère la fermeture de connexion
   void _onDone() {
-    _logger.i('WebSocket connection closed');
     _isConnected = false;
     _heartbeatTimer?.cancel();
-
-    if (!_isManuallyDisconnected) {
-      _scheduleReconnect();
-    }
+    if (!_isManuallyDisconnected) _scheduleReconnect();
   }
 
-  /// Planifie une reconnexion
   void _scheduleReconnect() {
-    if (_reconnectAttempts >= _maxReconnectAttempts) {
-      _logger.e('Max reconnection attempts reached');
+    if (_reconnectAttempts >= _maxReconnectAttempts ||
+        _currentMissionId == null ||
+        _accessToken == null) {
       _eventController.add(ChatEvent('reconnect_failed', null));
       return;
     }
 
     _reconnectTimer?.cancel();
     _reconnectAttempts++;
-
-    final delay = _reconnectDelay * _reconnectAttempts;
-    _logger.w(
-        'Reconnecting in ${delay.inSeconds}s (attempt $_reconnectAttempts/$_maxReconnectAttempts)');
+    final delaySec = (_reconnectDelay.inSeconds * _reconnectAttempts).clamp(1, 60);
+    final delay = Duration(seconds: delaySec);
 
     _reconnectTimer = Timer(delay, () {
-      // Note: Need context to reconnect, will be handled by UI layer
-      _eventController.add(ChatEvent('reconnecting', {
-        'attempt': _reconnectAttempts,
-        'max_attempts': _maxReconnectAttempts,
-      }));
-    });
-  }
-
-  /// Démarre le heartbeat
-  void _startHeartbeat() {
-    _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
-      if (_isConnected) {
-        _send({'type': 'heartbeat'});
+      if (_currentMissionId != null && _accessToken != null) {
+        connect(missionId: _currentMissionId!, accessToken: _accessToken!);
+        if (_lastMessageId != null) requestCatchup(_lastMessageId);
       }
     });
   }
 
-  /// Nettoyage
+  void _startHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
+      if (_isConnected) _send({'type': 'heartbeat'});
+    });
+  }
+
   void dispose() {
     disconnect();
     _eventController.close();
   }
 }
 
-/// Événement WebSocket
 class ChatEvent {
   final String type;
   final Map<String, dynamic>? data;
-
   ChatEvent(this.type, this.data);
-}
-
-/// Configuration API (référence)
-class ApiConfig {
-  static String get wsHost => '192.168.1.73:8000';
 }

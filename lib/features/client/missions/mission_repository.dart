@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:logger/logger.dart';
 
@@ -18,9 +20,12 @@ class MissionCreatePayload {
   final String? targetAgentUsername;
   final bool isUrgent;
   final bool isConfidential;
+  final bool isVocalDescription;
+  final String? descriptionAudioPath;
   final double purchaseAmount;
   final double serviceAmount;
   final String recurrence;
+  final int? categoryId;
 
   const MissionCreatePayload({
     required this.title,
@@ -34,9 +39,12 @@ class MissionCreatePayload {
     this.targetAgentUsername,
     this.isUrgent = false,
     this.isConfidential = false,
+    this.isVocalDescription = false,
+    this.descriptionAudioPath,
     this.purchaseAmount = 0,
     this.serviceAmount = 0,
     this.recurrence = 'once',
+    this.categoryId,
   });
 
   Map<String, dynamic> toJson() => {
@@ -50,11 +58,16 @@ class MissionCreatePayload {
         'requires_procuration': requiresProcuration,
         'is_urgent': isUrgent,
         'is_confidential': isConfidential,
+        'is_vocal_description': isVocalDescription,
         'purchase_amount': purchaseAmount,
         'service_amount': serviceAmount,
         'recurrence': recurrence,
         if (targetAgentUsername != null)
           'target_agent_username': targetAgentUsername,
+        if (categoryId != null) ...{
+          'category_id': categoryId,
+          'tag_ids': [categoryId],
+        },
       };
 }
 
@@ -140,6 +153,22 @@ class MissionRepository {
     int page = 1,
     int pageSize = 10,
   }) async {
+    final result = await fetchMissionsPage(
+      latitude: latitude,
+      longitude: longitude,
+      page: page,
+      pageSize: pageSize,
+    );
+    return result.missions;
+  }
+
+  /// Variante avec métadonnées de pagination (hasMore basé sur 'next').
+  Future<({List<MissionModel> missions, bool hasMore})> fetchMissionsPage({
+    double? latitude,
+    double? longitude,
+    int page = 1,
+    int pageSize = 10,
+  }) async {
     try {
       final Map<String, dynamic> query = {
         'page': page.toString(),
@@ -164,14 +193,31 @@ class MissionRepository {
         throw Exception('Erreur HTTP ${response.statusCode}');
       }
 
-      final rows = _extractListFromEnvelope(response.data);
+      final raw = response.data;
+      final rows = _extractListFromEnvelope(raw);
       _logger.i('✅ Missions parsées: ${rows.length}');
 
-      return rows
+      // Utiliser le champ 'next' du payload paginé plutôt que length >= pageSize
+      bool hasMore = false;
+      if (raw is Map) {
+        final data = raw['data'];
+        if (data is Map && data['next'] != null) {
+          hasMore = data['next'].toString().isNotEmpty;
+        } else if (raw['next'] != null) {
+          hasMore = raw['next'].toString().isNotEmpty;
+        }
+      }
+      if (!hasMore) {
+        hasMore = rows.length >= pageSize;
+      }
+
+      final missions = rows
           .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
           .toList();
+
+      return (missions: missions, hasMore: hasMore);
     } catch (e, st) {
-      _logger.e('fetchMissionsList', error: e, stackTrace: st);
+      _logger.e('fetchMissionsPage', error: e, stackTrace: st);
       rethrow;
     }
   }
@@ -260,10 +306,29 @@ class MissionRepository {
 
   Future<MissionModel> createMission(MissionCreatePayload payload) async {
     try {
-      final response = await _baseClient.post(
-        'missions/',
-        data: payload.toJson(),
-      );
+      final Response response;
+      if (payload.isVocalDescription &&
+          payload.descriptionAudioPath != null &&
+          File(payload.descriptionAudioPath!).existsSync()) {
+        final formMap = <String, dynamic>{
+          ...payload.toJson(),
+          'description_audio': await MultipartFile.fromFile(
+            payload.descriptionAudioPath!,
+            filename: 'description.m4a',
+            contentType: DioMediaType('audio', 'm4a'),
+          ),
+        };
+        response = await _baseClient.post(
+          'missions/',
+          data: FormData.fromMap(formMap),
+          options: Options(contentType: 'multipart/form-data'),
+        );
+      } else {
+        response = await _baseClient.post(
+          'missions/',
+          data: payload.toJson(),
+        );
+      }
       if (response.statusCode != 200 && response.statusCode != 201) {
         throw DioException(
           requestOptions: response.requestOptions,
@@ -271,7 +336,18 @@ class MissionRepository {
           message: 'Création mission refusée',
         );
       }
-      final missionMap = _extractObjectFromEnvelope(response.data);
+      Map<String, dynamic> missionMap;
+      try {
+        missionMap = _extractObjectFromEnvelope(response.data);
+      } catch (_) {
+        if (response.data is Map<String, dynamic>) {
+          missionMap = response.data as Map<String, dynamic>;
+        } else if (response.data is Map) {
+          missionMap = Map<String, dynamic>.from(response.data as Map);
+        } else {
+          rethrow;
+        }
+      }
       return MissionModel.fromJson(missionMap);
     } catch (e, st) {
       _logger.e('createMission', error: e, stackTrace: st);
@@ -309,6 +385,16 @@ class MissionRepository {
     return MissionModel.fromJson(_extractObjectFromEnvelope(response.data));
   }
 
+  Map<String, dynamic> _parseMissionBody(dynamic body) {
+    try {
+      return _extractObjectFromEnvelope(body);
+    } catch (_) {
+      if (body is Map<String, dynamic>) return body;
+      if (body is Map) return Map<String, dynamic>.from(body);
+      rethrow;
+    }
+  }
+
   /// Libère les fonds au client après validation de la mission terminée.
   Future<MissionModel> releaseFunds(String missionId) async {
     final response =
@@ -316,7 +402,13 @@ class MissionRepository {
     if (response.statusCode != 200 && response.statusCode != 201) {
       throw Exception('Impossible de libérer les fonds');
     }
-    return MissionModel.fromJson(_extractObjectFromEnvelope(response.data));
+    final data = response.data;
+    if (data is Map && data['data'] is Map) {
+      return MissionModel.fromJson(
+        Map<String, dynamic>.from(data['data'] as Map),
+      );
+    }
+    return MissionModel.fromJson(_parseMissionBody(data));
   }
 
   /// Catégories de services (GET /services/categories/).
@@ -446,6 +538,80 @@ class MissionRepository {
     } catch (e, st) {
       _logger.e('rateMission', error: e, stackTrace: st);
       rethrow;
+    }
+  }
+
+  /// Annule une mission (POST /missions/{id}/cancel_mission/).
+  Future<MissionModel> cancelMission(String missionId) async {
+    final response = await _baseClient.post(
+      'missions/$missionId/cancel_mission/',
+      data: {},
+    );
+    if (response.statusCode != 200) {
+      final body = response.data;
+      final msg = body is Map
+          ? body['message']?.toString() ?? body['error']?.toString()
+          : null;
+      throw Exception(msg ?? 'Annulation impossible (${response.statusCode})');
+    }
+    final body = response.data;
+    if (body is Map && body['data'] is Map) {
+      return MissionModel.fromJson(
+        Map<String, dynamic>.from(body['data'] as Map),
+      );
+    }
+    if (body is Map) {
+      return MissionModel.fromJson(Map<String, dynamic>.from(body));
+    }
+    throw Exception('Réponse annulation invalide');
+  }
+
+  /// Accepte une proposition tarifaire (POST update_negotiated_price).
+  Future<MissionModel> acceptNegotiatedPrice({
+    required String missionId,
+    required String messageId,
+    required String paymentMethod,
+    String? paymentReference,
+  }) async {
+    final response = await _baseClient.post(
+      'missions/$missionId/update_negotiated_price/',
+      data: {
+        'message_id': messageId,
+        'payment_method': paymentMethod,
+        if (paymentReference != null) 'payment_reference': paymentReference,
+      },
+    );
+    if (response.statusCode != 200) {
+      final body = response.data;
+      final msg = body is Map
+          ? body['message']?.toString() ?? body['error']?.toString()
+          : null;
+      throw Exception(msg ?? 'Acceptation impossible (${response.statusCode})');
+    }
+    final body = response.data;
+    if (body is Map && body['data'] is Map) {
+      return MissionModel.fromJson(
+        Map<String, dynamic>.from(body['data'] as Map),
+      );
+    }
+    throw Exception('Réponse négociation invalide');
+  }
+
+  /// Refuse une proposition tarifaire.
+  Future<void> rejectNegotiation({
+    required String missionId,
+    required String messageId,
+  }) async {
+    final response = await _baseClient.post(
+      'missions/$missionId/reject_negotiation/',
+      data: {'message_id': messageId},
+    );
+    if (response.statusCode != 200) {
+      final body = response.data;
+      final msg = body is Map
+          ? body['message']?.toString() ?? body['error']?.toString()
+          : null;
+      throw Exception(msg ?? 'Refus impossible (${response.statusCode})');
     }
   }
 }

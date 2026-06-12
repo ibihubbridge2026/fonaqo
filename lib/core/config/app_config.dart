@@ -111,24 +111,24 @@ class AppConfig {
   }
 
   void _logInitialization() {
-    print('═══════════════════════════════════════════════════════════');
-    print('🚀 FONAQO - Configuration Initialisée');
-    print('═══════════════════════════════════════════════════════════');
-    print('📦 Environment: ${_environment.name}');
-    print('📱 Version: $_appVersion ($_buildNumber)');
-    print('🌐 API: $_apiBaseUrl');
-    print('🔌 WebSocket: $_wsUrl');
-    print('🔥 Firebase: $_firebaseProjectId');
-    print(
+    debugPrint('═══════════════════════════════════════════════════════════');
+    debugPrint('🚀 FONAQO - Configuration Initialisée');
+    debugPrint('═══════════════════════════════════════════════════════════');
+    debugPrint('📦 Environment: ${_environment.name}');
+    debugPrint('📱 Version: $_appVersion ($_buildNumber)');
+    debugPrint('🌐 API: $_apiBaseUrl');
+    debugPrint('🔌 WebSocket: $_wsUrl');
+    debugPrint('🔥 Firebase: $_firebaseProjectId');
+    debugPrint(
         '🗺️ Google Maps: ${_googleMapsApiKey.isNotEmpty ? "✓ Configuré" : "✗ Non configuré"}');
-    print('═══════════════════════════════════════════════════════════');
-    print('⚙️ Features:');
-    print('  - AI Search: ${_enableAiSearch ? "✓" : "✗"}');
-    print('  - Chat: ${_enableChat ? "✓" : "✗"}');
-    print('  - Wallet: ${_enableWallet ? "✓" : "✗"}');
-    print('  - Boosts: ${_enableBoosts ? "✓" : "✗"}');
-    print('  - Disputes: ${_enableDisputes ? "✓" : "✗"}');
-    print('═══════════════════════════════════════════════════════════');
+    debugPrint('═══════════════════════════════════════════════════════════');
+    debugPrint('⚙️ Features:');
+    debugPrint('  - AI Search: ${_enableAiSearch ? "✓" : "✗"}');
+    debugPrint('  - Chat: ${_enableChat ? "✓" : "✗"}');
+    debugPrint('  - Wallet: ${_enableWallet ? "✓" : "✗"}');
+    debugPrint('  - Boosts: ${_enableBoosts ? "✓" : "✗"}');
+    debugPrint('  - Disputes: ${_enableDisputes ? "✓" : "✗"}');
+    debugPrint('═══════════════════════════════════════════════════════════');
   }
 
   // Getters

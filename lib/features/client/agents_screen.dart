@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import 'package:fonaco/core/constants/app_constants.dart';
-import 'package:fonaco/core/services/cache_service.dart';
+import 'package:fonaco/core/providers/auth_provider.dart';
+import 'package:fonaco/core/providers/favorites_provider.dart';
 import 'package:fonaco/core/utils/marker_icon_cache.dart';
 import 'package:fonaco/core/widgets/skeleton_loading.dart';
 import 'package:fonaco/features/client/missions/mission_repository.dart';
@@ -25,7 +27,6 @@ class _AgentsScreenState extends State<AgentsScreen>
 
   final Logger _log = Logger();
   final MissionRepository _missionRepository = MissionRepository();
-  final CacheService _cacheService = CacheService();
   final MarkerIconCache _markerCache = MarkerIconCache();
 
   List<Map<String, dynamic>> _agents = [];
@@ -34,8 +35,6 @@ class _AgentsScreenState extends State<AgentsScreen>
   bool _locating = false;
   bool _nearbyMode = false; // Mode "Proches de moi" désactivé par défaut
   String? _selectedExpertiseTag; // Tag d'expertise sélectionné pour filtrage
-  Set<String> _favoriteAgentIds = {};
-
   static const Color _accent = Color(0xFFFFD400);
 
   final CameraPosition _initialCamera = const CameraPosition(
@@ -55,11 +54,13 @@ class _AgentsScreenState extends State<AgentsScreen>
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Charger les favoris
-      _loadFavoriteAgents();
-      // Charger tous les agents d'abord (sans contrainte GPS)
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final userId = auth.currentUser?.id;
+      if (userId != null) {
+        await Provider.of<FavoritesProvider>(context, listen: false)
+            .init(userId);
+      }
       await _loadAgents();
-      // Initialiser la localisation en arrière-plan
       await _initLocation();
     });
   }
@@ -70,45 +71,9 @@ class _AgentsScreenState extends State<AgentsScreen>
     super.dispose();
   }
 
-  void _loadFavoriteAgents() {
-    if (!_cacheService.isInitialized) return;
-    try {
-      _cacheService.init().then((_) {
-        if (mounted) {
-          setState(() {
-            _favoriteAgentIds = _cacheService.getFavoriteAgents().toSet();
-          });
-        }
-      });
-    } catch (e) {
-      // Ignorer les erreurs
-    }
-  }
-
   void _toggleFavoriteAgent(String agentId) {
-    if (!_cacheService.isInitialized) {
-      _cacheService.init().then((_) {
-        _cacheService.toggleFavoriteAgent(agentId);
-        if (mounted) {
-          setState(() {
-            if (_favoriteAgentIds.contains(agentId)) {
-              _favoriteAgentIds.remove(agentId);
-            } else {
-              _favoriteAgentIds.add(agentId);
-            }
-          });
-        }
-      });
-    } else {
-      _cacheService.toggleFavoriteAgent(agentId);
-      setState(() {
-        if (_favoriteAgentIds.contains(agentId)) {
-          _favoriteAgentIds.remove(agentId);
-        } else {
-          _favoriteAgentIds.add(agentId);
-        }
-      });
-    }
+    Provider.of<FavoritesProvider>(context, listen: false)
+        .toggleFavorite(agentId);
   }
 
   Future<void> _loadAgents({
@@ -139,12 +104,11 @@ class _AgentsScreenState extends State<AgentsScreen>
         missionTypes: missionTypes,
         minPrice: minPrice,
         maxPrice: maxPrice,
-        limit: 20,
+        limit: 50,
       );
 
       if (!mounted) return;
 
-      // Utiliser les coordonnées actuelles ou les coordonnées par défaut
       final centerLatLng = _currentLatLng ??
           LatLng(AppConstants.defaultLatitude, AppConstants.defaultLongitude);
 
@@ -153,6 +117,8 @@ class _AgentsScreenState extends State<AgentsScreen>
         _isLoadingAgents = false;
         _markers = _buildMarkersAround(centerLatLng);
       });
+
+      await _fitMapToAgents();
     } catch (e) {
       if (!mounted) return;
 
@@ -372,8 +338,12 @@ class _AgentsScreenState extends State<AgentsScreen>
               markerId: MarkerId('agent_${agent['id']}'),
               position: LatLng(lat, lng),
               infoWindow: InfoWindow(
-                title: agent['first_name'] ?? 'Agent',
-                snippet: agent['specialties']?.join(', ') ?? '',
+                title: _agentDisplayName(agent),
+                snippet: agent['specialty']?.toString() ??
+                    (agent['expertise_tags'] as List?)
+                        ?.map((e) => e.toString())
+                        .join(', ') ??
+                    'Agent Fonaqo',
               ),
               icon: _markerCache.agentMarker,
             ),
@@ -408,6 +378,61 @@ class _AgentsScreenState extends State<AgentsScreen>
     }
 
     return markers;
+  }
+
+  String _agentDisplayName(Map<String, dynamic> agent) {
+    final fn = agent['first_name']?.toString() ?? '';
+    final ln = agent['last_name']?.toString() ?? '';
+    final full = '$fn $ln'.trim();
+    if (full.isNotEmpty) return full;
+    return agent['username']?.toString() ?? 'Agent';
+  }
+
+  LatLngBounds _boundsFromLatLngList(List<LatLng> points) {
+    double? minLat, maxLat, minLng, maxLng;
+    for (final p in points) {
+      minLat = minLat == null ? p.latitude : (p.latitude < minLat ? p.latitude : minLat);
+      maxLat = maxLat == null ? p.latitude : (p.latitude > maxLat ? p.latitude : maxLat);
+      minLng = minLng == null ? p.longitude : (p.longitude < minLng ? p.longitude : minLng);
+      maxLng = maxLng == null ? p.longitude : (p.longitude > maxLng ? p.longitude : maxLng);
+    }
+    return LatLngBounds(
+      southwest: LatLng(minLat!, minLng!),
+      northeast: LatLng(maxLat!, maxLng!),
+    );
+  }
+
+  Future<void> _fitMapToAgents() async {
+    final controller = _mapController;
+    if (controller == null || _agents.isEmpty) return;
+
+    final positions = <LatLng>[];
+    for (final agent in _agents) {
+      final lat = _parseCoordinate(agent['latitude']);
+      final lng = _parseCoordinate(agent['longitude']);
+      if (lat != null && lng != null) {
+        positions.add(LatLng(lat, lng));
+      }
+    }
+    if (_currentLatLng != null) positions.add(_currentLatLng!);
+    if (positions.isEmpty) return;
+
+    if (positions.length == 1) {
+      await controller.animateCamera(
+        CameraUpdate.newLatLngZoom(positions.first, 13),
+      );
+      return;
+    }
+
+    try {
+      await controller.animateCamera(
+        CameraUpdate.newLatLngBounds(_boundsFromLatLngList(positions), 72),
+      );
+    } catch (_) {
+      await controller.animateCamera(
+        CameraUpdate.newLatLngZoom(positions.first, 11),
+      );
+    }
   }
 
   Future<void> _animateTo(LatLng target) async {
@@ -535,10 +560,13 @@ class _AgentsScreenState extends State<AgentsScreen>
               onMapCreated: (controller) async {
                 _mapController = controller;
 
-                final me = _currentLatLng;
-
-                if (me != null) {
-                  await _animateTo(me);
+                if (_agents.isNotEmpty) {
+                  await _fitMapToAgents();
+                } else {
+                  final me = _currentLatLng;
+                  if (me != null) {
+                    await _animateTo(me);
+                  }
                 }
               },
               onCameraMove: (CameraPosition position) {
@@ -772,8 +800,9 @@ class _AgentsScreenState extends State<AgentsScreen>
                                       _selectedExpertiseTag = tag;
                                     });
                                   },
-                                  isFavorite:
-                                      _favoriteAgentIds.contains(agentId),
+                                  isFavorite: context
+                                      .watch<FavoritesProvider>()
+                                      .isFavorite(agentId),
                                   onToggleFavorite: _toggleFavoriteAgent,
                                 );
                               },
@@ -1060,11 +1089,10 @@ class AgentListTile extends StatelessWidget {
                   onPressed: () {
                     Navigator.pushNamed(
                       context,
-                      '/chat-detail',
+                      '/agent-profile',
                       arguments: {
-                        'chatId': 'chat_${agent['id']}',
-                        'userName': name.isNotEmpty ? name : 'Agent',
-                        'missionId': null,
+                        'agentId': agent['id']?.toString() ?? '',
+                        'agent': agent,
                       },
                     );
                   },

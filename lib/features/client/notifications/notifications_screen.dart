@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
+import 'package:provider/provider.dart';
 
 import 'package:fonaco/core/api/base_client.dart';
 import 'package:fonaco/core/providers/notification_provider.dart';
+import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 
 /// Liste des notifications côté client (Requester).
@@ -19,8 +21,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   List<Map<String, dynamic>> _notifications = [];
   bool _loading = true;
   String? _error;
-  final NotificationProvider _notificationProvider = NotificationProvider();
-
   @override
   void initState() {
     super.initState();
@@ -117,33 +117,81 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Icons.notifications_none;
   }
 
+  Future<void> _navigateFromNotification(Map<String, dynamic> notif) async {
+    if (!mounted) return;
+
+    final action = notif['action']?.toString().toLowerCase() ?? '';
+    final targetId = notif['target_id']?.toString() ?? '';
+    final title = notif['title']?.toString().toLowerCase() ?? '';
+    final body = notif['body']?.toString().toLowerCase() ?? '';
+
+    String resolvedAction = action;
+    String resolvedTarget = targetId;
+
+    if (resolvedAction.isEmpty) {
+      if (title.contains('message') ||
+          title.contains('chat') ||
+          body.contains('message')) {
+        resolvedAction = 'chat';
+      } else if (title.contains('mission') || body.contains('mission')) {
+        resolvedAction = 'mission';
+      }
+    }
+
+    switch (resolvedAction) {
+      case 'mission':
+        if (resolvedTarget.isNotEmpty) {
+          await Navigator.pushNamed(
+            context,
+            AppRoutes.missionDetail,
+            arguments: {'missionId': resolvedTarget},
+          );
+        }
+        break;
+      case 'chat':
+        if (resolvedTarget.isNotEmpty) {
+          await Navigator.pushNamed(
+            context,
+            AppRoutes.chatDetail,
+            arguments: {
+              'conversationId': resolvedTarget,
+              'chatId': resolvedTarget,
+            },
+          );
+        } else {
+          await Navigator.pushNamed(context, AppRoutes.chatList);
+        }
+        break;
+      case 'wallet':
+        await Navigator.pushNamed(context, AppRoutes.wallet);
+        break;
+      default:
+        break;
+    }
+  }
+
   /// Gère le tap sur une notification avec mise à jour optimiste locale
-  Future<void> _handleNotificationTap(int index, String? notificationId) async {
+  Future<void> _handleNotificationTap(
+    int index,
+    String? notificationId,
+    Map<String, dynamic> notif,
+  ) async {
     if (notificationId == null) return;
 
-    final notif = _notifications[index];
     final isRead = notif['is_read'] == true;
 
-    // Si déjà lue, ne rien faire
-    if (isRead) return;
-
-    // MISE À JOUR OPTIMISTE LOCALE (ZÉRO REFRESH)
-    setState(() {
-      _notifications[index]['is_read'] = true;
-    });
-
-    // Décrémenter le compteur global via NotificationProvider
-    _notificationProvider.markNotificationAsRead(notificationId);
-
-    // Appel API en arrière-plan (non bloquant)
-    try {
-      await _api.post('notifications/$notificationId/read/');
-      _logger.d('Notification $notificationId marquée comme lue via API');
-    } catch (e, st) {
-      _logger.e('Erreur marquage notification lue via API',
-          error: e, stackTrace: st);
-      // En cas d'erreur API, on garde l'état optimiste (l'utilisateur a vu la notification)
+    if (!isRead) {
+      setState(() {
+        _notifications[index]['is_read'] = true;
+      });
+      if (mounted) {
+        await context.read<NotificationProvider>().markNotificationAsRead(
+              notificationId,
+            );
+      }
     }
+
+    await _navigateFromNotification(notif);
   }
 
   @override
@@ -215,7 +263,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             time: timeAgo,
             icon: _iconForTitle(title),
             isRead: isRead,
-            onTap: () => _handleNotificationTap(index, notificationId),
+            onTap: () => _handleNotificationTap(index, notificationId, notif),
           );
         } catch (e, st) {
           _logger.e('Rendu d\'une notification a échoué — payload: $notif',

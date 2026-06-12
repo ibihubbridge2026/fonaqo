@@ -86,8 +86,8 @@ class GpsWebSocketService extends ChangeNotifier {
         if (lat != null && lng != null) {
           _agentPosition = LatLng(lat, lng);
         }
-      } else if (type == 'mission_status') {
-        _liveStatus = data['status']?.toString();
+      } else if (type == 'mission_status' || type == 'update') {
+        _liveStatus = (data['status'] ?? data['mission_status'])?.toString();
         final dLat = (data['destination_lat'] as num?)?.toDouble();
         final dLng = (data['destination_lng'] as num?)?.toDouble();
         if (dLat != null && dLng != null) {

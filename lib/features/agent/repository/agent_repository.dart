@@ -62,10 +62,27 @@ class AgentRepository {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> missionsData =
-            response.data['data']['results'] ?? [];
-        final missions =
-            missionsData.map((data) => MissionModel.fromJson(data)).toList();
+        final raw = response.data;
+        List<dynamic> missionsData;
+        if (raw is Map) {
+          if (raw['results'] is List) {
+            missionsData = raw['results'] as List<dynamic>;
+          } else if (raw['data'] is Map &&
+              (raw['data'] as Map)['results'] is List) {
+            missionsData = (raw['data'] as Map)['results'] as List<dynamic>;
+          } else if (raw['data'] is List) {
+            missionsData = raw['data'] as List<dynamic>;
+          } else {
+            missionsData = [];
+          }
+        } else if (raw is List) {
+          missionsData = raw;
+        } else {
+          missionsData = [];
+        }
+        final missions = missionsData
+            .map((data) => MissionModel.fromJson(data as Map<String, dynamic>))
+            .toList();
         _logger.d(
             'Missions disponibles récupérées: ${missions.length} avec localisation');
 

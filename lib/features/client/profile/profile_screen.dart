@@ -33,6 +33,12 @@ class ProfileScreen extends StatelessWidget {
                   ),
                 ),
                 ProfileParamItem(
+                  icon: Icons.account_balance_wallet_outlined,
+                  title: "Mon Portefeuille",
+                  subtitle: "Solde et historique des transactions",
+                  onTap: () => Navigator.pushNamed(context, AppRoutes.wallet),
+                ),
+                ProfileParamItem(
                   icon: Icons.notifications_none,
                   title: "Notifications",
                   subtitle: "Gérer vos alertes",
@@ -261,29 +267,6 @@ class ProfileHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 25),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String value, String label, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.black.withOpacity(0.05)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: const Color(0xFFFFD400), size: 24),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-          ),
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
         ],
       ),
     );

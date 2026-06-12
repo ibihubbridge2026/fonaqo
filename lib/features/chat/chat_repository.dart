@@ -1,9 +1,11 @@
 import 'package:fonaco/core/api/base_client.dart';
 import 'package:fonaco/core/models/mission_model.dart';
+import 'package:logger/logger.dart';
 
 /// Repository pour les opérations de chat
 class ChatRepository {
   final BaseClient _api = BaseClient();
+  final Logger _logger = Logger();
 
   /// Récupère toutes les conversations de l'utilisateur
   Future<List<Map<String, dynamic>>> fetchMyConversations() async {
@@ -11,12 +13,25 @@ class ChatRepository {
       final response = await _api.get('chat/conversations/my_conversations/');
 
       if (response.statusCode == 200) {
-        final data = response.data as List;
-        return data.map((item) => item as Map<String, dynamic>).toList();
+        final body = response.data;
+        List<dynamic> data;
+        if (body is List) {
+          data = body;
+        } else if (body is Map<String, dynamic>) {
+          final inner = body['data'] ?? body['results'];
+          data = inner is List ? inner : [];
+        } else {
+          data = [];
+        }
+        return data
+            .map((item) => item is Map<String, dynamic>
+                ? item
+                : Map<String, dynamic>.from(item as Map))
+            .toList();
       }
       return [];
     } catch (e) {
-      print('Error fetching conversations: $e');
+      _logger.e('Error fetching conversations: $e');
       return [];
     }
   }
@@ -31,11 +46,11 @@ class ChatRepository {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return response.data as Map<String, dynamic>;
+        return _unwrapConversation(response.data);
       }
       return null;
     } catch (e) {
-      print('Error creating conversation: $e');
+      _logger.e('Error creating conversation: $e');
       return null;
     }
   }
@@ -48,12 +63,25 @@ class ChatRepository {
           await _api.get('chat/conversations/$conversationId/messages/');
 
       if (response.statusCode == 200) {
-        final data = response.data as List;
-        return data.map((item) => item as Map<String, dynamic>).toList();
+        final body = response.data;
+        List<dynamic> data;
+        if (body is List) {
+          data = body;
+        } else if (body is Map<String, dynamic>) {
+          final inner = body['data'] ?? body['results'];
+          data = inner is List ? inner : [];
+        } else {
+          data = [];
+        }
+        return data
+            .map((item) => item is Map<String, dynamic>
+                ? item
+                : Map<String, dynamic>.from(item as Map))
+            .toList();
       }
       return [];
     } catch (e) {
-      print('Error fetching messages: $e');
+      _logger.e('Error fetching messages: $e');
       return [];
     }
   }
@@ -72,7 +100,7 @@ class ChatRepository {
 
       return response.statusCode == 200;
     } catch (e) {
-      print('Error marking messages as read: $e');
+      _logger.e('Error marking messages as read: $e');
       return false;
     }
   }
@@ -90,7 +118,7 @@ class ChatRepository {
       }
       return null;
     } catch (e) {
-      print('Error sending message: $e');
+      _logger.e('Error sending message: $e');
       return null;
     }
   }
@@ -105,9 +133,24 @@ class ChatRepository {
 
       return response.statusCode == 200;
     } catch (e) {
-      print('Error updating typing status: $e');
+      _logger.e('Error updating typing status: $e');
       return false;
     }
+  }
+
+  /// Extrait les données conversation depuis une réponse API (avec ou sans enveloppe).
+  static Map<String, dynamic>? _unwrapConversation(dynamic body) {
+    if (body is! Map) return null;
+    final map = body is Map<String, dynamic>
+        ? body
+        : Map<String, dynamic>.from(body);
+    final inner = map['data'];
+    if (inner is Map) {
+      return inner is Map<String, dynamic>
+          ? inner
+          : Map<String, dynamic>.from(inner);
+    }
+    return map;
   }
 
   /// Archiver une conversation
@@ -118,7 +161,7 @@ class ChatRepository {
 
       return response.statusCode == 200;
     } catch (e) {
-      print('Error archiving conversation: $e');
+      _logger.e('Error archiving conversation: $e');
       return false;
     }
   }

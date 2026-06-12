@@ -1,4 +1,8 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:fonaco/features/client/missions/mission_repository.dart';
 import '../../core/api/base_client.dart';
 import '../../core/models/mission_model.dart';
@@ -16,16 +20,26 @@ class LitigeScreen extends StatefulWidget {
 class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
   final MissionRepository _missionRepo = MissionRepository();
   final BaseClient _api = BaseClient();
+  final ImagePicker _imagePicker = ImagePicker();
 
   List<MissionModel> _missions = [];
   String? _selectedMissionId;
   String _reason = '';
+  File? _evidenceFile;
   bool _submitting = false;
 
   @override
   void initState() {
     super.initState();
-    _loadMissions();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      final presetId = args?['missionId']?.toString();
+      if (presetId != null && presetId.isNotEmpty) {
+        _selectedMissionId = presetId;
+      }
+      _loadMissions();
+    });
   }
 
   Future<void> _loadMissions() async {
@@ -33,10 +47,10 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
       () async {
         final missions = await _missionRepo.fetchMissionsList();
 
-        // Filtrage des missions éligibles au litige (on exclut les terminées/déjà en litige)
         final disputableMissions = missions.where((m) {
           return m.status != MissionStatus.DISPUTED &&
               m.status != MissionStatus.COMPLETED &&
+              m.status != MissionStatus.PENDING &&
               (m.status == MissionStatus.ACCEPTED ||
                   m.status == MissionStatus.ON_THE_WAY ||
                   m.status == MissionStatus.ARRIVED ||
@@ -45,39 +59,56 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
         }).toList();
 
         _missions = disputableMissions;
+        if (_selectedMissionId != null &&
+            !_missions.any((m) => m.id == _selectedMissionId)) {
+          _selectedMissionId = null;
+        }
         return null;
       },
       errorMessage: 'Erreur lors du chargement des missions',
     );
   }
 
+  Future<void> _pickEvidence() async {
+    final file = await _imagePicker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (file == null) return;
+    setState(() => _evidenceFile = File(file.path));
+  }
+
   Future<void> _submitDispute() async {
     if (_selectedMissionId == null || _reason.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-            content: Text(
-                'Veuillez sélectionner une mission et décrire le problème')),
+          content: Text(
+            'Veuillez sélectionner une mission et décrire le problème',
+          ),
+        ),
       );
       return;
     }
 
-    setState(() {
-      _submitting = true;
-    });
+    setState(() => _submitting = true);
 
     try {
-      // Appel API vers disputes endpoint
+      final formData = FormData.fromMap({
+        'reason': 'Litige sur mission',
+        'description': _reason.trim(),
+        if (_evidenceFile != null)
+          'evidence_file': await MultipartFile.fromFile(
+            _evidenceFile!.path,
+            filename: 'evidence.jpg',
+          ),
+      });
+
       final response = await _api.dio.post(
-        '/disputes/',
-        data: {
-          'mission': _selectedMissionId,
-          'title': 'Litige sur mission',
-          'description': _reason.trim(),
-          'priority': 'medium',
-        },
+        '/missions/$_selectedMissionId/open_dispute/',
+        data: formData,
       );
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -98,11 +129,7 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          _submitting = false;
-        });
-      }
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
@@ -122,15 +149,8 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
   }
 
   Widget _buildBody() {
-    if (isLoading) {
-      return buildLoadingIndicator();
-    }
-
-    if (error != null) {
-      return buildErrorWidget(
-        onRetry: _loadMissions,
-      );
-    }
+    if (isLoading) return buildLoadingIndicator();
+    if (error != null) return buildErrorWidget(onRetry: _loadMissions);
 
     if (_missions.isEmpty) {
       return const Padding(
@@ -149,11 +169,15 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
       children: [
         const Text(
           'Expliquez le problème',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w900,
+            color: Colors.black,
+          ),
         ),
         const SizedBox(height: 8),
         const Text(
-          "Choisissez la mission concernée puis décrivez la situation. Nous reviendrons vers vous rapidement.",
+          "Choisissez la mission concernée puis décrivez la situation.",
           style: TextStyle(color: Colors.grey),
         ),
         const SizedBox(height: 16),
@@ -168,11 +192,7 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
                       child: Text(mission.title),
                     ))
                 .toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedMissionId = value;
-              });
-            },
+            onChanged: (value) => setState(() => _selectedMissionId = value),
             decoration: InputDecoration(
               labelText: 'Mission',
               filled: true,
@@ -180,14 +200,6 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFFFD400)),
               ),
             ),
           ),
@@ -199,20 +211,11 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
             onChanged: (value) => _reason = value,
             decoration: InputDecoration(
               labelText: 'Description',
-              hintText: 'Décrivez le problème, ajoutez des détails utiles…',
+              hintText: 'Décrivez le problème…',
               filled: true,
               fillColor: Colors.white,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: Colors.grey[300]!),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: Color(0xFFFFD400)),
               ),
             ),
           ),
@@ -224,24 +227,22 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFD400).withOpacity(0.15),
+                  color: const Color(0xFFFFD400).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.attach_file, color: Colors.black),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Ajouter une pièce jointe',
-                  style: TextStyle(fontWeight: FontWeight.w900),
+                  _evidenceFile == null
+                      ? 'Ajouter une pièce jointe'
+                      : 'Preuve sélectionnée',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
               TextButton(
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Bientôt disponible')),
-                  );
-                },
+                onPressed: _pickEvidence,
                 child: const Text('Importer'),
               ),
             ],
@@ -266,7 +267,9 @@ class _LitigeScreenState extends State<LitigeScreen> with BaseScreenState {
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Text(
                     'SOUMETTRE',
@@ -290,7 +293,7 @@ class _Card extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 14),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 14),
         ],
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

@@ -1,5 +1,6 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
+import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
@@ -10,6 +11,7 @@ class SoundNotificationService {
   factory SoundNotificationService() => _instance;
   SoundNotificationService._internal();
 
+  final Logger _logger = Logger();
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isInitialized = false;
 
@@ -22,7 +24,7 @@ class SoundNotificationService {
       await _audioPlayer.setPlayerMode(PlayerMode.mediaPlayer);
       _isInitialized = true;
     } catch (e) {
-      print('Erreur initialisation SoundNotificationService: $e');
+      _logger.e('Erreur initialisation SoundNotificationService: $e');
     }
   }
 
@@ -40,7 +42,7 @@ class SoundNotificationService {
         await _playSystemNotificationSound();
       }
     } catch (e) {
-      print('Erreur lecture son message: $e');
+      _logger.e('Erreur lecture son message: $e');
       // Fallback vers son système
       await _playSystemNotificationSound();
     }
@@ -59,7 +61,7 @@ class SoundNotificationService {
         await _playSystemNotificationSound();
       }
     } catch (e) {
-      print('Erreur lecture son mission acceptée: $e');
+      _logger.e('Erreur lecture son mission acceptée: $e');
       await _playSystemNotificationSound();
     }
   }
@@ -77,7 +79,7 @@ class SoundNotificationService {
         await _playSystemSuccessSound();
       }
     } catch (e) {
-      print('Erreur lecture son succès financier: $e');
+      _logger.e('Erreur lecture son succès financier: $e');
       await _playSystemSuccessSound();
     }
   }
@@ -95,7 +97,7 @@ class SoundNotificationService {
         await _playSystemErrorSound();
       }
     } catch (e) {
-      print('Erreur lecture son erreur: $e');
+      _logger.e('Erreur lecture son erreur: $e');
       await _playSystemErrorSound();
     }
   }
@@ -112,7 +114,7 @@ class SoundNotificationService {
         await _playSystemSuccessSound(); // Réutiliser le son de succès
       }
     } catch (e) {
-      print('Erreur lecture son mission terminée: $e');
+      _logger.e('Erreur lecture son mission terminée: $e');
       await _playSystemSuccessSound();
     }
   }
@@ -122,7 +124,7 @@ class SoundNotificationService {
     try {
       await SystemSound.play(SystemSoundType.click);
     } catch (e) {
-      print('Erreur son système notification: $e');
+      _logger.e('Erreur son système notification: $e');
     }
   }
 
@@ -131,7 +133,7 @@ class SoundNotificationService {
     try {
       await SystemSound.play(SystemSoundType.click);
     } catch (e) {
-      print('Erreur son système succès: $e');
+      _logger.e('Erreur son système succès: $e');
       // Fallback vers notification
       await _playSystemNotificationSound();
     }
@@ -142,7 +144,7 @@ class SoundNotificationService {
     try {
       await SystemSound.play(SystemSoundType.alert);
     } catch (e) {
-      print('Erreur son système erreur: $e');
+      _logger.e('Erreur son système erreur: $e');
     }
   }
 
@@ -152,7 +154,7 @@ class SoundNotificationService {
       final directory = await getApplicationDocumentsDirectory();
       return '${directory.path}/sounds/$fileName';
     } catch (e) {
-      print('Erreur obtention chemin son: $e');
+      _logger.e('Erreur obtention chemin son: $e');
       rethrow;
     }
   }
@@ -162,7 +164,7 @@ class SoundNotificationService {
     try {
       await _audioPlayer.stop();
     } catch (e) {
-      print('Erreur arrêt son: $e');
+      _logger.e('Erreur arrêt son: $e');
     }
   }
 
@@ -171,7 +173,7 @@ class SoundNotificationService {
     try {
       await _audioPlayer.setVolume(volume);
     } catch (e) {
-      print('Erreur définition volume: $e');
+      _logger.e('Erreur définition volume: $e');
     }
   }
 

@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 import 'core/services/firebase_background_handler.dart';
 
 import 'core/services/feedback_service.dart';
@@ -13,7 +12,8 @@ import 'core/services/tutorial_service.dart';
 import 'core/services/lottie_animation_service.dart';
 import 'core/services/image_compression_service.dart';
 import 'core/services/error_monitoring_service.dart';
-import 'core/services/offline_cache_service.dart';
+import 'core/services/cache_service.dart';
+import 'core/services/notification_service.dart';
 
 import 'core/providers/auth_provider.dart';
 import 'core/providers/wallet_provider.dart';
@@ -35,21 +35,23 @@ import 'features/client/screens/agent_profile_screen.dart' as agents;
 import 'widgets/main_wrapper.dart';
 import 'widgets/auth_guard.dart';
 
-import 'features/chat/chat_screen.dart';
 import 'features/chat/screens/chat_list_screen.dart';
 import 'features/chat/screens/chat_detail_screen.dart';
+import 'features/auth/complete_profile_screen.dart';
+import 'features/client/missions/screens/mission_tracking_screen.dart';
+import 'features/agent/screens/agent_missions_explorer_screen.dart';
 
 import 'features/litiges/litige_screen.dart';
-import 'features/events/event_detail_screen.dart';
 
 import 'features/client/missions/mission_detail_screen.dart';
 import 'features/client/missions/missions_screen.dart';
-import 'features/client/missions/screens/create_mission_vocal_screen.dart';
+import 'features/ai/screens/ai_assistant_screen.dart';
+// import 'features/client/missions/screens/create_mission_vocal_screen.dart';
 import 'features/client/screens/favorite_agents_screen.dart';
 
-import 'features/map/agents_map_screen.dart';
 
 import 'features/client/notifications/notifications_screen.dart';
+import 'features/client/wallet/client_wallet_screen.dart';
 
 import 'features/client/profile/screens/personal_info_screen.dart';
 import 'features/client/profile/screens/security_settings_screen.dart';
@@ -63,105 +65,6 @@ import 'features/rating/rating_screen.dart';
 // Global navigator key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-/// Firebase Messaging Initialization
-Future<void> _initializeFirebaseMessaging(Logger log) async {
-  final FirebaseMessaging messaging = FirebaseMessaging.instance;
-
-  try {
-    final settings = await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
-
-    switch (settings.authorizationStatus) {
-      case AuthorizationStatus.authorized:
-        log.i('✅ Notifications autorisées');
-        break;
-
-      case AuthorizationStatus.provisional:
-        log.i('⚠️ Notifications provisoires');
-        break;
-
-      default:
-        log.w('❌ Notifications refusées');
-    }
-
-    final token = await messaging.getToken();
-    log.i('🔑 FCM Token: $token');
-
-    // Foreground
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      final title = message.notification?.title ?? 'Nouvelle notification';
-
-      final body = message.notification?.body ?? '';
-
-      final fullMessage = body.isNotEmpty ? '$title\n$body' : title;
-
-      FeedbackService.showInfoGlobal(fullMessage);
-
-      log.i('📨 Notification foreground: $title');
-    });
-
-    // Open app from background
-    FirebaseMessaging.onMessageOpenedApp.listen(
-      (RemoteMessage message) {
-        final messageType = message.data['type'];
-
-        log.i(
-          '📱 Notification ouverte: ${message.notification?.title} - Type: $messageType',
-        );
-
-        // Navigation directe pour les nouvelles missions
-        if (messageType == 'NEW_MISSION') {
-          _navigateToMissionFromNotification(message);
-        }
-      },
-    );
-
-    // Open app from terminated
-    final initialMessage = await messaging.getInitialMessage();
-
-    if (initialMessage != null) {
-      final messageType = initialMessage.data['type'];
-
-      log.i(
-        '🚀 App ouverte via notification: '
-        '${initialMessage.notification?.title} - Type: $messageType',
-      );
-
-      // Navigation directe pour les nouvelles missions
-      if (messageType == 'NEW_MISSION') {
-        _navigateToMissionFromNotification(initialMessage);
-      }
-    }
-  } catch (e) {
-    log.e('❌ Erreur Firebase Messaging: $e');
-  }
-}
-
-/// Navigation directe vers l'écran des missions depuis une notification
-void _navigateToMissionFromNotification(RemoteMessage message) {
-  final missionId = message.data['mission_id'];
-
-  debugPrint('🧭 Navigation vers mission: $missionId');
-
-  // Navigation vers l'explorateur de missions agent
-  if (navigatorKey.currentContext != null) {
-    if (missionId != null) {
-      // Navigation vers le détail de la mission si ID fourni
-      navigatorKey.currentState?.pushNamed(
-        '/agent/mission-detail',
-        arguments: {'missionId': missionId},
-      );
-    } else {
-      // Navigation vers l'explorateur de missions
-      navigatorKey.currentState?.pushNamed('/agent/missions-explorer');
-    }
-  }
-}
-
 void main() async {
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
 
@@ -173,10 +76,8 @@ void main() async {
       dsn: 'VOTRE_DSN_SENTRY_ICI', // Remplacer par votre DSN Sentry
     );
 
-    // Initialisation de Hive pour le cache offline
-    await Hive.initFlutter();
-    await OfflineCacheService().init();
-    log.i('✅ Hive & Cache offline initialisés');
+    await CacheService().init();
+    log.i('✅ Cache offline initialisé');
 
     // Initialisation des autres services
     TutorialService().init();
@@ -191,8 +92,7 @@ void main() async {
     // Enregistrer le handler background pour Firebase
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-    await _initializeFirebaseMessaging(log);
-
+    await NotificationService().initialize();
     FeedbackService.navigatorKey = navigatorKey;
 
     log.i('🚀 FONAQO prêt à démarrer');
@@ -212,6 +112,12 @@ void main() async {
   final authProvider = AuthProvider();
 
   await authProvider.checkAuth();
+  if (authProvider.isAuthenticated) {
+    final token = authProvider.accessToken;
+    if (token != null) {
+      await NotificationService().sendTokenToBackend(token);
+    }
+  }
 
   final isLoggedIn = authProvider.isAuthenticated;
 
@@ -287,9 +193,10 @@ class FonacoApp extends StatelessWidget {
               AppRoutes.missionDetail: (context) => const MissionDetailScreen(),
               AppRoutes.favoriteAgents: (context) =>
                   const FavoriteAgentsScreen(),
-              AppRoutes.eventDetail: (context) => const EventDetailScreen(),
               AppRoutes.litige: (context) => const LitigeScreen(),
+              AppRoutes.aiAssistant: (context) => const AiAssistantScreen(),
               AppRoutes.notifications: (context) => const NotificationsScreen(),
+              AppRoutes.wallet: (context) => const ClientWalletScreen(),
               AppRoutes.helpCenter: (context) => const HelpCenterScreen(),
               AppRoutes.profileNotifications: (context) =>
                   const NotificationsSettingsScreen(),
@@ -299,9 +206,30 @@ class FonacoApp extends StatelessWidget {
                   const SecuritySettingsScreen(),
               AppRoutes.profileLocation: (context) =>
                   const LocationSettingsScreen(),
-              AppRoutes.rating: (context) => const RatingScreen(),
-              AppRoutes.chat: (context) => const ChatScreen(),
+              AppRoutes.completeProfile: (context) =>
+                  const CompleteProfileScreen(),
+              AppRoutes.missionTracking: (context) {
+                final args = ModalRoute.of(context)?.settings.arguments;
+                final mapArgs =
+                    args is Map<String, dynamic> ? args : <String, dynamic>{};
+                return MissionTrackingScreen(
+                  missionId: mapArgs['missionId']?.toString() ?? '',
+                );
+              },
+              AppRoutes.rating: (context) {
+                final args = ModalRoute.of(context)?.settings.arguments;
+                final mapArgs =
+                    args is Map<String, dynamic> ? args : <String, dynamic>{};
+                return RatingScreen(
+                  missionId: mapArgs['missionId']?.toString(),
+                );
+              },
+              AppRoutes.chat: (context) => const ChatListScreen(),
               AppRoutes.chatList: (context) => const ChatListScreen(),
+              AppRoutes.agentMissionsExplorer: (context) =>
+                  const AgentMissionsExplorerScreen(),
+              AppRoutes.agentMissionDetail: (context) =>
+                  const AgentMissionsExplorerScreen(),
               AppRoutes.chatDetail: (context) {
                 final args = ModalRoute.of(context)?.settings.arguments;
 
@@ -309,17 +237,30 @@ class FonacoApp extends StatelessWidget {
                     args is Map<String, dynamic> ? args : <String, dynamic>{};
 
                 return ChatDetailScreen(
-                  chatId: mapArgs['chatId']?.toString() ?? '',
+                  chatId: mapArgs['conversationId']?.toString() ??
+                      mapArgs['chatId']?.toString() ??
+                      '',
                   userName: mapArgs['userName']?.toString() ?? 'Utilisateur',
+                  missionId: mapArgs['missionId']?.toString(),
                 );
               },
               AppRoutes.missionsAvailable: (context) => MissionsScreen(
                     showCreateMissionListenable: ValueNotifier(false),
                   ),
-              AppRoutes.agentsMap: (context) => const AgentsMapScreen(),
-              AppRoutes.createMissionVocal: (context) =>
-                  const CreateMissionVocalScreen(),
-              '/agent-profile': (context) {
+              // Route vocale désactivée (deep links / notifications) tant que la feature est en pause.
+              AppRoutes.createMissionVocal: (context) => const Scaffold(
+                    body: Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          'La création de mission vocale est temporairement indisponible.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ),
+              AppRoutes.agentProfile: (context) {
                 final args = ModalRoute.of(context)?.settings.arguments
                     as Map<String, dynamic>?;
 

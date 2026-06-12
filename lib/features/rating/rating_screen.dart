@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../widgets/custom_app_bar.dart';
+import '../client/missions/mission_repository.dart';
 
-/// Écran de notation d’un agent après mission.
+/// Écran de notation d'un agent après mission.
 class RatingScreen extends StatefulWidget {
-  const RatingScreen({super.key});
+  final String? missionId;
+
+  const RatingScreen({super.key, this.missionId});
 
   @override
   State<RatingScreen> createState() => _RatingScreenState();
@@ -12,12 +15,40 @@ class RatingScreen extends StatefulWidget {
 
 class _RatingScreenState extends State<RatingScreen> {
   int _stars = 5;
+  bool _submitting = false;
   final TextEditingController _controller = TextEditingController();
+  final MissionRepository _repository = MissionRepository();
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final missionId = widget.missionId;
+    if (missionId == null || missionId.isEmpty) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      await _repository.rateMission(
+        missionId,
+        _stars,
+        _controller.text.trim(),
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Erreur lors de l\'envoi de la note')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -96,7 +127,7 @@ class _RatingScreenState extends State<RatingScreen> {
             width: double.infinity,
             height: 56,
             child: ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: _submitting ? null : _submit,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFFD400),
                 foregroundColor: Colors.black,
@@ -105,10 +136,16 @@ class _RatingScreenState extends State<RatingScreen> {
                   borderRadius: BorderRadius.circular(30),
                 ),
               ),
-              child: const Text(
-                'ENVOYER',
-                style: TextStyle(fontWeight: FontWeight.w900),
-              ),
+              child: _submitting
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text(
+                      'ENVOYER',
+                      style: TextStyle(fontWeight: FontWeight.w900),
+                    ),
             ),
           ),
         ],

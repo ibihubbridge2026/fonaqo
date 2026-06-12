@@ -24,6 +24,29 @@ class MissionProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Met à jour ou insère une mission dans la liste locale.
+  void upsertMission(MissionModel mission) {
+    final index = _missions.indexWhere((m) => m.id == mission.id);
+    if (index >= 0) {
+      _missions[index] = mission;
+    } else {
+      _missions.insert(0, mission);
+    }
+    notifyListeners();
+  }
+
+  /// Rafraîchit une mission par identifiant (après action client).
+  Future<MissionModel?> refreshMissionById(String missionId) async {
+    try {
+      final mission = await _repository.fetchMissionDetails(missionId);
+      upsertMission(mission);
+      return mission;
+    } catch (e) {
+      _setError('Erreur mise à jour mission: $e');
+      return null;
+    }
+  }
+
   /// Récupérer les missions depuis l'API
   Future<void> fetchMissions() async {
     _setLoading(true);

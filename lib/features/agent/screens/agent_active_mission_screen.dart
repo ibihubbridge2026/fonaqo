@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:logger/logger.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
@@ -31,6 +32,7 @@ class AgentActiveMissionScreen extends StatefulWidget {
 }
 
 class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
+  final Logger _logger = Logger();
   final AgentRepository _agentRepository = AgentRepository();
   final LocationService _locationService = LocationService();
   final MissionTimelineService _timelineService = MissionTimelineService();
@@ -845,7 +847,7 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
       final agentId = authProvider.currentUser?.id;
 
       if (agentId == null || token == null) {
-        print('Erreur: Agent ID ou token non disponible');
+        _logger.e('Erreur: Agent ID ou token non disponible');
         return;
       }
 
@@ -865,18 +867,18 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
             final data = json.decode(message) as Map<String, dynamic>;
             if (data['type'] == 'pong') {
               _lastGpsPongTime = DateTime.now();
-              print('GPS Pong received');
+              _logger.d('GPS Pong received');
             }
           } catch (e) {
-            print('Error parsing GPS WebSocket message: $e');
+            _logger.e('Error parsing GPS WebSocket message: $e');
           }
         },
         onError: (error) {
-          print('GPS WebSocket error: $error');
+          _logger.e('GPS WebSocket error: $error');
           _handleGpsDisconnection();
         },
         onDone: () {
-          print('GPS WebSocket disconnected');
+          _logger.w('GPS WebSocket disconnected');
           _handleGpsDisconnection();
         },
         cancelOnError: true,
@@ -912,7 +914,7 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
           }
         },
         onError: (error) {
-          print('Erreur GPS: $error');
+          _logger.e('Erreur GPS: $error');
         },
       );
 
@@ -920,10 +922,10 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
         _isGpsTracking = true;
       });
 
-      print(
+      _logger.d(
           'GPS tracking démarré pour mission $_missionId avec agent $agentId');
     } catch (e) {
-      print('Erreur démarrage GPS: $e');
+      _logger.e('Erreur démarrage GPS: $e');
       _handleGpsDisconnection();
     }
   }
@@ -934,12 +936,13 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
     _gpsHeartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (_gpsWebSocket != null) {
         _gpsWebSocket?.sink.add(json.encode({'type': 'ping'}));
-        print('GPS Heartbeat ping sent');
+        _logger.d('GPS Heartbeat ping sent');
 
         // Check if we received a pong in the last 60 seconds
         if (_lastGpsPongTime != null &&
             DateTime.now().difference(_lastGpsPongTime!).inSeconds > 60) {
-          print('No GPS pong received for 60 seconds, connection may be dead');
+          _logger
+              .w('No GPS pong received for 60 seconds, connection may be dead');
           _handleGpsDisconnection();
         }
       }
@@ -962,7 +965,7 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
   /// Schedule GPS WebSocket reconnection with exponential backoff
   void _scheduleGpsReconnect() {
     if (_gpsToken == null || _gpsAgentId == null) {
-      print('Cannot reconnect GPS: no token/agent context');
+      _logger.w('Cannot reconnect GPS: no token/agent context');
       return;
     }
 
@@ -973,18 +976,18 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
         : _gpsReconnectDelays.length - 1;
     final delaySeconds = _gpsReconnectDelays[delayIndex];
 
-    print(
+    _logger.d(
         'Scheduling GPS reconnection in ${delaySeconds}s (attempt ${_gpsReconnectAttempts + 1})');
 
     _gpsReconnectTimer = Timer(Duration(seconds: delaySeconds), () async {
       _gpsReconnectAttempts++;
       try {
-        print('Attempting GPS reconnection...');
+        _logger.d('Attempting GPS reconnection...');
         _startGpsTracking();
 
         // If successful, send queued GPS data
         if (_isGpsTracking && _gpsQueue.isNotEmpty) {
-          print('Sending ${_gpsQueue.length} queued GPS points');
+          _logger.d('Sending ${_gpsQueue.length} queued GPS points');
           for (final gpsData in List.from(_gpsQueue)) {
             try {
               _gpsWebSocket?.sink.add(json.encode({
@@ -995,12 +998,12 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
               }));
               _gpsQueue.remove(gpsData);
             } catch (e) {
-              print('Failed to send queued GPS data: $e');
+              _logger.e('Failed to send queued GPS data: $e');
             }
           }
         }
       } catch (e) {
-        print('GPS reconnection failed: $e');
+        _logger.e('GPS reconnection failed: $e');
         _scheduleGpsReconnect();
       }
     });
@@ -1026,7 +1029,7 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
       _isGpsTracking = false;
     });
 
-    print('GPS tracking arrêté');
+    _logger.d('GPS tracking arrêté');
   }
 
   /// Envoie les coordonnées GPS via WebSocket
@@ -1047,10 +1050,10 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
 
     try {
       _gpsWebSocket!.sink.add(json.encode(gpsData));
-      print(
+      _logger.d(
           'Coordonnées GPS envoyées: ${position.latitude}, ${position.longitude}');
     } catch (e) {
-      print('Erreur envoi GPS: $e');
+      _logger.e('Erreur envoi GPS: $e');
     }
   }
 
@@ -1058,7 +1061,7 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
   void _initializeTimeline() {
     _timelineService.connectToTimeline(_missionId, (stepData) {
       // Mettre à jour l'état de la timeline
-      print('Timeline update: $stepData');
+      _logger.d('Timeline update: $stepData');
     });
   }
 

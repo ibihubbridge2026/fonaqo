@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
-import '../../../widgets/custom_app_bar.dart';
-import '../../../core/providers/auth_provider.dart';
-import '../../../core/config/api_config.dart';
-import '../../../core/services/chat_service.dart';
-import '../chat_repository.dart';
 
-/// Écran de liste des conversations (Inbox)
+import '../../../core/providers/auth_provider.dart';
+import '../../../core/routes/app_routes.dart';
+import '../../../core/widgets/skeleton_loading.dart';
+import '../../../widgets/custom_app_bar.dart';
+import '../models/chat_room.dart';
+import '../providers/chat_provider.dart';
+
+/// Liste des conversations — shimmer au chargement initial, transition fluide.
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
 
@@ -17,346 +17,231 @@ class ChatListScreen extends StatefulWidget {
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
-  final ChatRepository _chatRepository = ChatRepository();
-  final ChatService _chatService = ChatService();
-  List<Map<String, dynamic>> _conversations = [];
-  bool _isLoading = true;
-  String? _error;
+  late final ChatProvider _chatProvider;
 
   @override
   void initState() {
     super.initState();
-    _loadConversations();
-    _setupWebSocketListener();
+    _chatProvider = ChatProvider();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _chatProvider.loadConversations(context);
+    });
   }
 
   @override
   void dispose() {
-    _chatService.disconnect();
+    _chatProvider.dispose();
     super.dispose();
   }
 
-  void _setupWebSocketListener() {
-    // Listen for new messages via WebSocket to update list in real-time
-    _chatService.messageStream.listen((message) {
-      if (mounted) {
-        _loadConversations(); // Reload to get updated order
-      }
-    });
+  void _openConversation(ChatRoom room) {
+    final other = room.getOtherParticipant(
+      context.read<AuthProvider>().currentUser?.id ?? '',
+    );
+    Navigator.pushNamed(
+      context,
+      AppRoutes.chatDetail,
+      arguments: {
+        'conversationId': room.id,
+        'chatId': room.id,
+        'userName': other?.userName ?? room.name,
+        'missionId': room.missionId,
+      },
+    );
   }
 
-  Future<void> _loadConversations() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final conversations = await _chatRepository.fetchMyConversations();
-      if (mounted) {
-        setState(() {
-          _conversations = conversations;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  String _formatLastMessageTime(DateTime? dateTime) {
-    if (dateTime == null) return '';
-
+  String _formatTime(DateTime? dt) {
+    if (dt == null) return '';
     final now = DateTime.now();
-    final difference = now.difference(dateTime);
-
-    if (difference.inMinutes < 1) return 'À l\'instant';
-    if (difference.inMinutes < 60) return 'Il y a ${difference.inMinutes} min';
-    if (difference.inHours < 24) return 'Il y a ${difference.inHours}h';
-    if (difference.inDays == 1) return 'Hier';
-    if (difference.inDays < 7) return 'Il y a ${difference.inDays}j';
-
-    return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
-  }
-
-  String _formatLastMessage(Map<String, dynamic>? message) {
-    if (message == null) return 'Aucun message';
-
-    final messageType = message['message_type'] ?? 'text';
-    if (messageType == 'image') return '[Image]';
-    if (messageType == 'voice') return '[Mémo vocal]';
-    if (messageType == 'file') return '[Fichier]';
-
-    final content = message['content'] as String?;
-    if (content == null || content.isEmpty) return '...';
-
-    return content.length > 50 ? '${content.substring(0, 50)}...' : content;
-  }
-
-  int _getUnreadCount(Map<String, dynamic> conversation) {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final isAgent = authProvider.currentUser?.isAgent ?? false;
-
-    if (isAgent) {
-      return conversation['unread_count_agent'] ?? 0;
-    } else {
-      return conversation['unread_count_client'] ?? 0;
+    if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+      final h = dt.hour.toString().padLeft(2, '0');
+      final m = dt.minute.toString().padLeft(2, '0');
+      return '$h:$m';
     }
-  }
-
-  String _getOtherUserName(Map<String, dynamic> conversation) {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final currentUserId = authProvider.currentUser?.id;
-
-    final client = conversation['client'] as Map<String, dynamic>?;
-    final agent = conversation['agent'] as Map<String, dynamic>?;
-
-    if (client != null && client['id'] != currentUserId) {
-      return client['username'] ?? client['first_name'] ?? 'Client';
-    }
-
-    if (agent != null && agent['id'] != currentUserId) {
-      return agent['username'] ?? agent['first_name'] ?? 'Agent';
-    }
-
-    return 'Inconnu';
-  }
-
-  String? _getOtherUserAvatar(Map<String, dynamic> conversation) {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final currentUserId = authProvider.currentUser?.id;
-
-    final client = conversation['client'] as Map<String, dynamic>?;
-    final agent = conversation['agent'] as Map<String, dynamic>?;
-
-    if (client != null && client['id'] != currentUserId) {
-      return client['avatar_url'];
-    }
-
-    if (agent != null && agent['id'] != currentUserId) {
-      return agent['avatar_url'];
-    }
-
-    return null;
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF9F9F9),
-      appBar: const CustomAppBar.detailStack(title: 'Discussion'),
-      body: RefreshIndicator(
-        onRefresh: _loadConversations,
-        color: const Color(0xFFFFD400),
-        backgroundColor: Colors.white,
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(
-                  color: Color(0xFFFFD400),
-                ),
-              )
-            : _error != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline,
-                            size: 64, color: Colors.grey),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Erreur de chargement',
-                          style: TextStyle(color: Colors.grey[700]),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _error!,
-                          style:
-                              TextStyle(color: Colors.grey[500], fontSize: 12),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  )
-                : _conversations.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.chat_bubble_outline,
-                                size: 64, color: Colors.grey[400]),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Aucune conversation',
-                              style: TextStyle(color: Colors.grey[700]),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _conversations.length,
-                        itemBuilder: (context, index) {
-                          final conversation = _conversations[index];
-                          final lastMessage = conversation['last_message']
-                              as Map<String, dynamic>?;
-                          final lastMessageTime =
-                              conversation['last_message_at'] != null
-                                  ? DateTime.parse(
-                                      conversation['last_message_at'])
-                                  : null;
-                          final unreadCount = _getUnreadCount(conversation);
-                          final userName = _getOtherUserName(conversation);
-                          final userAvatar = _getOtherUserAvatar(conversation);
-
-                          return _ChatPreviewCard(
-                            userName: userName,
-                            userAvatar: userAvatar,
-                            lastMessage: _formatLastMessage(lastMessage),
-                            lastMessageTime:
-                                _formatLastMessageTime(lastMessageTime),
-                            unreadCount: unreadCount,
-                            onTap: () {
-                              Navigator.pushNamed(
-                                context,
-                                '/chat-detail',
-                                arguments: {
-                                  'conversationId': conversation['id'],
-                                  'userName': userName,
-                                },
-                              );
-                            },
-                          );
-                        },
-                      ),
+    return ChangeNotifierProvider<ChatProvider>.value(
+      value: _chatProvider,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8F8F8),
+        appBar: const CustomAppBar.detailStack(
+          title: 'Messages',
+          detailTitleWidget: Text(
+            'Messages',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: Colors.black,
+            ),
+          ),
+        ),
+        body: Consumer<ChatProvider>(
+          builder: (context, chat, _) {
+            return AnimatedSwitcher(
+              duration: const Duration(milliseconds: 350),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              child: _buildBody(context, chat),
+            );
+          },
+        ),
       ),
     );
   }
-}
 
-class _ChatPreviewCard extends StatelessWidget {
-  final String userName;
-  final String? userAvatar;
-  final String lastMessage;
-  final String lastMessageTime;
-  final int unreadCount;
-  final VoidCallback onTap;
+  Widget _buildBody(BuildContext context, ChatProvider chat) {
+    if (chat.isLoadingConversations && chat.conversations.isEmpty) {
+      return KeyedSubtree(
+        key: const ValueKey('chat_shimmer'),
+        child: SkeletonLoading.conversationList(),
+      );
+    }
 
-  const _ChatPreviewCard({
-    required this.userName,
-    required this.userAvatar,
-    required this.lastMessage,
-    required this.lastMessageTime,
-    required this.unreadCount,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
+    if (chat.conversations.isEmpty) {
+      return KeyedSubtree(
+        key: const ValueKey('chat_empty'),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.chat_bubble_outline,
+                  size: 64, color: Colors.grey.shade400),
+              const SizedBox(height: 16),
+              Text(
+                'Aucune conversation',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Vos échanges avec les agents apparaîtront ici.',
+                style: TextStyle(color: Colors.grey.shade500),
+              ),
+            ],
+          ),
         ),
-        child: Row(
-          children: [
-            // Avatar
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: Colors.grey[200],
-              backgroundImage: userAvatar != null
-                  ? CachedNetworkImageProvider(userAvatar!) as ImageProvider
-                  : null,
-              child: userAvatar == null
-                  ? Text(
-                      userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 16),
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        userName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        lastMessageTime,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[500],
-                        ),
-                      ),
-                    ],
+      );
+    }
+
+    return KeyedSubtree(
+      key: const ValueKey('chat_list'),
+      child: RefreshIndicator(
+        color: const Color(0xFFFFD400),
+        onRefresh: () => chat.loadConversations(context),
+        child: ListView.separated(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          itemCount: chat.conversations.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 8),
+          itemBuilder: (context, index) {
+            final room = chat.conversations[index];
+            final userId =
+                context.read<AuthProvider>().currentUser?.id ?? '';
+            final other = room.getOtherParticipant(userId);
+            final name = other?.userName ?? room.name;
+            final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
+            final preview = room.lastMessage?.content ?? 'Pas de message';
+            final time = _formatTime(room.updatedAt);
+
+            return Material(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              elevation: 0,
+              child: InkWell(
+                onTap: () => _openConversation(room),
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFEEEEEE)),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
+                  child: Row(
                     children: [
-                      Expanded(
+                      CircleAvatar(
+                        radius: 26,
+                        backgroundColor:
+                            const Color(0xFFFFD400).withValues(alpha: 0.25),
                         child: Text(
-                          lastMessage,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
+                          initial,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF715D00),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (unreadCount > 0) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
+                                if (time.isNotEmpty)
+                                  Text(
+                                    time,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade500,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              preview,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (room.unreadCount > 0) ...[
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFD400),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            unreadCount > 9 ? '9+' : unreadCount.toString(),
+                            '${room.unreadCount}',
                             style: const TextStyle(
+                              fontWeight: FontWeight.w800,
                               fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
                             ),
                           ),
                         ),
                       ],
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );

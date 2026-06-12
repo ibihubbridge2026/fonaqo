@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../core/config/splash_config.dart';
 import '../core/providers/auth_provider.dart';
 import '../core/routes/app_routes.dart';
+import '../core/utils/auth_navigation.dart';
 import '../features/onboarding/getting_screen.dart';
 
 /// Auth Guard Widget - Gère le flux d'authentification au démarrage
@@ -58,7 +59,7 @@ class _AuthGuardState extends State<AuthGuard> {
         await SplashConfig.removeSplash();
 
         if (authProvider.isAuthenticated) {
-          Navigator.pushReplacementNamed(context, AppRoutes.mainShell);
+          await navigateAfterAuth(context, authProvider);
         } else {
           Navigator.pushReplacementNamed(context, AppRoutes.login);
         }

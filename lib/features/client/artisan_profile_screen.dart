@@ -93,10 +93,6 @@ class ArtisanProfileScreen extends StatelessWidget {
                 // En-tête avec avatar et infos
                 _buildHeader(context),
                 const SizedBox(height: 24),
-                // Statistiques
-                _buildStatistics(),
-                const SizedBox(height: 24),
-                // À propos
                 _buildAboutSection(),
                 const SizedBox(height: 24),
                 // Réalisations
@@ -217,90 +213,6 @@ class ArtisanProfileScreen extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatistics() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        children: [
-          // Rating
-          Expanded(
-            child: _buildStatCard(
-              icon: Icons.star,
-              value: artisan.rating.toStringAsFixed(1),
-              label: 'Note',
-              color: const Color(0xFFFFD400),
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Missions
-          Expanded(
-            child: _buildStatCard(
-              icon: Icons.check_circle,
-              value: '${artisan.completedMissions}',
-              label: 'Chantiers',
-              color: Colors.green,
-            ),
-          ),
-          const SizedBox(width: 12),
-          // Expérience
-          Expanded(
-            child: _buildStatCard(
-              icon: Icons.work,
-              value: '${artisan.yearsOfExperience}',
-              label: 'Années',
-              color: Colors.blue,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard({
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black.withOpacity(0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Icon(icon, color: color, size: 24),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
           ),
         ],
       ),

@@ -29,9 +29,11 @@ class Category {
 
   factory Category.fromJson(Map<String, dynamic> json) {
     return Category(
-      id: json['id'] as int,
-      name: json['name'] as String,
-      icon: json['icon'] as String?,
+      id: json['id'] is int
+          ? json['id'] as int
+          : int.tryParse('${json['id']}') ?? 0,
+      name: json['name']?.toString() ?? 'Catégorie',
+      icon: json['icon']?.toString(),
     );
   }
 }
@@ -122,13 +124,25 @@ class _Step1TypeSelectorState extends State<Step1TypeSelector> {
 
       final response = await dio.get('services/categories/');
       if (response.statusCode == 200) {
-        final data = response.data['data'] as List;
+        final body = response.data;
+        List<dynamic> data;
+        if (body is List) {
+          data = body;
+        } else if (body is Map<String, dynamic>) {
+          final inner = body['data'] ?? body['results'];
+          data = inner is List ? inner : [];
+        } else {
+          data = [];
+        }
         setState(() {
-          _categories = data.map((json) => Category.fromJson(json)).toList();
+          _categories = data
+              .map((json) =>
+                  Category.fromJson(json is Map<String, dynamic> ? json : {}))
+              .toList();
         });
       }
     } catch (e) {
-      // Gérer l'erreur silencieusement pour l'instant
+      debugPrint('Erreur chargement catégories: $e');
     } finally {
       setState(() => _isLoadingCategories = false);
     }

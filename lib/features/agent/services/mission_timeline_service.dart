@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:logger/logger.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../../core/config/api_config.dart';
 import '../repository/agent_repository.dart';
@@ -6,6 +7,7 @@ import '../repository/agent_repository.dart';
 /// Service pour gérer la timeline dynamique des missions
 class MissionTimelineService {
   final AgentRepository _repository = AgentRepository();
+  final Logger _logger = Logger();
   WebSocketChannel? _timelineWebSocket;
 
   /// Connecte au WebSocket timeline d'une mission
@@ -21,16 +23,16 @@ class MissionTimelineService {
           onStepUpdate(stepData);
         },
         onError: (error) {
-          print('Erreur WebSocket Timeline: $error');
+          _logger.e('Erreur WebSocket Timeline: $error');
         },
         onDone: () {
-          print('WebSocket Timeline déconnecté');
+          _logger.w('WebSocket Timeline déconnecté');
         },
       );
 
-      print('Timeline connectée pour mission $missionId');
+      _logger.d('Timeline connectée pour mission $missionId');
     } catch (e) {
-      print('Erreur connexion Timeline: $e');
+      _logger.e('Erreur connexion Timeline: $e');
     }
   }
 
@@ -47,7 +49,7 @@ class MissionTimelineService {
 
       return success;
     } catch (e) {
-      print('Erreur updateMissionStep: $e');
+      _logger.e('Erreur updateMissionStep: $e');
       return false;
     }
   }
@@ -68,7 +70,7 @@ class MissionTimelineService {
     try {
       _timelineWebSocket!.sink.add(json.encode(notification));
     } catch (e) {
-      print('Erreur notification step update: $e');
+      _logger.e('Erreur notification step update: $e');
     }
   }
 

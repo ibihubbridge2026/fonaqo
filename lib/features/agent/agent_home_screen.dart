@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 import './providers/agent_provider.dart';
 import '../../core/models/mission_model.dart';
@@ -15,6 +16,7 @@ class AgentHomeScreen extends StatefulWidget {
 }
 
 class _AgentHomeScreenState extends State<AgentHomeScreen> {
+  final Logger _logger = Logger();
   bool _isRefreshing = false;
 
   @override
@@ -38,7 +40,7 @@ class _AgentHomeScreenState extends State<AgentHomeScreen> {
         agentProvider.fetchStats(),
       ]);
     } catch (e) {
-      print('Error refreshing data: $e');
+      _logger.e('Error refreshing data: $e');
     } finally {
       if (mounted) {
         setState(() {

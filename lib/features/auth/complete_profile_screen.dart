@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/models/country_model.dart';
 import '../../core/providers/auth_provider.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/utils/auth_navigation.dart';
 import '../../core/services/feedback_service.dart';
 import 'widgets/phone_input_card.dart';
 
@@ -50,9 +51,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       if (success && mounted) {
         FeedbackService.showSuccess(
             context, 'Numéro de téléphone enregistré avec succès !');
-
-        // Rediriger vers le mainShell maintenant que le profil est complet
-        Navigator.pushReplacementNamed(context, AppRoutes.mainShell);
+        await navigateAfterAuth(context, authProvider);
+      } else if (mounted && authProvider.errorMessage != null) {
+        setState(() {
+          _errorMessage = authProvider.errorMessage;
+        });
       }
     } catch (e) {
       setState(() {

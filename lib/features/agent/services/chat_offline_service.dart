@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../../core/config/api_config.dart';
@@ -10,6 +11,8 @@ class ChatOfflineService {
   static final ChatOfflineService _instance = ChatOfflineService._internal();
   factory ChatOfflineService() => _instance;
   ChatOfflineService._internal();
+
+  final Logger _logger = Logger();
 
   final List<Map<String, dynamic>> _pendingMessages = [];
   StreamSubscription<ConnectivityResult>? _connectivitySubscription;
@@ -35,9 +38,9 @@ class ChatOfflineService {
         _pendingMessages.add(message);
       }
 
-      print('Messages en attente chargés: ${_pendingMessages.length}');
+      _logger.d('Messages en attente chargés: ${_pendingMessages.length}');
     } catch (e) {
-      print('Erreur chargement messages en attente: $e');
+      _logger.e('Erreur chargement messages en attente: $e');
     }
   }
 
@@ -49,7 +52,7 @@ class ChatOfflineService {
           _pendingMessages.map((msg) => json.encode(msg)).toList();
       await prefs.setStringList('pending_messages', pendingJson);
     } catch (e) {
-      print('Erreur sauvegarde messages en attente: $e');
+      _logger.e('Erreur sauvegarde messages en attente: $e');
     }
   }
 
@@ -77,19 +80,19 @@ class ChatOfflineService {
           onMessage(message);
         },
         onError: (error) {
-          print('Erreur WebSocket chat: $error');
+          _logger.e('Erreur WebSocket chat: $error');
           _isConnected = false;
         },
         onDone: () {
-          print('WebSocket chat déconnecté');
+          _logger.w('WebSocket chat déconnecté');
           _isConnected = false;
         },
       );
 
       _isConnected = true;
-      print('Connecté au chat WebSocket');
+      _logger.d('Connecté au chat WebSocket');
     } catch (e) {
-      print('Erreur connexion chat WebSocket: $e');
+      _logger.e('Erreur connexion chat WebSocket: $e');
       _isConnected = false;
     }
   }
@@ -112,7 +115,7 @@ class ChatOfflineService {
         // Si l'envoi réussit, ne pas ajouter à la queue
         return true;
       } catch (e) {
-        print('Échec envoi direct, ajout à la queue: $e');
+        _logger.w('Échec envoi direct, ajout à la queue: $e');
         // Continuer vers la queue locale
       }
     }
@@ -124,7 +127,8 @@ class ChatOfflineService {
     // Démarrer le timer de retry
     _startRetryTimer();
 
-    print('Message ajouté à la queue hors ligne: ${_pendingMessages.length}');
+    _logger
+        .d('Message ajouté à la queue hors ligne: ${_pendingMessages.length}');
     return false;
   }
 
@@ -142,7 +146,7 @@ class ChatOfflineService {
       return;
     }
 
-    print(
+    _logger.d(
         'Tentative d\'envoi de ${_pendingMessages.length} messages en attente');
 
     final messagesToSend = List<Map<String, dynamic>>.from(_pendingMessages);
@@ -160,9 +164,9 @@ class ChatOfflineService {
         // Retirer de la queue si l'envoi réussit
         _pendingMessages.remove(message);
 
-        print('Message envoyé avec succès: ${message['local_id']}');
+        _logger.d("Message envoyé avec succès: ${message['local_id']}");
       } catch (e) {
-        print('Échec envoi message ${message['local_id']}: $e');
+        _logger.e("Echec envoi message ${message['local_id']}: $e");
         allSent = false;
         // Continuer avec les autres messages
       }
@@ -172,7 +176,7 @@ class ChatOfflineService {
 
     if (allSent) {
       _retryTimer?.cancel();
-      print('Tous les messages en attente ont été envoyés');
+      _logger.d('Tous les messages en attente ont été envoyés');
     }
   }
 
@@ -206,7 +210,7 @@ class ChatOfflineService {
 
     if (_pendingMessages.length != initialCount) {
       await _savePendingMessages();
-      print(
+      _logger.d(
           'Nettoyage: ${initialCount - _pendingMessages.length} anciens messages supprimés');
     }
   }

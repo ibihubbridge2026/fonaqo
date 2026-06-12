@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fonaco/core/providers/favorites_provider.dart';
+import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/services/cache_service.dart';
+import 'package:fonaco/core/widgets/agent_avatar.dart';
+import 'package:fonaco/features/client/screens/client_agent_profile_screen.dart';
 import 'package:fonaco/features/client/missions/mission_repository.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 
-/// Écran affichant la liste des agents favoris du client
+/// Écran affichant la liste des agents favoris du client.
 class FavoriteAgentsScreen extends StatefulWidget {
   const FavoriteAgentsScreen({super.key});
 
@@ -36,13 +38,15 @@ class _FavoriteAgentsScreenState extends State<FavoriteAgentsScreen> {
         await _cacheService.init();
       }
 
+      final auth = Provider.of<AuthProvider>(context, listen: false);
       final favoritesProvider =
           Provider.of<FavoritesProvider>(context, listen: false);
-      await favoritesProvider.init();
+      if (auth.currentUser?.id != null) {
+        await favoritesProvider.init(auth.currentUser!.id);
+      }
 
       final favorites = favoritesProvider.favoriteAgentIds.toList();
 
-      // Récupérer les profils complets des agents favoris
       if (favorites.isNotEmpty) {
         await _loadAgentProfiles(favorites);
       }
@@ -61,15 +65,13 @@ class _FavoriteAgentsScreenState extends State<FavoriteAgentsScreen> {
 
   Future<void> _loadAgentProfiles(List<String> agentIds) async {
     try {
-      // Récupérer tous les agents disponibles et filtrer par IDs favoris
-      final allAgents = await _missionRepository.fetchNearbyAgents(
-        limit: 100, // Récupérer plus d'agents pour inclure les favoris
+      final allAgents = await _missionRepository.fetchAgentSuggestions(
+        limit: 100,
       );
 
       final favoritesProvider =
           Provider.of<FavoritesProvider>(context, listen: false);
 
-      // Filtrer pour ne garder que les agents favoris
       final favoriteAgents = allAgents.where((agent) {
         final agentId = agent['id']?.toString() ?? '';
         return favoritesProvider.isFavorite(agentId);
@@ -80,7 +82,6 @@ class _FavoriteAgentsScreenState extends State<FavoriteAgentsScreen> {
           _agents = favoriteAgents;
         });
       }
-      _logger.i('✅ ${favoriteAgents.length} profils agents récupérés');
     } catch (e) {
       _logger.e('❌ Erreur chargement profils agents: $e');
     }
@@ -95,7 +96,6 @@ class _FavoriteAgentsScreenState extends State<FavoriteAgentsScreen> {
           if (!favoritesProvider.isFavorite(agentId)) {
             _agents.removeWhere((agent) => agent['id']?.toString() == agentId);
           } else {
-            // Recharger les profils pour inclure le nouvel agent favori
             _loadAgentProfiles(favoritesProvider.favoriteAgentIds.toList());
           }
         });
@@ -103,23 +103,45 @@ class _FavoriteAgentsScreenState extends State<FavoriteAgentsScreen> {
     });
   }
 
+  String _agentDisplayName(Map<String, dynamic> agent) {
+    final first = agent['first_name']?.toString().trim() ?? '';
+    final last = agent['last_name']?.toString().trim() ?? '';
+    final full = '$first $last'.trim();
+    if (full.isNotEmpty) return full;
+    final username = agent['username']?.toString().trim();
+    if (username != null && username.isNotEmpty) return username;
+    return 'Agent Fonaqo';
+  }
+
+  List<String> _agentSpecialties(Map<String, dynamic> agent) {
+    final specialties = agent['specialties'];
+    if (specialties is List && specialties.isNotEmpty) {
+      return specialties.map((e) => e.toString()).where((s) => s.isNotEmpty).toList();
+    }
+    final specialty = agent['specialty']?.toString().trim();
+    if (specialty != null && specialty.isNotEmpty) {
+      return [specialty];
+    }
+    return const [];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.black, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
           'Mes agents favoris',
           style: TextStyle(
             color: Colors.black,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -129,224 +151,260 @@ class _FavoriteAgentsScreenState extends State<FavoriteAgentsScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFFFFD400)),
+      );
     }
 
     final favoritesProvider = Provider.of<FavoritesProvider>(context);
     if (favoritesProvider.favoriteAgentIds.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.grey[100],
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.favorite_border,
-                  size: 64,
-                  color: Colors.grey[400],
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Aucun agent favori',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Ajoutez des agents à vos favoris depuis le dashboard pour les retrouver facilement ici.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  height: 1.5,
-                ),
-              ),
-            ],
-          ),
-        ),
+      return _emptyState(
+        icon: Icons.favorite_border,
+        title: 'Aucun agent favori',
+        subtitle:
+            'Ajoutez des agents à vos favoris depuis le dashboard pour les retrouver facilement ici.',
       );
     }
 
     if (_agents.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.search_off,
-                size: 64,
-                color: Colors.grey[400],
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Agents favoris introuvables',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Les agents que vous avez ajoutés en favori ne sont pas disponibles actuellement.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[600],
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _loadFavoriteAgents,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFD400),
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: const Text('Réessayer'),
-              ),
-            ],
+      return _emptyState(
+        icon: Icons.search_off,
+        title: 'Agents favoris introuvables',
+        subtitle:
+            'Les agents que vous avez ajoutés en favori ne sont pas disponibles actuellement.',
+        action: ElevatedButton(
+          onPressed: _loadFavoriteAgents,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFFFD400),
+            foregroundColor: Colors.black,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
+          child: const Text('Réessayer'),
         ),
       );
     }
 
-    return ListView.builder(
+    return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: _agents.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final agent = _agents[index];
         final agentId = agent['id']?.toString() ?? '';
-        final agentName =
-            '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
+        final displayName = _agentDisplayName(agent);
         final avatarUrl = agent['avatar_url']?.toString();
-        final rating = agent['rating']?.toString() ?? 'N/A';
+        final rating = formatAgentRating(
+          agent['reliability_score'] ?? agent['rating'],
+        );
         final isVerified = agent['is_verified'] == true;
-        final specialties = agent['specialties'] as List<dynamic>? ?? [];
+        final specialties = _agentSpecialties(agent);
 
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          elevation: 2,
-          shape: RoundedRectangleBorder(
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
             borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFEEEEEE)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Avatar
-                CircleAvatar(
-                  radius: 32,
-                  backgroundColor: Colors.grey[200],
-                  backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-                      ? CachedNetworkImageProvider(avatarUrl) as ImageProvider
-                      : null,
-                  child: avatarUrl == null || avatarUrl.isEmpty
-                      ? const Icon(Icons.person, color: Colors.grey, size: 32)
-                      : null,
-                ),
-                const SizedBox(width: 16),
-                // Info agent
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                Row(
+                  children: [
+                    AgentAvatar(
+                      avatarUrl: avatarUrl,
+                      displayName: displayName,
+                      radius: 28,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            agentName.isEmpty ? 'Agent' : agentName,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Color(0xFF121212),
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  displayName,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                    color: Color(0xFF121212),
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (isVerified)
+                                const Padding(
+                                  padding: EdgeInsets.only(left: 6),
+                                  child: Icon(
+                                    Icons.verified,
+                                    color: Color(0xFF2563EB),
+                                    size: 16,
+                                  ),
+                                ),
+                            ],
                           ),
-                          if (isVerified) ...[
-                            const SizedBox(width: 8),
-                            const Icon(
-                              Icons.verified,
-                              color: Colors.blue,
-                              size: 16,
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                color: Color(0xFFF7C600),
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                rating,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 12,
+                                  color: Colors.grey.shade800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (specialties.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: specialties.take(2).map((spec) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF3F4F6),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    spec,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.grey.shade700,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
                             ),
                           ],
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.star,
-                            color: Color(0xFFF7C600),
-                            size: 14,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            rating,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              color: Color(0xFF121212),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (specialties.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: specialties.take(2).map<Widget>((spec) {
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                spec.toString(),
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
-                    ],
-                  ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.favorite, color: Color(0xFFEF4444)),
+                      onPressed: () => _toggleFavoriteAgent(agentId),
+                    ),
+                  ],
                 ),
-                // Bouton favori
-                IconButton(
-                  icon: const Icon(
-                    Icons.favorite,
-                    color: Colors.red,
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.center,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => ClientAgentProfileScreen(
+                            agentId: agentId,
+                            name: displayName,
+                            role: specialties.isNotEmpty
+                                ? specialties.first
+                                : 'Agent Fonaqo',
+                            avatarUrl: avatarUrl,
+                            expertiseTags: specialties,
+                            rating: double.tryParse(rating),
+                            isVerified: isVerified,
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFD400),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'Consulter le profil',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                    ),
                   ),
-                  onPressed: () => _toggleFavoriteAgent(agentId),
                 ),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _emptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    Widget? action,
+  }) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFEEEEEE)),
+              ),
+              child: Icon(icon, size: 56, color: Colors.grey.shade400),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF121212),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade600,
+                height: 1.5,
+              ),
+            ),
+            if (action != null) ...[
+              const SizedBox(height: 24),
+              action,
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

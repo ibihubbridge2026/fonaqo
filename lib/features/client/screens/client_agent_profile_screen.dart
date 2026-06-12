@@ -1,13 +1,16 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 
 /// Écran de profil d'un agent accessible par le client
 class ClientAgentProfileScreen extends StatelessWidget {
+  static const String _fallbackAvatarAsset = 'assets/images/avatar/user.png';
+
   final String agentId;
   final String name;
   final String role;
-  final String? imagePath;
+  final String? avatarUrl;
   final List<String> expertiseTags;
   final double? rating;
   final bool isVerified;
@@ -18,7 +21,7 @@ class ClientAgentProfileScreen extends StatelessWidget {
     required this.agentId,
     required this.name,
     required this.role,
-    this.imagePath,
+    this.avatarUrl,
     this.expertiseTags = const [],
     this.rating,
     this.isVerified = false,
@@ -57,25 +60,7 @@ class ClientAgentProfileScreen extends StatelessWidget {
                         radius: 60,
                         backgroundColor: Colors.grey[200],
                         child: ClipOval(
-                          child: imagePath != null
-                              ? Image.asset(
-                                  imagePath!,
-                                  width: 120,
-                                  height: 120,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) {
-                                    return const Icon(
-                                      Icons.person,
-                                      color: Colors.black54,
-                                      size: 60,
-                                    );
-                                  },
-                                )
-                              : const Icon(
-                                  Icons.person,
-                                  color: Colors.black54,
-                                  size: 60,
-                                ),
+                          child: _buildAvatarImage(),
                         ),
                       ),
                       if (isVerified)
@@ -315,6 +300,47 @@ class ClientAgentProfileScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarImage() {
+    final url = avatarUrl?.trim();
+    if (url != null && url.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: url,
+        width: 120,
+        height: 120,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => Image.asset(
+          _fallbackAvatarAsset,
+          width: 120,
+          height: 120,
+          fit: BoxFit.cover,
+        ),
+        errorWidget: (_, __, ___) => Image.asset(
+          _fallbackAvatarAsset,
+          width: 120,
+          height: 120,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => const Icon(
+            Icons.person,
+            color: Colors.black54,
+            size: 60,
+          ),
+        ),
+      );
+    }
+
+    return Image.asset(
+      _fallbackAvatarAsset,
+      width: 120,
+      height: 120,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => const Icon(
+        Icons.person,
+        color: Colors.black54,
+        size: 60,
       ),
     );
   }

@@ -11,7 +11,8 @@ class FeedbackService {
   static GlobalKey<NavigatorState>? _navigatorKey;
   static final Logger _logger = Logger();
 
-  // Setter pour initialiser la navigatorKey
+  static GlobalKey<NavigatorState>? get navigatorKey => _navigatorKey;
+
   static set navigatorKey(GlobalKey<NavigatorState>? key) {
     _navigatorKey = key;
   }

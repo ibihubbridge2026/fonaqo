@@ -8,7 +8,7 @@ import 'main_wrapper.dart';
 
 /// Variante d'en-tête : logo marque pour l’accueil shell, titre d’onglet, ou pile détail avec retour.
 enum CustomAppBarVariant {
-  /// Logo FONACO centré, avatar à gauche, actions notifications + chat (onglet principal).
+  /// Accueil shell : avatar à gauche, notifications + assistance à droite.
   mainShellHome,
 
   /// Titre uniquement pour les autres onglets du shell (sans logo ni retour système plein cadre).
@@ -43,14 +43,14 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// Déclenchée à la pression du bouton retour en mode pile ; défaut si null : pop.
   final VoidCallback? leadingOnBackPressed;
 
-  /// Rappels optionnels pour remplacer le comportement par défaut vers [AppRoutes.chat].
+  /// Rappels optionnels pour remplacer le comportement par défaut.
   final VoidCallback? onNotificationsPressed;
-  final VoidCallback? onChatPressed;
+  final VoidCallback? onSupportPressed;
 
   const CustomAppBar.mainShellHome({
     super.key,
     this.onNotificationsPressed,
-    this.onChatPressed,
+    this.onSupportPressed,
   })  : variant = CustomAppBarVariant.mainShellHome,
         sectionTitle = null,
         detailTitleWidget = null,
@@ -65,7 +65,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
         detailTrailingActions = null,
         leadingOnBackPressed = null,
         onNotificationsPressed = null,
-        onChatPressed = null;
+        onSupportPressed = null;
 
   const CustomAppBar.detailStack({
     super.key,
@@ -76,7 +76,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   })  : variant = CustomAppBarVariant.detailStack,
         sectionTitle = null,
         onNotificationsPressed = null,
-        onChatPressed = null;
+        onSupportPressed = null;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 12);
@@ -92,78 +92,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
       leading: _buildLeading(context),
       title: _buildTitle(context),
       actions: _buildActions(context),
-    );
-  }
-
-  void _showAISearchModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Text(
-                'Recherche IA',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: TextField(
-                autofocus: true,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText:
-                      'Décrivez votre besoin (ex: Je cherche un agent pour une course urgente à Ganvié)',
-                  labelStyle: const TextStyle(fontSize: 12),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
-                    foregroundColor: const Color(0xFFFFD400),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    'Générer des suggestions',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
     );
   }
 
@@ -222,24 +150,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget? _buildTitle(BuildContext context) {
     switch (variant) {
       case CustomAppBarVariant.mainShellHome:
-        // Demande: enlever l’icône centrée du header.
-        // On conserve un wordmark texte propre et stable (sans asset central).
-        return GestureDetector(
-          onTap: () => _showAISearchModal(context),
-          child: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFFD400), width: 2),
-            ),
-            child: const Icon(
-              Icons.search_rounded,
-              color: Colors.black,
-              size: 24,
-            ),
-          ),
-        );
+        return const SizedBox.shrink();
 
       case CustomAppBarVariant.mainShellSection:
         final title = sectionTitle ?? '';
@@ -268,10 +179,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   List<Widget> _buildActions(BuildContext context) {
     switch (variant) {
       case CustomAppBarVariant.mainShellHome:
-        final chat = onChatPressed ??
-            () => Navigator.pushNamed(context, AppRoutes.chatList);
         final bell = onNotificationsPressed ??
             () => Navigator.pushNamed(context, AppRoutes.notifications);
+        final support = onSupportPressed ??
+            () => Navigator.pushNamed(context, AppRoutes.aiAssistant);
 
         final notificationProvider = Provider.of<NotificationProvider>(context);
 
@@ -311,43 +222,16 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ),
             ],
           ),
-          const SizedBox(width: 12),
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.forum_outlined,
-                  color: Colors.black,
-                  size: 28,
-                ),
-                onPressed: chat,
-              ),
-              if (notificationProvider.unreadMessages > 0)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      notificationProvider.unreadMessages > 9
-                          ? '9+'
-                          : notificationProvider.unreadMessages.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+          IconButton(
+            icon: const Icon(
+              Icons.support_agent,
+              color: Colors.black,
+              size: 28,
+            ),
+            tooltip: 'Assistance',
+            onPressed: support,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 8),
         ];
 
       case CustomAppBarVariant.mainShellSection:

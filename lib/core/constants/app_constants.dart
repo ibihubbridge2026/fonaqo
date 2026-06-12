@@ -12,8 +12,9 @@ class AppConstants {
   static const double defaultSearchRadiusKm = 10.0;
 
   // Coûts par défaut
-  static const double defaultServiceAmount = 15000.0;
+  static const double defaultServiceAmount = 1000.0;
   static const double defaultPurchaseAmount = 0.0;
+  static const double minServiceAmount = 500.0;
   static const double optionCost = 500.0;
 
   // Timeout localisation GPS
