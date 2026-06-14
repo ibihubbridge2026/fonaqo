@@ -11,6 +11,7 @@ enum MissionStatus {
   ON_THE_WAY('on_the_way', 'En route'),
   ARRIVED('arrived', 'Sur place'),
   IN_PROGRESS('in_progress', 'En cours'),
+  IN_PROGRESS_REVIEW('in_progress_review', 'En validation'),
   COMPLETED('completed', 'Terminée'),
   CANCELLED('cancelled', 'Annulée'),
   DISPUTED('disputed', 'En litige'),
@@ -38,6 +39,7 @@ enum MissionStatus {
       case MissionStatus.ON_THE_WAY:
       case MissionStatus.ARRIVED:
       case MissionStatus.IN_PROGRESS:
+      case MissionStatus.IN_PROGRESS_REVIEW:
         return Colors.blue;
       case MissionStatus.UNKNOWN:
         return Colors.grey;
@@ -84,6 +86,7 @@ class MissionModel {
   final double? purchaseAmount;
   final String? agentEmail;
   final String? clientEmail;
+  final String? targetAgentUsername;
   final List<String>? tags;
   final double? clientRating;
 
@@ -119,6 +122,7 @@ class MissionModel {
     this.purchaseAmount,
     this.agentEmail,
     this.clientEmail,
+    this.targetAgentUsername,
     this.tags,
     this.clientRating,
   });
@@ -161,6 +165,7 @@ class MissionModel {
         purchaseAmount: _readDouble(json['purchase_amount']),
         agentEmail: json['agent_email']?.toString(),
         clientEmail: json['client_email']?.toString(),
+        targetAgentUsername: json['target_agent_username']?.toString(),
         tags: _readStringList(json['tags']),
         clientRating: _readDouble(json['client_rating']),
       );
@@ -243,7 +248,66 @@ class MissionModel {
       if (agentLatitude != null) 'agent_latitude': agentLatitude,
       if (agentLongitude != null) 'agent_longitude': agentLongitude,
       if (etaMinutes != null) 'eta_minutes': etaMinutes,
+      if (targetAgentUsername != null)
+        'target_agent_username': targetAgentUsername,
     };
+  }
+
+  /// Statuts faisant partie du cycle de vie actif agent.
+  static const Set<MissionStatus> activeLifecycle = {
+    MissionStatus.ACCEPTED,
+    MissionStatus.ON_THE_WAY,
+    MissionStatus.ARRIVED,
+    MissionStatus.IN_PROGRESS,
+    MissionStatus.IN_PROGRESS_REVIEW,
+  };
+
+  /// Délai priorité boost avant ouverture au pool général (minutes).
+  static const int boostGateMinutes = 10;
+
+  static bool isActiveLifecycle(MissionStatus status) =>
+      activeLifecycle.contains(status);
+
+  bool get hasAcceptedAgent =>
+      agentName != null && agentName!.trim().isNotEmpty;
+
+  bool isAssignedToAgent(String? agentUsername) {
+    if (agentUsername == null || agentUsername.trim().isEmpty) return false;
+    final target = targetAgentUsername?.trim();
+    if (target == null || target.isEmpty) return false;
+    return target.toLowerCase() == agentUsername.trim().toLowerCase();
+  }
+
+  /// Accepter : mission PENDING, sans agent, et ouverte ou assignée à moi.
+  bool canAgentAccept(String? agentUsername) {
+    if (status != MissionStatus.PENDING || hasAcceptedAgent) return false;
+    final target = targetAgentUsername?.trim();
+    if (target == null || target.isEmpty) return true;
+    return isAssignedToAgent(agentUsername);
+  }
+
+  /// Refuser : uniquement si la mission m'a été attribuée explicitement.
+  bool canAgentDecline(String? agentUsername) {
+    return status == MissionStatus.PENDING &&
+        !hasAcceptedAgent &&
+        isAssignedToAgent(agentUsername);
+  }
+
+  /// Temps restant avant visibilité pool (agents sans boost).
+  Duration? boostGateRemaining({bool hasActiveBoost = false}) {
+    if (hasActiveBoost || createdAt == null) return null;
+    if (status != MissionStatus.PENDING) return null;
+    final unlockAt =
+        createdAt!.add(const Duration(minutes: boostGateMinutes));
+    final remaining = unlockAt.difference(DateTime.now());
+    if (remaining.isNegative || remaining.inSeconds <= 0) return null;
+    return remaining;
+  }
+
+  String formatCountdown(Duration duration) {
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 
   /// Parse le statut depuis l'API Django (TextChoices).
@@ -259,6 +323,8 @@ class MissionModel {
         return MissionStatus.ARRIVED;
       case 'in_progress':
         return MissionStatus.IN_PROGRESS;
+      case 'in_progress_review':
+        return MissionStatus.IN_PROGRESS_REVIEW;
       case 'completed':
         return MissionStatus.COMPLETED;
       case 'cancelled':
@@ -294,6 +360,7 @@ class MissionModel {
     double? agentLatitude,
     double? agentLongitude,
     int? etaMinutes,
+    String? targetAgentUsername,
   }) {
     return MissionModel(
       id: id ?? this.id,
@@ -319,6 +386,8 @@ class MissionModel {
       agentLatitude: agentLatitude ?? this.agentLatitude,
       agentLongitude: agentLongitude ?? this.agentLongitude,
       etaMinutes: etaMinutes ?? this.etaMinutes,
+      targetAgentUsername:
+          targetAgentUsername ?? this.targetAgentUsername,
     );
   }
 

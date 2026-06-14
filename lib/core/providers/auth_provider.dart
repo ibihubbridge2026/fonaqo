@@ -624,10 +624,12 @@ class AuthProvider extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         return true;
-      } else {
-        _setError('Erreur lors du changement de mot de passe');
-        return false;
       }
+      _setError(_extractApiErrors(response.data));
+      return false;
+    } on ApiException catch (e) {
+      _setError(e.message);
+      return false;
     } catch (e) {
       _setError('Erreur: ${e.toString()}');
       return false;

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'package:fonaco/widgets/custom_app_bar.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
+import 'package:fonaco/core/widgets/profile/profile_form_widgets.dart';
 
 /// Écran de modification des informations personnelles (nom, email, photo).
 class PersonalInfoScreen extends StatefulWidget {
@@ -92,7 +93,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       dynamic profileData;
 
-      // Logique corrigée : Si image présente, on utilise FormData pour le multipart/form-data
       if (_profileImage != null) {
         profileData = FormData.fromMap({
           'first_name': _firstName.text.trim(),
@@ -103,7 +103,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           ),
         });
       } else {
-        // Sinon un simple Map JSON suffit
         profileData = {
           'first_name': _firstName.text.trim(),
           'last_name': _lastName.text.trim(),
@@ -112,33 +111,34 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
       final success = await authProvider.updateProfile(profileData);
 
-      if (mounted) {
-        if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Profil mis à jour avec succès'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  authProvider.errorMessage ?? 'Erreur lors de la mise à jour'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profil mis à jour avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur inattendue: $e'),
+            content: Text(
+              authProvider.errorMessage ?? 'Erreur lors de la mise à jour',
+            ),
             backgroundColor: Colors.red,
           ),
         );
       }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur inattendue: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -166,221 +166,39 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
-                _AvatarEditor(
+                ProfileAvatarEditor(
                   profileImage: _profileImage,
                   onPickImage: _pickImage,
                 ),
                 const SizedBox(height: 12),
-                _FieldCard(
+                ProfileFieldCard(
                   label: 'Prénom',
                   controller: _firstName,
                   keyboardType: TextInputType.name,
                 ),
                 const SizedBox(height: 12),
-                _FieldCard(
+                ProfileFieldCard(
                   label: 'Nom',
                   controller: _lastName,
                   keyboardType: TextInputType.name,
                 ),
                 const SizedBox(height: 12),
-                _FieldCard(
+                ProfileFieldCard(
                   label: 'Email',
                   controller: _email,
                   keyboardType: TextInputType.emailAddress,
                   readOnly: true,
                 ),
                 const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isSaving ? null : _saveProfile,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFFD400),
-                      foregroundColor: Colors.black,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: _isSaving
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.black,
-                            ),
-                          )
-                        : const Text(
-                            'ENREGISTRER',
-                            style: TextStyle(fontWeight: FontWeight.w900),
-                          ),
-                  ),
+                ProfileSaveButton(
+                  isSaving: _isSaving,
+                  onPressed: _saveProfile,
                 ),
                 const SizedBox(height: 20),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _FieldCard extends StatelessWidget {
-  final String label;
-  final TextEditingController controller;
-  final TextInputType? keyboardType;
-  final bool readOnly;
-
-  const _FieldCard({
-    required this.label,
-    required this.controller,
-    this.keyboardType,
-    this.readOnly = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12),
-        ],
-      ),
-      child: TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        readOnly: readOnly,
-        style: TextStyle(
-          color: readOnly ? Colors.grey[600] : Colors.black,
-          fontWeight: readOnly ? FontWeight.normal : FontWeight.w500,
-        ),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(
-            color: readOnly ? Colors.grey[500] : Colors.black54,
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: BorderSide(color: Colors.grey[300]!),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: BorderSide(color: Colors.grey[300]!),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: const BorderSide(color: Color(0xFFFFD400)),
-          ),
-          suffixIcon: readOnly
-              ? Icon(Icons.lock_outline, color: Colors.grey[400], size: 20)
-              : null,
-        ),
-      ),
-    );
-  }
-}
-
-class _AvatarEditor extends StatelessWidget {
-  final File? profileImage;
-  final VoidCallback onPickImage;
-
-  const _AvatarEditor({required this.profileImage, required this.onPickImage});
-
-  @override
-  Widget build(BuildContext context) {
-    final user = Provider.of<AuthProvider>(context, listen: false).currentUser;
-    final avatarUrl = user?.avatarUrl;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 12),
-        ],
-      ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: onPickImage,
-            child: Stack(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: Colors.grey[200],
-                  child: profileImage != null
-                      ? ClipOval(
-                          child: Image.file(
-                            profileImage!,
-                            width: 60,
-                            height: 60,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
-                                const Icon(Icons.person, color: Colors.black54),
-                          ),
-                        )
-                      : avatarUrl != null && avatarUrl.isNotEmpty
-                          ? ClipOval(
-                              child: Image.network(
-                                avatarUrl,
-                                width: 60,
-                                height: 60,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                    Icons.person,
-                                    color: Colors.black54),
-                              ),
-                            )
-                          : ClipOval(
-                              child: Image.asset(
-                                'assets/images/avatar/user.png',
-                                width: 60,
-                                height: 60,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                    Icons.person,
-                                    color: Colors.black54),
-                              ),
-                            ),
-                ),
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFFD400),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt,
-                      size: 12,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Text(
-              'Photo de profil',
-              style: TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ),
-          TextButton(onPressed: onPickImage, child: const Text('Modifier')),
-        ],
       ),
     );
   }

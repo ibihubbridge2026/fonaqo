@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:provider/provider.dart';
 import '../providers/agent_provider.dart';
-import '../repository/agent_repository.dart';
 
 /// Dialogue de notation pour évaluer une mission terminée
 class RatingDialog extends StatefulWidget {
@@ -218,21 +217,18 @@ class _RatingDialogState extends State<RatingDialog> {
     });
 
     try {
-      final agentRepository = AgentRepository();
+      final agentProvider =
+          Provider.of<AgentProvider>(context, listen: false);
       bool success = false;
 
       if (widget.isClientRating && widget.clientId != null) {
-        // Noter le client
-        success = await agentRepository.rateClient(
+        success = await agentProvider.missionRepository.rateClient(
           missionId: widget.missionId,
           clientId: widget.clientId!,
           rating: _rating,
           comment: _commentController.text.trim(),
         );
       } else {
-        // Noter la mission (évaluation de l'agent par le client)
-        final agentProvider =
-            Provider.of<AgentProvider>(context, listen: false);
         success = await agentProvider.submitReview(
           widget.missionId,
           _rating,

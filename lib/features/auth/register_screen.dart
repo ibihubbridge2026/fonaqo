@@ -17,7 +17,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -29,7 +29,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _usernameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -51,6 +51,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       return;
     }
+    if (_usernameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Le nom d\'utilisateur est obligatoire'),
+        ),
+      );
+      return;
+    }
     if (_passwordController.text.trim().length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -68,21 +76,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       try {
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-        // Nettoyer le username pour qu'il soit valide selon Django (lettres, chiffres, @/./+/-/_)
-        String cleanUsername = _nameController.text
-            .trim()
-            .toLowerCase()
-            .replaceAll(RegExp(r'[^a-zA-Z0-9@./+/-/_]'), '_')
-            .replaceAll(RegExp(r'\s+'), '_')
-            .replaceAll(RegExp(r'_+'), '_')
-            .replaceAll(RegExp(r'^_|_$'), '');
-
         final registerData = {
           'phone_number':
               '${_selectedCountry.dialCode}${_phoneController.text.trim()}',
-          'username': cleanUsername.isEmpty
-              ? 'user_${DateTime.now().millisecondsSinceEpoch}'
-              : cleanUsername,
+          'username': _usernameController.text.trim(),
           'password': _passwordController.text.trim(),
           'role': _selectedRole,
           'email': _emailController.text.trim(),
@@ -227,13 +224,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     const SizedBox(height: 25),
 
-                    // CHAMPS DE SAISIE
-                    // _buildField(
-                    //   controller: _nameController,
-                    //   hint: "Nom complet",
-                    //   icon: Icons.person_outline,
-                    // ),
-                    // const SizedBox(height: 15),
+                    const Text(
+                      'Nom d\'utilisateur',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildField(
+                      controller: _usernameController,
+                      hint: 'Nom d\'utilisateur',
+                      icon: Icons.alternate_email,
+                    ),
+                    const SizedBox(height: 15),
 
                     PhoneInputCard(
                       country: _selectedCountry,

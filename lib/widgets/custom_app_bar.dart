@@ -31,6 +31,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// Comportement visuel principal du bandeau.
   final CustomAppBarVariant variant;
 
+  /// Index onglet profil dans le shell (client: 4, agent: 4).
+  final int profileTabIndex;
+
   /// Titre centré lorsque `variant == mainShellSection`.
   final String? sectionTitle;
 
@@ -49,6 +52,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   const CustomAppBar.mainShellHome({
     super.key,
+    this.profileTabIndex = 4,
     this.onNotificationsPressed,
     this.onSupportPressed,
   })  : variant = CustomAppBarVariant.mainShellHome,
@@ -60,6 +64,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   const CustomAppBar.mainShellSection({
     super.key,
     required String this.sectionTitle,
+    this.profileTabIndex = 4,
   })  : variant = CustomAppBarVariant.mainShellSection,
         detailTitleWidget = null,
         detailTrailingActions = null,
@@ -69,6 +74,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   const CustomAppBar.detailStack({
     super.key,
+    this.profileTabIndex = 4,
     this.detailTitleWidget,
     this.leadingOnBackPressed,
     this.detailTrailingActions,
@@ -113,7 +119,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                   onTap: () {
                     final shell = MainShellScope.maybeOf(context);
                     if (shell != null) {
-                      shell.setIndex(4); // Navigate to Profile/Paramètres tab
+                      shell.setIndex(profileTabIndex);
                     }
                   },
                   borderRadius: BorderRadius.circular(99),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/agent_provider.dart';
-import '../repository/agent_repository.dart';
 
+import 'package:fonaco/core/services/feexpay_service.dart';
+import 'package:fonaco/features/agent/providers/agent_provider.dart';
+
+/// Écran boost agent — plans API, boost actif, achat wallet/FeexPay.
 class AgentBoostScreen extends StatefulWidget {
   const AgentBoostScreen({super.key});
 
@@ -11,387 +13,327 @@ class AgentBoostScreen extends StatefulWidget {
 }
 
 class _AgentBoostScreenState extends State<AgentBoostScreen> {
-  int selectedBoost = 0;
-  bool _isActivating = false;
-  final AgentRepository _agentRepository = AgentRepository();
+  int _selectedIndex = 0;
+  bool _loading = true;
+  bool _purchasing = false;
 
-  final List<Map<String, dynamic>> boosts = [
-    {
-      "title": "Day Boost",
-      "price": "200 FCFA",
-      "duration": "24 heures",
-      "missions": "+35% visibilité",
-      "recommended": false,
-    },
-    {
-      "title": "Week Boost",
-      "price": "1 000 FCFA",
-      "duration": "7 jours",
-      "missions": "+80% visibilité",
-      "recommended": true,
-    },
-    {
-      "title": "Month Boost",
-      "price": "2 000 FCFA",
-      "duration": "30 jours",
-      "missions": "Visibilité maximale",
-      "recommended": false,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    await context.read<AgentProvider>().fetchBoostData();
+    await context.read<AgentProvider>().fetchWalletDetails();
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _purchase(Map<String, dynamic> plan) async {
+    final name = plan['name']?.toString() ?? '';
+    final price = (plan['price'] as num?)?.toDouble() ?? 0;
+
+    final method = await showModalBottomSheet<String>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Activer $name',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.account_balance_wallet),
+              title: const Text('Portefeuille FONACO'),
+              subtitle: Text(
+                '${context.read<AgentProvider>().balance.toStringAsFixed(0)} FCFA',
+              ),
+              onTap: () => Navigator.pop(ctx, 'wallet'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.phone_android),
+              title: const Text('FeexPay'),
+              onTap: () => Navigator.pop(ctx, 'feexpay'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (method == null || !mounted) return;
+    setState(() => _purchasing = true);
+
+    try {
+      final provider = context.read<AgentProvider>();
+      String? transactionId;
+
+      if (method == 'wallet') {
+        if (provider.balance < price) {
+          _snack('Solde insuffisant', isError: true);
+          return;
+        }
+      } else {
+        final paid = await FeexPayService.instance.requestPayment(
+          context: context,
+          amount: price,
+          description: 'Boost $name',
+        );
+        if (!paid || !mounted) return;
+        transactionId = 'FEEX-${DateTime.now().millisecondsSinceEpoch}';
+      }
+
+      final ok = await provider.profileRepository.purchaseBoost(
+        name,
+        price,
+        paymentMethod: method == 'feexpay' ? 'feexpay' : 'wallet',
+        transactionId: transactionId,
+      );
+
+      if (!mounted) return;
+      if (ok) {
+        await _load();
+        _snack('$name activé jusqu\'à expiration');
+      } else {
+        _snack('Échec de l\'achat', isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _purchasing = false);
+    }
+  }
+
+  void _snack(String msg, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final agentProvider = Provider.of<AgentProvider>(context, listen: false);
-    final balance = agentProvider.balance;
+    final provider = context.watch<AgentProvider>();
+    final plans = provider.boostPlans;
+    final active = provider.activeBoost;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
+      backgroundColor: const Color(0xFFF9F9F9),
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
+        elevation: 0.5,
         leading: const BackButton(color: Colors.black),
         title: const Text(
-          "Booster mon profil",
+          'Booster mon profil',
           style: TextStyle(
             color: Colors.black,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             fontSize: 18,
           ),
         ),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Solde Boost
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(22),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFFFFD400),
-                    Color(0xFFFFC107),
-                  ],
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      body: _loading
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFFFFD400)),
+            )
+          : RefreshIndicator(
+              onRefresh: _load,
+              color: const Color(0xFFFFD400),
+              child: ListView(
+                padding: const EdgeInsets.all(20),
                 children: [
-                  const Text(
-                    "Solde Boost",
-                    style: TextStyle(
-                      color: Colors.black87,
-                      fontSize: 14,
+                  if (active != null) _ActiveBoostCard(boost: active),
+                  Container(
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFD400), Color(0xFFFFC107)],
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Priorité missions',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 16,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Accédez aux nouvelles missions 10 min avant les autres agents.',
+                          style: TextStyle(
+                            color: Colors.black.withValues(alpha: 0.75),
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "${balance.toStringAsFixed(0)} FCFA",
-                    style: const TextStyle(
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Choisir un pass',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                       color: Colors.black,
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: 14),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.25),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.trending_up, size: 18),
-                        SizedBox(width: 8),
-                        Text(
-                          "Augmentez votre visibilité",
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 28),
-
-            const Text(
-              "Pass Priorité",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-
-            const SizedBox(height: 6),
-
-            Text(
-              "Soyez affiché avant les autres agents dans votre zone.",
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                height: 1.4,
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Liste des boosts
-            ...List.generate(
-              boosts.length,
-              (index) {
-                final boost = boosts[index];
-                final isSelected = selectedBoost == index;
-
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      selectedBoost = index;
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(22),
-                      border: Border.all(
-                        color: isSelected
-                            ? const Color(0xFFFFD400)
-                            : Colors.grey.shade200,
-                        width: 2,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        // Radio custom
-                        Container(
-                          width: 24,
-                          height: 24,
+                  if (plans.isEmpty)
+                    const Text('Aucun plan disponible pour le moment.')
+                  else
+                    ...List.generate(plans.length, (index) {
+                      final plan = plans[index];
+                      final selected = _selectedIndex == index;
+                      final price = (plan['price'] as num?)?.toDouble() ?? 0;
+                      final hours = plan['duration_hours'] ?? plan['duration'];
+                      return GestureDetector(
+                        onTap: () => setState(() => _selectedIndex = index),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: isSelected
+                              color: selected
                                   ? const Color(0xFFFFD400)
-                                  : Colors.grey.shade400,
+                                  : Colors.grey.shade200,
                               width: 2,
                             ),
                           ),
-                          child: isSelected
-                              ? Center(
-                                  child: Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: const BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Color(0xFFFFD400),
-                                    ),
-                                  ),
-                                )
-                              : null,
-                        ),
-
-                        const SizedBox(width: 16),
-
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
                             children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    boost['title'],
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  if (boost['recommended'])
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 4,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFFF3C4),
-                                        borderRadius: BorderRadius.circular(30),
-                                      ),
-                                      child: const Text(
-                                        "Populaire",
-                                        style: TextStyle(
-                                          color: Color(0xFFB8860B),
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 11,
-                                        ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      plan['name']?.toString() ?? 'Boost',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 16,
+                                        color: Colors.black,
                                       ),
                                     ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                boost['duration'],
-                                style: TextStyle(
-                                  color: Colors.grey.shade600,
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${hours ?? '?'} h · x${plan['visibility_multiplier'] ?? '1.5'} visibilité',
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 6),
                               Text(
-                                boost['missions'],
+                                '${price.toStringAsFixed(0)} F',
                                 style: const TextStyle(
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 17,
+                                  color: Color(0xFFE0B800),
                                 ),
                               ),
                             ],
                           ),
                         ),
-
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              boost['price'],
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-
-            const SizedBox(height: 10),
-
-            // Bouton activation
-            SizedBox(
-              width: double.infinity,
-              height: 58,
-              child: ElevatedButton(
-                onPressed: _isActivating ? null : _activateBoost,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFD400),
-                  foregroundColor: Colors.black,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-                child: _isActivating
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.black,
-                        ),
-                      )
-                    : const Text(
-                        "Activer le boost",
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
+                      );
+                    }),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: _purchasing || plans.isEmpty
+                          ? null
+                          : () => _purchase(plans[_selectedIndex]),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFFD400),
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
+                      child: _purchasing
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Activer le boost',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
-
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
     );
   }
+}
 
-  /// Active le boost sélectionné
-  Future<void> _activateBoost() async {
-    if (selectedBoost < 0 || selectedBoost >= boosts.length) return;
+class _ActiveBoostCard extends StatelessWidget {
+  final Map<String, dynamic> boost;
 
-    final boost = boosts[selectedBoost];
-    final price = double.parse(
-        boost['price'].replaceAll(' FCFA', '').replaceAll(' ', ''));
+  const _ActiveBoostCard({required this.boost});
 
-    setState(() {
-      _isActivating = true;
-    });
+  @override
+  Widget build(BuildContext context) {
+    final plan = boost['plan'];
+    final planName = plan is Map
+        ? plan['name']?.toString() ?? 'Boost actif'
+        : 'Boost actif';
+    final expires = boost['expires_at']?.toString() ?? '';
 
-    try {
-      final agentProvider = Provider.of<AgentProvider>(context, listen: false);
-      final currentBalance = agentProvider.balance;
-
-      if (currentBalance < price) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Solde insuffisant pour activer ce boost'),
-            backgroundColor: Colors.red,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.green.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.verified, color: Colors.green.shade700),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  planName,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black,
+                  ),
+                ),
+                if (expires.isNotEmpty)
+                  Text(
+                    'Expire : ${expires.substring(0, 16).replaceFirst('T', ' ')}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.green.shade800,
+                    ),
+                  ),
+              ],
+            ),
           ),
-        );
-        return;
-      }
-
-      // Déduire le montant du solde
-      final success = await _agentRepository.purchaseBoost(
-        boost['title'],
-        price,
-      );
-
-      if (success) {
-        // Mettre à jour le solde immédiatement
-        await agentProvider.fetchWalletDetails();
-
-        // Activer le boost
-        // TODO: Implémenter la logique d'activation du boost
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${boost["title"]} activé avec succès!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-
-        // Retourner au dashboard
-        Navigator.pop(context);
-      } else {
-        throw Exception('Échec de l\'achat du boost');
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isActivating = false;
-        });
-      }
-    }
+        ],
+      ),
+    );
   }
 }

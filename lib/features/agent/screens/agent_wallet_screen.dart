@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:open_file/open_file.dart';
 import 'package:provider/provider.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:shimmer/shimmer.dart';
-import 'dart:io';
+
 import '../providers/agent_provider.dart';
 import '../widgets/wallet_transaction_tile.dart';
-import '../repository/agent_repository.dart';
+import 'package:fonaco/core/services/feexpay_service.dart';
 
 class AgentWalletScreen extends StatefulWidget {
   const AgentWalletScreen({super.key});
@@ -18,766 +15,299 @@ class AgentWalletScreen extends StatefulWidget {
 }
 
 class _AgentWalletScreenState extends State<AgentWalletScreen> {
-  bool _isGeneratingPdf = false;
-  final AgentRepository _agentRepository = AgentRepository();
-
-  Future<void> _refreshWalletData() async {
-    final agentProvider = Provider.of<AgentProvider>(context, listen: false);
-    await agentProvider.fetchWalletDetails();
-  }
+  bool _downloading = false;
 
   @override
-  void dispose() {
-    super.dispose();
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AgentProvider>().fetchWalletDetails();
+      context.read<AgentProvider>().fetchStats();
+    });
   }
 
-  /// Télécharge le rapport mensuel depuis le backend
-  Future<void> _downloadMonthlyReport() async {
-    setState(() {
-      _isGeneratingPdf = true;
-    });
+  Future<void> _refresh() async {
+    await Future.wait([
+      context.read<AgentProvider>().fetchWalletDetails(),
+      context.read<AgentProvider>().fetchStats(),
+    ]);
+  }
 
+  Future<void> _downloadReport() async {
+    setState(() => _downloading = true);
     try {
-      final reportUrl = await _agentRepository.downloadMonthlyReport(
-        month: DateTime.now().month,
-        year: DateTime.now().year,
-      );
-
-      if (reportUrl != null) {
-        // Ouvrir l'URL du rapport
-        // TODO: Implémenter l'ouverture de l'URL dans le navigateur ou téléchargement direct
+      final path = await context
+          .read<AgentProvider>()
+          .missionRepository
+          .downloadMonthlyReport();
+      if (!mounted) return;
+      if (path != null) {
+        await OpenFile.open(path);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Rapport mensuel téléchargé avec succès!'),
+            content: Text('Relevé mensuel téléchargé'),
             backgroundColor: Colors.green,
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Erreur lors du téléchargement du rapport'),
+            content: Text('Impossible de télécharger le relevé'),
             backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur téléchargement rapport: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isGeneratingPdf = false;
-        });
-      }
+      if (mounted) setState(() => _downloading = false);
     }
+  }
+
+  void _showRecharge(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _RechargeBottomSheet(),
+    );
+  }
+
+  void _showWithdraw(BuildContext context, double balance) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _WithdrawalBottomSheet(availableBalance: balance),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Consumer<AgentProvider>(
-      builder: (context, agentProvider, child) {
-        return Scaffold(
-          backgroundColor: const Color(0xFFF5F5F5),
-          body: SafeArea(
-            child: RefreshIndicator(
-              onRefresh: _refreshWalletData,
-              color: const Color(0xFFFFD400),
-              backgroundColor: Colors.white,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20),
-                child: agentProvider.isLoading
-                    ? _buildShimmerLoading()
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // HEADER
-                          const Text(
-                            'Mon Portefeuille',
-                            style: TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.black,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Gérez vos revenus et transactions',
-                            style: TextStyle(
-                              color: Colors.black54,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 30),
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.transactions.isEmpty) {
+          return _buildShimmer();
+        }
 
-                          // SOLDE CARD
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 5),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Solde disponible',
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  '${agentProvider.balance.toStringAsFixed(0)} FCFA',
-                                  style: const TextStyle(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: () =>
-                                      _showWithdrawalBottomSheet(context),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.black,
-                                    foregroundColor: const Color(0xFFFFD400),
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Retirer mes gains',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+        final stats = provider.stats;
+        final completed = stats['completed_missions'] ?? 0;
+        final total = (stats['total_earnings'] as num?)?.toDouble() ?? 0;
 
-                          const SizedBox(height: 30),
-
-                          // ACTIONS RAPIDES
-                          Row(
-                            children: [
-                              Expanded(
-                                child:
-                                    _buildQuickAction(Icons.add, 'Recharger'),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child:
-                                    _buildQuickAction(Icons.send, 'Transfert'),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: _buildQuickAction(
-                                    Icons.receipt_long, 'Factures'),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 30),
-
-                          // RÉSUMÉ DES REVENUS
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(22),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(.03),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Résumé des revenus',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                _buildRevenueRow('Missions terminées',
-                                    '${agentProvider.stats['completed_missions'] ?? 0}'),
-                                _buildRevenueRow('Revenus totaux',
-                                    '${(agentProvider.stats['total_earnings'] ?? 0).toStringAsFixed(0)} FCFA'),
-                                _buildRevenueRow('Commission FONACO',
-                                    '${((agentProvider.stats['total_earnings'] ?? 0) * 0.1).toStringAsFixed(0)} FCFA'),
-                                _buildRevenueRow('Revenu moyen / mission',
-                                    '${(agentProvider.stats['completed_missions'] ?? 1) > 0 ? ((agentProvider.stats['total_earnings'] ?? 0) / (agentProvider.stats['completed_missions'] ?? 1)).toStringAsFixed(0) : '0'} FCFA'),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 30),
-
-                          // TRANSACTIONS RÉCENTES
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(22),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(.03),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    const Text(
-                                      'Transactions récentes',
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w900,
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        // TODO: Navigation vers historique
-                                      },
-                                      child: const Text('Voir tout'),
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 8),
-
-                                // Bouton Télécharger relevé
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 40,
-                                  child: ElevatedButton.icon(
-                                    onPressed: _isGeneratingPdf
-                                        ? null
-                                        : _downloadMonthlyReport,
-                                    icon: _isGeneratingPdf
-                                        ? const SizedBox(
-                                            width: 16,
-                                            height: 16,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: Colors.black,
-                                            ),
-                                          )
-                                        : const Icon(Icons.picture_as_pdf,
-                                            size: 16),
-                                    label: Text(
-                                      _isGeneratingPdf
-                                          ? 'Téléchargement...'
-                                          : 'Télécharger mon relevé',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFFFD400),
-                                      foregroundColor: Colors.black,
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                // Transactions dynamiques
-                                ...agentProvider.transactions
-                                    .map((transaction) {
-                                  return WalletTransactionTile(
-                                    title:
-                                        transaction['title'] ?? 'Transaction',
-                                    subtitle: transaction['subtitle'] ??
-                                        'Description',
-                                    amount: transaction['amount']?.toString() ??
-                                        '0',
-                                    icon:
-                                        transaction['icon'] ?? Icons.swap_horiz,
-                                    iconColor:
-                                        transaction['iconColor'] ?? Colors.grey,
-                                    amountColor: transaction['amountColor'] ??
-                                        Colors.black,
-                                    isIncome: transaction['isIncome'] ?? true,
-                                    onTap: () {
-                                      // TODO: Détails transaction
-                                    },
-                                  );
-                                }).toList(),
-                              ],
-                            ),
-                          ),
-
-                          const SizedBox(height: 30),
-                        ],
+        return RefreshIndicator(
+          color: const Color(0xFFFFD400),
+          onRefresh: _refresh,
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1A1A1A), Color(0xFF2D2D2D)],
+                  ),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Solde disponible',
+                      style: TextStyle(color: Colors.white70, fontSize: 14),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${provider.balance.toStringAsFixed(0)} FCFA',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
                       ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () =>
+                                _showWithdraw(context, provider.balance),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFFD400),
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              'Retirer',
+                              style: TextStyle(fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _showRecharge(context),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Colors.white54),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: const Text(
+                              'Recharger',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: _StatTile(
+                      label: 'Missions',
+                      value: '$completed',
+                      icon: Icons.check_circle_outline,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _StatTile(
+                      label: 'Gains totaux',
+                      value: '${total.toStringAsFixed(0)} F',
+                      icon: Icons.trending_up,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Transactions',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _downloading ? null : _downloadReport,
+                    icon: _downloading
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                    label: const Text('Relevé'),
+                  ),
+                ],
+              ),
+              if (provider.transactions.isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Aucune transaction pour le moment',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                )
+              else
+                ...provider.transactions.map((tx) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: WalletTransactionTile(
+                      title: tx['title']?.toString() ?? 'Transaction',
+                      subtitle: tx['subtitle']?.toString() ?? '',
+                      amount: tx['amount']?.toString() ?? '0',
+                      icon: tx['icon'] as IconData? ?? Icons.swap_horiz,
+                      iconColor:
+                          tx['iconColor'] as Color? ?? Colors.grey,
+                      amountColor:
+                          tx['amountColor'] as Color? ?? Colors.black,
+                      isIncome: tx['isIncome'] == true,
+                      onTap: () {},
+                    ),
+                  );
+                }),
+            ],
           ),
         );
       },
     );
   }
 
-  Widget _buildShimmerLoading() {
+  Widget _buildShimmer() {
     return Shimmer.fromColors(
-      baseColor: Colors.grey[300]!,
-      highlightColor: Colors.grey[100]!,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: ListView(
+        padding: const EdgeInsets.all(20),
         children: [
           Container(
-            width: 200,
-            height: 28,
+            height: 180,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: 250,
-            height: 16,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          const SizedBox(height: 30),
-          Container(
-            width: double.infinity,
-            height: 150,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-            ),
-          ),
-          const SizedBox(height: 30),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Container(
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Container(
-                  height: 100,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRevenueRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black54,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
+              borderRadius: BorderRadius.circular(28),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildQuickAction(
-    IconData icon,
-    String label,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF7CC),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Icon(icon, color: const Color(0xFFFFD400)),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.black54,
-              fontSize: 13,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showWithdrawalBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _WithdrawalBottomSheet(
-        availableBalance: context.read<AgentProvider>().balance,
-        onWithdrawalRequested: (amount, provider) async {
-          Navigator.pop(context);
-          final success = await context
-              .read<AgentProvider>()
-              .requestWithdrawal(amount, provider);
-          if (success) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Demande de retrait enregistrée avec succès'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Erreur lors de la demande de retrait'),
-                backgroundColor: Colors.red,
-              ),
-            );
-          }
-        },
       ),
     );
   }
 }
 
-class _WithdrawalBottomSheet extends StatefulWidget {
-  final double availableBalance;
-  final Function(double amount, String provider) onWithdrawalRequested;
+class _StatTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
 
-  const _WithdrawalBottomSheet({
-    required this.availableBalance,
-    required this.onWithdrawalRequested,
+  const _StatTile({
+    required this.label,
+    required this.value,
+    required this.icon,
   });
-
-  @override
-  State<_WithdrawalBottomSheet> createState() => _WithdrawalBottomSheetState();
-}
-
-class _WithdrawalBottomSheetState extends State<_WithdrawalBottomSheet> {
-  final TextEditingController _amountController = TextEditingController();
-  final AgentRepository _agentRepository = AgentRepository();
-  bool _isProcessing = false;
-  bool _isGeneratingPdf = false;
-  String _selectedProvider = 'mtn_momo';
-
-  @override
-  void dispose() {
-    _amountController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      decoration: const BoxDecoration(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(28),
-          topRight: Radius.circular(28),
-        ),
+        borderRadius: BorderRadius.circular(18),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
-          // Header
-          Container(
-            width: 60,
-            height: 6,
-            margin: const EdgeInsets.only(top: 12),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(3),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Titre
-          const Text(
-            'Retirer mes gains',
-            style: TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-              color: Colors.black,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          Text(
-            'Solde disponible: ${widget.availableBalance.toStringAsFixed(0)} FCFA',
-            style: const TextStyle(
-              color: Colors.black54,
-              fontSize: 16,
-            ),
-          ),
-
-          const SizedBox(height: 32),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+          Icon(icon, color: const Color(0xFFE0B800)),
+          const SizedBox(width: 10),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Montant
-                const Text(
-                  'Montant à retirer',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
+                Text(label, style: const TextStyle(fontSize: 11)),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15,
                   ),
                 ),
-
-                const SizedBox(height: 12),
-
-                TextField(
-                  controller: _amountController,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    hintText: '0 FCFA',
-                    prefixText: 'FCFA ',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: Colors.grey.shade300),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFFFFD400)),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Opérateur
-                const Text(
-                  'Opérateur Mobile Money',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black,
-                  ),
-                ),
-
-                const SizedBox(height: 12),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedProvider = 'mtn_momo';
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: _selectedProvider == 'mtn_momo'
-                                ? const Color(0xFFFFD400).withOpacity(.2)
-                                : Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: _selectedProvider == 'mtn_momo'
-                                  ? const Color(0xFFFFD400)
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: Colors.yellow,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.phone,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'MTN MoMo',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            _selectedProvider = 'moov_flooz';
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: _selectedProvider == 'moov_flooz'
-                                ? const Color(0xFFFFD400).withOpacity(.2)
-                                : Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: _selectedProvider == 'moov_flooz'
-                                  ? const Color(0xFFFFD400)
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: Colors.green,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.phone,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Moov Flooz',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 32),
-
-                // Bouton de retrait
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _isProcessing ? null : _submitWithdrawal,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFFD400),
-                      foregroundColor: Colors.black,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                    ),
-                    child: _isProcessing
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.black,
-                            ),
-                          )
-                        : const Text(
-                            'Confirmer le retrait',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 16,
-                            ),
-                          ),
-                  ),
-                ),
-
-                const SizedBox(height: 32),
               ],
             ),
           ),
@@ -785,62 +315,291 @@ class _WithdrawalBottomSheetState extends State<_WithdrawalBottomSheet> {
       ),
     );
   }
+}
 
-  Future<void> _submitWithdrawal() async {
-    HapticFeedback.lightImpact();
-    final amountText = _amountController.text.trim();
+class _RechargeBottomSheet extends StatefulWidget {
+  const _RechargeBottomSheet();
 
-    if (amountText.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez entrer un montant'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+  @override
+  State<_RechargeBottomSheet> createState() => _RechargeBottomSheetState();
+}
 
-    final amount = double.tryParse(amountText);
+class _RechargeBottomSheetState extends State<_RechargeBottomSheet> {
+  final _amountController = TextEditingController();
+  bool _processing = false;
 
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _recharge(String method) async {
+    final amount = double.tryParse(_amountController.text.trim());
     if (amount == null || amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Montant invalide'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Montant invalide')),
       );
       return;
     }
 
-    if (amount > widget.availableBalance) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Solde insuffisant'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _isProcessing = true;
-    });
-
+    setState(() => _processing = true);
     try {
-      await widget.onWithdrawalRequested(amount, _selectedProvider);
-    } catch (e) {
+      String? reference;
+      if (method == 'feexpay') {
+        final paid = await FeexPayService.instance.requestPayment(
+          context: context,
+          amount: amount,
+          description: 'Recharge portefeuille agent',
+        );
+        if (!paid || !mounted) return;
+        reference = 'FEEX-${DateTime.now().millisecondsSinceEpoch}';
+      }
+
+      final ok = await context.read<AgentProvider>().depositWallet(
+            amount: amount,
+            paymentMethod: method,
+            paymentReference: reference,
+          );
+
+      if (!mounted) return;
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur: ${e.toString()}'),
-          backgroundColor: Colors.red,
+          content: Text(
+            ok ? 'Recharge effectuée' : 'Échec de la recharge',
+          ),
+          backgroundColor: ok ? Colors.green : Colors.red,
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isProcessing = false;
-        });
-      }
+      if (mounted) setState(() => _processing = false);
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Recharger mon portefeuille',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Montant (FCFA)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.phone_android),
+              title: const Text('FeexPay'),
+              subtitle: const Text('Mobile Money via FeexPay'),
+              onTap: _processing ? null : () => _recharge('feexpay'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.account_balance_wallet_outlined),
+              title: const Text('Mobile Money'),
+              subtitle: const Text('MTN / Moov'),
+              onTap: _processing ? null : () => _recharge('mobile_money'),
+            ),
+            if (_processing)
+              const Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WithdrawalBottomSheet extends StatefulWidget {
+  final double availableBalance;
+
+  const _WithdrawalBottomSheet({required this.availableBalance});
+
+  @override
+  State<_WithdrawalBottomSheet> createState() => _WithdrawalBottomSheetState();
+}
+
+class _WithdrawalBottomSheetState extends State<_WithdrawalBottomSheet> {
+  final _amountController = TextEditingController();
+  final _phoneController = TextEditingController();
+  bool _processing = false;
+  String _provider = 'mtn_momo';
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final amount = double.tryParse(_amountController.text.trim());
+    final phone = _phoneController.text.trim();
+    if (amount == null || amount <= 0 || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Montant et téléphone requis')),
+      );
+      return;
+    }
+    setState(() => _processing = true);
+    final result = await context.read<AgentProvider>().requestWithdrawal(
+          amount: amount,
+          paymentMethod: _provider,
+          phoneNumber: phone,
+        );
+    if (!mounted) return;
+    setState(() => _processing = false);
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.message ??
+              (result.success
+                  ? 'Demande de retrait envoyée'
+                  : 'Erreur lors du retrait'),
+        ),
+        backgroundColor: result.success ? Colors.green : Colors.red,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Retirer mes gains',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+            ),
+            Text(
+              'Solde : ${widget.availableBalance.toStringAsFixed(0)} FCFA',
+              style: const TextStyle(color: Colors.black54),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _amountController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Montant (FCFA)',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: 'Mobile Money',
+                prefixIcon: const Icon(Icons.phone),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: ChoiceChip(
+                    label: const Text('MTN'),
+                    selected: _provider == 'mtn_momo',
+                    onSelected: (_) => setState(() => _provider = 'mtn_momo'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ChoiceChip(
+                    label: const Text('Moov'),
+                    selected: _provider == 'moov_flooz',
+                    onSelected: (_) => setState(() => _provider = 'moov_flooz'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _processing ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFFD400),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              child: _processing
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text(
+                      'Confirmer le retrait',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

@@ -13,6 +13,7 @@ class UserModel {
   final String? lastName;
   final String role; // 'agent' ou 'client' - avec valeur par défaut 'client'
   final bool isVerified;
+  final String? kycStatus;
   final String? avatarUrl;
   final double? walletBalance;
   final AgentProfile? agentProfile;
@@ -28,6 +29,7 @@ class UserModel {
     this.lastName,
     required this.role,
     required this.isVerified,
+    this.kycStatus,
     this.avatarUrl,
     this.walletBalance,
     this.agentProfile,
@@ -53,6 +55,7 @@ class UserModel {
       lastName: json['last_name']?.toString(),
       role: json['role']?.toString() ?? 'client',
       isVerified: json['is_verified'] as bool? ?? false,
+      kycStatus: json['kyc_status']?.toString(),
       avatarUrl: avatarUrl,
       walletBalance: (json['wallet_balance'] as num?)?.toDouble(),
       agentProfile: json['agent_profile'] != null
@@ -92,6 +95,7 @@ class UserModel {
       if (lastName != null) 'last_name': lastName,
       'role': role,
       'is_verified': isVerified,
+      if (kycStatus != null) 'kyc_status': kycStatus,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
       if (walletBalance != null) 'wallet_balance': walletBalance,
       if (agentProfile != null) 'agent_profile': agentProfile!.toJson(),
@@ -110,6 +114,7 @@ class UserModel {
     String? lastName,
     String? role,
     bool? isVerified,
+    String? kycStatus,
     String? avatarUrl,
     double? walletBalance,
     AgentProfile? agentProfile,
@@ -125,6 +130,7 @@ class UserModel {
       lastName: lastName ?? this.lastName,
       role: role ?? this.role,
       isVerified: isVerified ?? this.isVerified,
+      kycStatus: kycStatus ?? this.kycStatus,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       walletBalance: walletBalance ?? this.walletBalance,
       agentProfile: agentProfile ?? this.agentProfile,
@@ -140,6 +146,13 @@ class UserModel {
     }
     return firstName ?? lastName ?? email;
   }
+
+  /// KYC approuvé (agents uniquement).
+  bool get isKycApproved => !isAgent || kycStatus == 'APPROVED';
+
+  /// Agent bloqué par KYC (PENDING ou REJECTED).
+  bool get isKycLocked =>
+      isAgent && (kycStatus == null || kycStatus == 'PENDING' || kycStatus == 'REJECTED');
 
   /// Retourne true si l'utilisateur est un agent
   bool get isAgent => role == 'agent';

@@ -2,11 +2,12 @@ import 'dart:convert';
 import 'package:logger/logger.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../../core/config/api_config.dart';
-import '../repository/agent_repository.dart';
+import '../data/repositories/agent_mission_repository_impl.dart';
+import '../domain/repositories/agent_mission_repository.dart';
 
 /// Service pour gérer la timeline dynamique des missions
 class MissionTimelineService {
-  final AgentRepository _repository = AgentRepository();
+  final AgentMissionRepository _repository = AgentMissionRepositoryImpl();
   final Logger _logger = Logger();
   WebSocketChannel? _timelineWebSocket;
 
@@ -40,7 +41,7 @@ class MissionTimelineService {
   Future<bool> updateMissionStep(
       String missionId, String stepName, Map<String, dynamic>? metadata) async {
     try {
-      final success = await _repository.updateMissionStep(missionId, stepName);
+      final success = await _repository.updateSteps(missionId, stepName);
 
       if (success) {
         // Notifier via WebSocket si disponible

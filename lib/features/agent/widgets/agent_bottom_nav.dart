@@ -23,21 +23,13 @@ class AgentBottomNav extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
+          Expanded(child: _navItem(Icons.home_filled, 'Accueil', 0)),
+          Expanded(child: _navItem(Icons.assignment_rounded, 'Missions', 1)),
+          Expanded(child: _navItem(Icons.history, 'Historique', 2)),
           Expanded(
-            child: _navItem(Icons.home_filled, "Accueil", 0),
+            child: _navItem(Icons.account_balance_wallet_outlined, 'Wallet', 3),
           ),
-          Expanded(
-            child: _navItem(Icons.assignment_outlined, "Missions", 1),
-          ),
-          Expanded(
-            child: _navItem(Icons.account_balance_wallet_outlined, "Wallet", 2),
-          ),
-          Expanded(
-            child: _navItem(Icons.person_outline, "Profil", 3),
-          ),
-          Expanded(
-            child: _navItem(Icons.settings_outlined, "Paramètres", 4),
-          ),
+          Expanded(child: _navItem(Icons.person_outline, 'Profil', 4)),
         ],
       ),
     );
@@ -62,13 +54,13 @@ class AgentBottomNav extends StatelessWidget {
             child: Icon(
               icon,
               color: isActive ? Colors.black : inactiveColor,
-              size: 24,
+              size: 22,
             ),
           ),
           Text(
             label,
             style: GoogleFonts.poppins(
-              fontSize: 10,
+              fontSize: 9,
               fontWeight: FontWeight.bold,
               color: isActive ? Colors.black : inactiveColor,
             ),

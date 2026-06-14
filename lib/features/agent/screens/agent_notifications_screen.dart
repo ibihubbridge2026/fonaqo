@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/services.dart';
-import 'dart:async';
-import '../providers/agent_provider.dart';
-import '../repository/agent_repository.dart';
-import '../../../core/services/audio_service.dart';
+
+import 'package:fonaco/core/providers/notification_provider.dart';
+import 'package:fonaco/features/agent/providers/agent_provider.dart';
+
+enum _AgentNotifType { mission, dispute, system, payment, boost, other }
 
 class AgentNotificationsScreen extends StatefulWidget {
   const AgentNotificationsScreen({super.key});
@@ -16,491 +15,321 @@ class AgentNotificationsScreen extends StatefulWidget {
 }
 
 class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
-  final AgentRepository _agentRepository = AgentRepository();
-  final AudioService _audioService = AudioService();
-
-  List<Map<String, dynamic>> _notifications = [];
+  List<_AgentNotificationItem> _items = [];
   bool _isLoading = true;
   bool _isMarkingAll = false;
-  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
-
-  String selectedFilter = "Tout";
-
-  final List<String> filters = [
-    "Tout",
-    "Missions",
-    "Paiements",
-    "Boost",
-  ];
 
   @override
   void initState() {
     super.initState();
     _loadNotifications();
-    _setupConnectivityListener();
   }
 
-  @override
-  void dispose() {
-    _connectivitySubscription?.cancel();
-    super.dispose();
-  }
-
-  /// Charge les notifications depuis l'API
   Future<void> _loadNotifications() async {
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
-      final apiNotifications = await _agentRepository.getNotifications();
+      final raw = await context
+          .read<AgentProvider>()
+          .profileRepository
+          .getNotifications();
 
-      // Transformer les notifications API en format UI
-      final notifications = apiNotifications.map((notif) {
-        final type = notif['title']?.toString().toLowerCase() ?? '';
-        IconData icon;
-        Color color;
-        String notifType;
-
-        if (type.contains('mission') || type.contains('travail')) {
-          icon = Icons.work_outline;
-          color = Colors.orange;
-          notifType = 'mission';
-        } else if (type.contains('paiement') || type.contains('argent')) {
-          icon = Icons.account_balance_wallet_outlined;
-          color = Colors.blue;
-          notifType = 'payment';
-        } else if (type.contains('boost')) {
-          icon = Icons.flash_on_outlined;
-          color = Colors.purple;
-          notifType = 'boost';
-        } else {
-          icon = Icons.notifications;
-          color = Colors.grey;
-          notifType = 'other';
-        }
-
-        return {
-          'id': notif['id']?.toString() ?? '',
-          'icon': icon,
-          'title': notif['title']?.toString() ?? '',
-          'subtitle': notif['body']?.toString() ?? '',
-          'time': notif['time_ago']?.toString() ??
-              notif['created_at']?.toString() ??
-              '',
-          'color': color,
-          'is_read': notif['is_read'] ?? false,
-          'type': notifType,
-        };
-      }).toList();
-
+      final items = raw.map(_AgentNotificationItem.fromApi).toList();
+      if (!mounted) return;
       setState(() {
-        _notifications = notifications;
+        _items = items;
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (!mounted) return;
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur chargement notifications: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Erreur chargement : $e')),
       );
     }
   }
 
-  /// Configure l'écouteur de connectivité
-  void _setupConnectivityListener() {
-    _connectivitySubscription =
-        Connectivity().onConnectivityChanged.listen((result) {
-      if (result != ConnectivityResult.none) {
-        // Retour de connexion, recharger les notifications
-        _loadNotifications();
-      }
-    });
-  }
+  Future<void> _markAsRead(String id) async {
+    final index = _items.indexWhere((n) => n.id == id);
+    if (index < 0 || _items[index].isRead) return;
 
-  /// Marque une notification comme lue
-  Future<void> _markAsRead(String notificationId) async {
-    try {
-      final success =
-          await _agentRepository.markNotificationAsRead(notificationId);
+    setState(() => _items[index] = _items[index].copyWith(isRead: true));
 
-      if (success) {
-        setState(() {
-          _notifications = _notifications.map((notif) {
-            if (notif['id'] == notificationId) {
-              return {...notif, 'is_read': true};
-            }
-            return notif;
-          }).toList();
-        });
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur marquage lecture: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    final ok = await context
+        .read<AgentProvider>()
+        .profileRepository
+        .markNotificationAsRead(id);
+    if (!ok && mounted) {
+      setState(() => _items[index] = _items[index].copyWith(isRead: false));
+    } else if (mounted) {
+      await context.read<NotificationProvider>().refreshCounts();
     }
   }
 
-  /// Supprime une notification
-  Future<void> _deleteNotification(String notificationId) async {
-    try {
-      final success = await _agentRepository.deleteNotification(notificationId);
-
-      if (success) {
-        setState(() {
-          _notifications.removeWhere((notif) => notif['id'] == notificationId);
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Notification supprimée'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur suppression: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  /// Marque toutes les notifications comme lues
   Future<void> _markAllAsRead() async {
-    setState(() {
-      _isMarkingAll = true;
-    });
-
-    try {
-      // TODO: Implémenter markAllNotificationsAsRead dans AgentRepository
-      // final success = await _agentRepository.markAllNotificationsAsRead();
-      final success = true; // Simulation
-
-      if (success) {
-        setState(() {
-          _notifications = _notifications.map((notif) {
-            return {...notif, 'is_read': true};
-          }).toList();
-          _isMarkingAll = false;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Toutes les notifications marquées comme lues'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
+    setState(() => _isMarkingAll = true);
+    final ok = await context
+        .read<AgentProvider>()
+        .profileRepository
+        .markAllNotificationsAsRead();
+    if (!mounted) return;
+    if (ok) {
       setState(() {
-        _isMarkingAll = false;
+        _items = _items.map((n) => n.copyWith(isRead: true)).toList();
       });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur marquage: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      await context.read<NotificationProvider>().refreshCounts();
     }
-  }
-
-  /// Filtre les notifications
-  List<Map<String, dynamic>> get _filteredNotifications {
-    if (selectedFilter == "Tout") return _notifications;
-
-    return _notifications.where((notif) {
-      final type = notif['type']?.toString().toLowerCase() ?? '';
-      switch (selectedFilter) {
-        case "Missions":
-          return type.contains('mission') || type.contains('work');
-        case "Paiements":
-          return type.contains('paiement') ||
-              type.contains('payment') ||
-              type.contains('wallet');
-        case "Boost":
-          return type.contains('boost') || type.contains('flash');
-        default:
-          return true;
-      }
-    }).toList();
+    setState(() => _isMarkingAll = false);
   }
 
   @override
   Widget build(BuildContext context) {
+    final unread = _items.where((n) => !n.isRead).length;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
-      body: Column(
-        children: [
-          // BOUTON TOUT MARQUER COMME LU
-          if (_notifications.any((notif) => !(notif['is_read'] ?? true)))
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: SizedBox(
-                width: double.infinity,
-                height: 45,
-                child: ElevatedButton.icon(
-                  onPressed: _isMarkingAll ? null : _markAllAsRead,
-                  icon: _isMarkingAll
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.black,
-                          ),
-                        )
-                      : const Icon(Icons.done_all, size: 18),
-                  label: Text(
-                    _isMarkingAll ? 'Marquage...' : 'Tout marquer comme lu',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD400),
-                    foregroundColor: Colors.black,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0.5,
+        leading: const BackButton(color: Colors.black),
+        title: const Text(
+          'Notifications',
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        actions: [
+          if (unread > 0)
+            TextButton(
+              onPressed: _isMarkingAll ? null : _markAllAsRead,
+              child: Text(
+                _isMarkingAll ? '...' : 'Tout lire',
+                style: const TextStyle(
+                  color: Color(0xFFE0B800),
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-          Container(
-            height: 60,
-            padding: const EdgeInsets.symmetric(horizontal: 18),
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: filters.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 10),
-              itemBuilder: (context, index) {
-                final filter = filters[index];
-                final isSelected = selectedFilter == filter;
-
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      selectedFilter = filter;
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color:
-                          isSelected ? const Color(0xFFFFD400) : Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isSelected
-                            ? const Color(0xFFFFD400)
-                            : Colors.grey.shade200,
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _items.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.notifications_none,
+                          size: 56, color: Colors.grey.shade400),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Aucune notification',
+                        style: TextStyle(color: Colors.grey.shade600),
                       ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        filter,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color:
-                              isSelected ? Colors.black : Colors.grey.shade700,
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
-                );
-              },
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadNotifications,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: _items.length,
+                    itemBuilder: (context, index) {
+                      final item = _items[index];
+                      return _NotificationTile(
+                        item: item,
+                        onTap: () => _markAsRead(item.id),
+                      );
+                    },
+                  ),
+                ),
+    );
+  }
+}
+
+class _AgentNotificationItem {
+  final String id;
+  final String title;
+  final String body;
+  final String timeAgo;
+  final _AgentNotifType type;
+  final bool isRead;
+
+  const _AgentNotificationItem({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.timeAgo,
+    required this.type,
+    required this.isRead,
+  });
+
+  factory _AgentNotificationItem.fromApi(Map<String, dynamic> json) {
+    final title = json['title']?.toString() ?? '';
+    final lower = title.toLowerCase();
+    _AgentNotifType type;
+    if (lower.contains('litige') || lower.contains('dispute')) {
+      type = _AgentNotifType.dispute;
+    } else if (lower.contains('mission')) {
+      type = _AgentNotifType.mission;
+    } else if (lower.contains('paiement') || lower.contains('wallet')) {
+      type = _AgentNotifType.payment;
+    } else if (lower.contains('boost')) {
+      type = _AgentNotifType.boost;
+    } else if (lower.contains('système') || lower.contains('system')) {
+      type = _AgentNotifType.system;
+    } else {
+      type = _AgentNotifType.other;
+    }
+
+    return _AgentNotificationItem(
+      id: json['id']?.toString() ?? '',
+      title: title,
+      body: json['body']?.toString() ?? '',
+      timeAgo: json['time_ago']?.toString() ??
+          json['created_at']?.toString() ??
+          '',
+      type: type,
+      isRead: json['is_read'] == true,
+    );
+  }
+
+  _AgentNotificationItem copyWith({bool? isRead}) {
+    return _AgentNotificationItem(
+      id: id,
+      title: title,
+      body: body,
+      timeAgo: timeAgo,
+      type: type,
+      isRead: isRead ?? this.isRead,
+    );
+  }
+}
+
+class _NotificationTile extends StatelessWidget {
+  final _AgentNotificationItem item;
+  final VoidCallback onTap;
+
+  const _NotificationTile({required this.item, required this.onTap});
+
+  Color get _badgeColor {
+    switch (item.type) {
+      case _AgentNotifType.mission:
+        return const Color(0xFF2EC4B6);
+      case _AgentNotifType.dispute:
+        return Colors.orange.shade700;
+      case _AgentNotifType.system:
+        return Colors.blueGrey;
+      case _AgentNotifType.payment:
+        return Colors.blue;
+      case _AgentNotifType.boost:
+        return Colors.purple;
+      case _AgentNotifType.other:
+        return Colors.grey;
+    }
+  }
+
+  String get _typeLabel {
+    switch (item.type) {
+      case _AgentNotifType.mission:
+        return 'Nouvelle Mission';
+      case _AgentNotifType.dispute:
+        return 'Rappel Litige';
+      case _AgentNotifType.system:
+        return 'Système';
+      case _AgentNotifType.payment:
+        return 'Paiement';
+      case _AgentNotifType.boost:
+        return 'Boost';
+      case _AgentNotifType.other:
+        return 'Alerte';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: item.isRead ? Colors.white : const Color(0xFFF5FBFA),
+      child: ListTile(
+        onTap: onTap,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: _badgeColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: _badgeColor,
+                shape: BoxShape.circle,
+              ),
             ),
           ),
-
-          const SizedBox(height: 10),
-
-          // LISTE DES NOTIFICATIONS
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredNotifications.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.notifications_none,
-                              size: 64,
-                              color: Colors.grey.shade400,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Aucune notification',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Vous n\'avez pas encore de notifications',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey.shade500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: _filteredNotifications.length,
-                        itemBuilder: (context, index) {
-                          final notification = _filteredNotifications[index];
-                          final isRead = notification['is_read'] ?? true;
-
-                          return Dismissible(
-                            key: Key(notification['id']?.toString() ??
-                                index.toString()),
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 20),
-                              child: const Icon(
-                                Icons.delete,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                            ),
-                            onDismissed: (direction) {
-                              _deleteNotification(
-                                  notification['id']?.toString() ?? '');
-                            },
-                            child: GestureDetector(
-                              onTap: () {
-                                if (!isRead) {
-                                  _markAsRead(
-                                      notification['id']?.toString() ?? '');
-                                }
-                              },
-                              child: Container(
-                                margin: const EdgeInsets.only(bottom: 12),
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: isRead
-                                      ? Colors.white
-                                      : const Color(0xFFFFF7CC),
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  children: [
-                                    // Icône
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: (notification['color'] as Color?)
-                                                ?.withOpacity(0.1) ??
-                                            Colors.grey.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Icon(
-                                        notification['icon'] as IconData? ??
-                                            Icons.notifications,
-                                        color:
-                                            notification['color'] as Color? ??
-                                                Colors.grey,
-                                        size: 20,
-                                      ),
-                                    ),
-
-                                    const SizedBox(width: 16),
-
-                                    // Contenu
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            notification['title']?.toString() ??
-                                                '',
-                                            style: TextStyle(
-                                              fontSize: 16,
-                                              fontWeight: isRead
-                                                  ? FontWeight.w500
-                                                  : FontWeight.w700,
-                                              color: Colors.black,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            notification['subtitle']
-                                                    ?.toString() ??
-                                                '',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    // Point rouge si non lu
-                                    if (!isRead)
-                                      Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFFFFD400),
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-
-                                    const SizedBox(width: 8),
-
-                                    // Heure
-                                    Text(
-                                      notification['time']?.toString() ?? '',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-          ),
-        ],
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: _badgeColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                _typeLabel,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: _badgeColor,
+                ),
+              ),
+            ),
+            if (!item.isRead) ...[
+              const SizedBox(width: 8),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF2EC4B6),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              item.title,
+              style: TextStyle(
+                fontWeight: item.isRead ? FontWeight.w600 : FontWeight.w800,
+                color: Colors.black,
+                fontSize: 15,
+              ),
+            ),
+            if (item.body.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                item.body,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              ),
+            ],
+            const SizedBox(height: 4),
+            Text(
+              item.timeAgo,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
+            ),
+          ],
+        ),
       ),
     );
   }

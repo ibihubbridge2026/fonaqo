@@ -253,6 +253,14 @@ class BaseClient {
           type: ApiErrorType.notFound,
         );
 
+      case 409:
+        return ApiException(
+          message: message.isEmpty
+              ? 'Conflit : ressource déjà modifiée'
+              : message,
+          type: ApiErrorType.conflict,
+        );
+
       case 422:
         return ApiException(
           message: message.isEmpty ? 'Données invalides' : message,
@@ -556,6 +564,7 @@ enum ApiErrorType {
   unauthorized,
   forbidden,
   notFound,
+  conflict,
   validation,
   tooManyRequests,
   serverError,

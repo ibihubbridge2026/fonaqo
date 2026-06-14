@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../repository/agent_repository.dart';
+import 'package:provider/provider.dart';
+import '../providers/agent_provider.dart';
 
 /// BottomSheet pour l'ouverture d'un litige
 class DisputeBottomSheet extends StatefulWidget {
@@ -18,7 +19,6 @@ class DisputeBottomSheet extends StatefulWidget {
 class _DisputeBottomSheetState extends State<DisputeBottomSheet> {
   final _reasonController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final AgentRepository _agentRepository = AgentRepository();
 
   bool _isSubmitting = false;
   String _selectedReason = '';
@@ -60,12 +60,14 @@ class _DisputeBottomSheetState extends State<DisputeBottomSheet> {
     });
 
     try {
-      final success = await _agentRepository.createDispute(
-        missionId: widget.missionId,
-        title: reason,
-        description: description,
-        priority: 'medium',
-      );
+      final success = await context
+          .read<AgentProvider>()
+          .missionRepository
+          .openDispute(
+            widget.missionId,
+            reason,
+            description,
+          );
 
       if (success) {
         widget.onDisputeOpened();

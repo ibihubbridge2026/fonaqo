@@ -12,13 +12,15 @@ import '../features/client/missions/missions_screen.dart';
 import '../features/client/profile/profile_screen.dart';
 import '../features/client/agents_screen.dart';
 import '../features/client/artisans_screen.dart';
-import '../features/agent/agent_home_screen.dart';
-import '../features/agent/screens/agent_missions_explorer_screen.dart';
+import '../features/agent/presentation/kyc/kyc_lock_screen.dart';
+import '../features/agent/presentation/dashboard/screens/agent_dashboard_screen.dart';
+import '../features/agent/screens/agent_missions_screen.dart';
+import '../features/agent/screens/agent_mission_history_screen.dart';
 import '../features/agent/screens/agent_wallet_screen.dart';
-import '../features/agent/screens/agent_profile_screen.dart';
-import '../features/agent/screens/agent_settings_screen.dart';
+import '../features/agent/presentation/profile/screens/agent_profile_screen.dart';
+import '../features/agent/screens/agent_notifications_screen.dart';
 import '../features/agent/widgets/agent_bottom_nav.dart';
-import '../features/agent/widgets/agent_header.dart';
+import '../core/routes/app_routes.dart';
 import 'custom_app_bar.dart';
 import 'main_navigation_bar.dart';
 
@@ -69,14 +71,13 @@ class _MainWrapperState extends State<MainWrapper> {
     const ProfileScreen(),
   ];
 
-  /// Pages pour les agents (alignées avec AgentBottomNav: 5 onglets)
-  /// Les notifications sont accessibles via l'icône cloche du header.
+  /// Pages agent : Accueil, Missions, Historique, Wallet, Profil
   late final List<Widget> _agentPages = [
-    const AgentHomeScreen(), // Index 0: Accueil
-    const AgentMissionsExplorerScreen(), // Index 1: Missions
-    const AgentWalletScreen(), // Index 2: Portefeuille
-    const AgentProfileScreen(), // Index 3: Profil
-    const AgentSettingsScreen(), // Index 4: Paramètres
+    const AgentDashboardScreen(),
+    const AgentMissionsScreen(),
+    const AgentMissionHistoryScreen(embeddedInShell: true),
+    const AgentWalletScreen(),
+    const AgentProfileScreen(),
   ];
 
   @override
@@ -151,37 +152,31 @@ class _MainWrapperState extends State<MainWrapper> {
     });
   }
 
+  PreferredSizeWidget _agentAppBar() {
+    return CustomAppBar.mainShellHome(
+      profileTabIndex: 4,
+      onNotificationsPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const AgentNotificationsScreen(),
+          ),
+        );
+      },
+      onSupportPressed: () {
+        Navigator.pushNamed(context, AppRoutes.aiAssistant);
+      },
+    );
+  }
+
   PreferredSizeWidget _appBarForIndex() {
-    // Vérifier si l'utilisateur est un agent
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final isAgent = authProvider.isAgent;
 
-    // Header différent selon le rôle
     if (isAgent) {
-      return AppBar(
-        backgroundColor: const Color(0xFFFFD400),
-        elevation: 0,
-        title: const Text(
-          'FONACO Agent',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            onPressed: () {
-              // TODO: Notifications
-            },
-            icon: const Icon(Icons.notifications, color: Colors.black),
-          ),
-        ],
-      );
+      return _agentAppBar();
     }
 
-    // Header client par défaut
     return const CustomAppBar.mainShellHome();
   }
 
@@ -190,6 +185,11 @@ class _MainWrapperState extends State<MainWrapper> {
     // Vérifier si l'utilisateur est un agent
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final isAgent = authProvider.isAgent;
+    final isKycLocked = authProvider.currentUser?.isKycLocked ?? false;
+
+    if (isAgent && isKycLocked) {
+      return const KycLockScreen();
+    }
 
     return MainShellScope(
       currentIndex: _currentIndex,
@@ -202,7 +202,7 @@ class _MainWrapperState extends State<MainWrapper> {
       closeCreateMission: () => _showCreateMission.value = false,
       child: Scaffold(
         backgroundColor: const Color(0xFFF9F9F9),
-        appBar: isAgent ? const AgentHeader() : _appBarForIndex(),
+        appBar: isAgent ? _agentAppBar() : const CustomAppBar.mainShellHome(),
         body: Column(
           children: [
             // Bannière discrète si GPS refusé

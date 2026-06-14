@@ -79,4 +79,13 @@ abstract final class AppRoutes {
   static const String agentMissionDetail = '/agent/mission-detail';
   static const String agentMissionsExplorer = '/agent/missions-explorer';
   static const String agentProfile = '/agent-profile';
+
+  /// Profil agent (sous-écrans).
+  static const String agentProfilePersonalInfo = '/agent/profile/personal-info';
+
+  /// Dashboard et suivi mission agent.
+  static const String agentDashboard = '/agent/dashboard';
+  static const String agentMissionTracking = '/agent/mission-tracking';
+  static const String agentKycLock = '/agent/kyc-lock';
+  static const String agentBoost = '/agent/boost';
 }

@@ -39,7 +39,7 @@ import 'features/chat/screens/chat_list_screen.dart';
 import 'features/chat/screens/chat_detail_screen.dart';
 import 'features/auth/complete_profile_screen.dart';
 import 'features/client/missions/screens/mission_tracking_screen.dart';
-import 'features/agent/screens/agent_missions_explorer_screen.dart';
+import 'features/agent/presentation/dashboard/screens/agent_dashboard_screen.dart';
 
 import 'features/litiges/litige_screen.dart';
 
@@ -58,6 +58,12 @@ import 'features/client/profile/screens/location_settings_screen.dart';
 import 'features/client/profile/screens/language_screen.dart';
 import 'features/client/profile/screens/help_center_screen.dart';
 import 'features/client/profile/screens/notifications_settings_screen.dart';
+import 'features/agent/presentation/profile/screens/agent_personal_info_screen.dart';
+import 'features/agent/presentation/dashboard/screens/agent_mission_tracking_screen.dart';
+import 'features/agent/presentation/kyc/kyc_lock_screen.dart';
+import 'features/agent/screens/agent_boost_screen.dart';
+import 'features/agent/screens/agent_mission_detail_screen.dart';
+import 'package:fonaco/core/models/mission_model.dart';
 
 import 'features/rating/rating_screen.dart';
 
@@ -201,6 +207,20 @@ class FonacoApp extends StatelessWidget {
                   const NotificationsSettingsScreen(),
               AppRoutes.profileLanguage: (context) => const LanguageScreen(),
               AppRoutes.personalInfo: (context) => const PersonalInfoScreen(),
+              AppRoutes.agentProfilePersonalInfo: (context) =>
+                  const AgentPersonalInfoScreen(),
+              AppRoutes.agentMissionTracking: (context) {
+                final args = ModalRoute.of(context)?.settings.arguments;
+                final mapArgs =
+                    args is Map<String, dynamic> ? args : <String, dynamic>{};
+                final mission = mapArgs['mission'];
+                if (mission is MissionModel) {
+                  return AgentMissionTrackingScreen(mission: mission);
+                }
+                return const Scaffold(
+                  body: Center(child: Text('Mission introuvable')),
+                );
+              },
               AppRoutes.securitySettings: (context) =>
                   const SecuritySettingsScreen(),
               AppRoutes.profileLocation: (context) =>
@@ -226,9 +246,23 @@ class FonacoApp extends StatelessWidget {
               AppRoutes.chat: (context) => const ChatListScreen(),
               AppRoutes.chatList: (context) => const ChatListScreen(),
               AppRoutes.agentMissionsExplorer: (context) =>
-                  const AgentMissionsExplorerScreen(),
-              AppRoutes.agentMissionDetail: (context) =>
-                  const AgentMissionsExplorerScreen(),
+                  const AgentDashboardScreen(),
+              AppRoutes.agentMissionDetail: (context) {
+                final args = ModalRoute.of(context)?.settings.arguments;
+                final mapArgs =
+                    args is Map<String, dynamic> ? args : <String, dynamic>{};
+                final mission = mapArgs['mission'];
+                if (mission is MissionModel) {
+                  return AgentMissionDetailScreen(mission: mission);
+                }
+                return const Scaffold(
+                  body: Center(child: Text('Mission introuvable')),
+                );
+              },
+              AppRoutes.agentDashboard: (context) =>
+                  const AgentDashboardScreen(),
+              AppRoutes.agentKycLock: (context) => const KycLockScreen(),
+              AppRoutes.agentBoost: (context) => const AgentBoostScreen(),
               AppRoutes.chatDetail: (context) {
                 final args = ModalRoute.of(context)?.settings.arguments;
 

@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:latlong2/latlong.dart';
-import '../providers/agent_provider.dart';
-import '../repository/agent_repository.dart';
-import '../../../core/models/mission_model.dart';
 
-/// Écran d'historique détaillé des missions de l'agent
+import 'package:fonaco/core/models/mission_model.dart';
+import 'package:fonaco/core/routes/app_routes.dart';
+import 'package:fonaco/features/agent/providers/agent_provider.dart';
+import 'package:fonaco/features/agent/widgets/rating_dialog.dart';
+
+/// Écran d'historique détaillé des missions de l'agent.
 class AgentMissionHistoryScreen extends StatefulWidget {
-  const AgentMissionHistoryScreen({super.key});
+  final bool embeddedInShell;
+
+  const AgentMissionHistoryScreen({
+    super.key,
+    this.embeddedInShell = false,
+  });
 
   @override
   State<AgentMissionHistoryScreen> createState() =>
@@ -16,18 +22,17 @@ class AgentMissionHistoryScreen extends StatefulWidget {
 
 class _AgentMissionHistoryScreenState extends State<AgentMissionHistoryScreen>
     with SingleTickerProviderStateMixin {
-  final AgentRepository _agentRepository = AgentRepository();
   late TabController _tabController;
 
   List<MissionModel> _completedMissions = [];
   List<MissionModel> _cancelledMissions = [];
+  List<MissionModel> _disputedMissions = [];
   bool _isLoading = true;
-  String _selectedFilter = 'Toutes';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadMissionHistory();
   }
 
@@ -37,92 +42,84 @@ class _AgentMissionHistoryScreenState extends State<AgentMissionHistoryScreen>
     super.dispose();
   }
 
-  /// Charge l'historique des missions depuis l'API
   Future<void> _loadMissionHistory() async {
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      // TODO: Implémenter getMissionHistory dans AgentRepository
-      // final history = await _agentRepository.getMissionHistory();
+      final repo = context.read<AgentProvider>().missionRepository;
+      final results = await Future.wait([
+        repo.getHistory(limit: 50),
+        repo.getDisputed(limit: 50),
+      ]);
 
-      // Données de test pour le moment
-      final completedMissions = [
-        MissionModel(
-          id: '1',
-          title: 'Livraison documents SBEE',
-          description: 'Livraison de documents officiels à la banque',
-          clientName: 'Jean Dupont',
-          latitude: 6.3670,
-          longitude: 2.3935,
-          price: 2500.0,
-          status: MissionStatus.COMPLETED,
-          createdAt: DateTime.now().subtract(const Duration(days: 1)),
-          updatedAt: DateTime.now().subtract(const Duration(hours: 12)),
-        ),
-        MissionModel(
-          id: '2',
-          title: 'Course restaurant Chez Lamine',
-          description: 'Récupération commande repas à emporter',
-          clientName: 'Marie Sagna',
-          latitude: 6.3670,
-          longitude: 2.3935,
-          price: 1800.0,
-          status: MissionStatus.COMPLETED,
-          createdAt: DateTime.now().subtract(const Duration(days: 3)),
-          updatedAt: DateTime.now().subtract(const Duration(days: 2)),
-        ),
-      ];
-
-      final cancelledMissions = [
-        MissionModel(
-          id: '3',
-          title: 'Livraison médicaments pharmacie',
-          description: 'Livraison de médicaments urgents',
-          clientName: 'Paul Konan',
-          latitude: 6.3670,
-          longitude: 2.3935,
-          price: 3200.0,
-          status: MissionStatus.CANCELLED,
-          createdAt: DateTime.now().subtract(const Duration(days: 5)),
-          updatedAt: DateTime.now().subtract(const Duration(days: 5)),
-        ),
-      ];
+      final history = results[0] as List<MissionModel>;
+      final disputed = results[1] as List<MissionModel>;
 
       setState(() {
-        _completedMissions = completedMissions;
-        _cancelledMissions = cancelledMissions;
+        _completedMissions = history
+            .where((m) => m.status == MissionStatus.COMPLETED)
+            .toList();
+        _cancelledMissions = history
+            .where((m) => m.status == MissionStatus.CANCELLED)
+            .toList();
+        _disputedMissions = disputed;
         _isLoading = false;
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur chargement historique: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  /// Retourne la liste filtrée selon le statut
-  List<MissionModel> get _filteredMissions {
-    switch (_selectedFilter) {
-      case 'Terminées':
-        return _completedMissions;
-      case 'Annulées':
-        return _cancelledMissions;
-      default:
-        return [..._completedMissions, ..._cancelledMissions];
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur chargement historique: $e')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final tabView = TabBarView(
+      controller: _tabController,
+      children: [
+        _buildMissionsList(_completedMissions, 'terminées'),
+        _buildMissionsList(_cancelledMissions, 'annulées'),
+        _buildMissionsList(_disputedMissions, 'litiges'),
+      ],
+    );
+
+    final tabBar = TabBar(
+      controller: _tabController,
+      labelColor: Colors.black,
+      unselectedLabelColor: Colors.grey.shade600,
+      indicatorColor: const Color(0xFFFFD400),
+      indicatorWeight: 3,
+      tabs: const [
+        Tab(text: 'Terminées'),
+        Tab(text: 'Annulées'),
+        Tab(text: 'Litiges'),
+      ],
+    );
+
+    if (widget.embeddedInShell) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: Text(
+              'Historique',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: Colors.black,
+              ),
+            ),
+          ),
+          tabBar,
+          Expanded(child: tabView),
+        ],
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(
@@ -132,7 +129,7 @@ class _AgentMissionHistoryScreenState extends State<AgentMissionHistoryScreen>
           'Historique des missions',
           style: TextStyle(
             fontSize: 18,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
             color: Colors.black,
           ),
         ),
@@ -140,35 +137,12 @@ class _AgentMissionHistoryScreenState extends State<AgentMissionHistoryScreen>
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
         ),
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.black,
-          unselectedLabelColor: Colors.grey.shade600,
-          indicatorColor: const Color(0xFFFFD400),
-          indicatorWeight: 3,
-          tabs: const [
-            Tab(
-              icon: Icon(Icons.check_circle, size: 20),
-              text: 'Terminées',
-            ),
-            Tab(
-              icon: Icon(Icons.cancel, size: 20),
-              text: 'Annulées',
-            ),
-          ],
-        ),
+        bottom: tabBar,
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildMissionsList(_completedMissions, 'terminées'),
-          _buildMissionsList(_cancelledMissions, 'annulées'),
-        ],
-      ),
+      body: tabView,
     );
   }
 
-  /// Construit la liste des missions
   Widget _buildMissionsList(List<MissionModel> missions, String type) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -176,59 +150,45 @@ class _AgentMissionHistoryScreenState extends State<AgentMissionHistoryScreen>
 
     if (missions.isEmpty) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              type == 'terminées' ? Icons.history : Icons.cancel_outlined,
-              size: 64,
-              color: Colors.grey.shade400,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Aucune mission ${type}',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey.shade600,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Vous n\'avez pas encore de missions ${type}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade500,
-              ),
-            ),
-          ],
+        child: Text(
+          'Aucune mission $type',
+          style: TextStyle(color: Colors.grey.shade600),
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: missions.length,
-      itemBuilder: (context, index) {
-        final mission = missions[index];
-        return _MissionHistoryCard(mission: mission);
-      },
+    return RefreshIndicator(
+      onRefresh: _loadMissionHistory,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(20),
+        itemCount: missions.length,
+        itemBuilder: (context, index) {
+          return _MissionHistoryCard(
+            mission: missions[index],
+            onRefresh: _loadMissionHistory,
+          );
+        },
+      ),
     );
   }
 }
 
-/// Carte pour afficher une mission dans l'historique
 class _MissionHistoryCard extends StatelessWidget {
   final MissionModel mission;
+  final VoidCallback onRefresh;
 
   const _MissionHistoryCard({
     required this.mission,
+    required this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context) {
     final isCompleted = mission.status == MissionStatus.COMPLETED;
-    final formattedDate = _formatDate(mission.updatedAt!);
+    final isDisputed = mission.status == MissionStatus.DISPUTED;
+    final formattedDate = mission.updatedAt != null
+        ? _formatDate(mission.updatedAt!)
+        : '';
     final formattedPrice = '${mission.price.toStringAsFixed(0)} FCFA';
 
     return Container(
@@ -239,7 +199,7 @@ class _MissionHistoryCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -248,7 +208,6 @@ class _MissionHistoryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header avec titre et statut
           Row(
             children: [
               Expanded(
@@ -256,178 +215,120 @@ class _MissionHistoryCard extends StatelessWidget {
                   mission.title,
                   style: const TextStyle(
                     fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     color: Colors.black,
                   ),
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color:
-                      isCompleted ? Colors.green.shade100 : Colors.red.shade100,
+                  color: isDisputed
+                      ? Colors.orange.shade100
+                      : isCompleted
+                          ? Colors.green.shade100
+                          : Colors.red.shade100,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  isCompleted ? 'Terminée' : 'Annulée',
+                  mission.formattedStatus,
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: isCompleted
-                        ? Colors.green.shade800
-                        : Colors.red.shade800,
+                    color: isDisputed
+                        ? Colors.orange.shade800
+                        : isCompleted
+                            ? Colors.green.shade800
+                            : Colors.red.shade800,
                   ),
                 ),
               ),
             ],
           ),
-
-          const SizedBox(height: 12),
-
-          // Description
-          if (mission.description.isNotEmpty)
+          if (mission.description.isNotEmpty) ...[
+            const SizedBox(height: 8),
             Text(
               mission.description,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade600,
-              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
             ),
-
+          ],
           const SizedBox(height: 12),
-
-          // Informations client et prix
           Row(
             children: [
-              // Avatar client
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFD400).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Icon(
-                  Icons.person,
-                  color: Color(0xFFFFD400),
-                  size: 20,
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
-              // Infos client
+              Icon(Icons.person_outline,
+                  size: 16, color: Colors.grey.shade600),
+              const SizedBox(width: 4),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      mission.clientName ?? 'Client',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black,
-                      ),
-                    ),
-                    if (mission.address != null)
-                      Text(
-                        mission.address!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                  ],
+                child: Text(
+                  mission.clientName ?? 'Client',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
-
-              // Prix et date
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    formattedPrice,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: isCompleted
-                          ? Colors.green.shade700
-                          : Colors.red.shade700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    formattedDate,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade500,
-                    ),
-                  ),
-                ],
+              Text(
+                formattedPrice,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: isCompleted
+                      ? Colors.green.shade700
+                      : Colors.grey.shade800,
+                ),
               ),
             ],
           ),
-
+          if (formattedDate.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              formattedDate,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+          ],
           const SizedBox(height: 12),
-
-          // Séparateur
-          Container(
-            height: 1,
-            color: Colors.grey.shade200,
-          ),
-
-          const SizedBox(height: 12),
-
-          // Actions
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              if (isCompleted) ...[
-                // Bouton évaluation (si pas encore noté)
+              if (isCompleted)
                 OutlinedButton.icon(
                   onPressed: () {
-                    // TODO: Ouvrir dialogue de notation
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                          content: Text('Fonctionnalité bientôt disponible')),
+                    showDialog(
+                      context: context,
+                      builder: (_) => RatingDialog(
+                        missionId: mission.id,
+                        onRatingSubmitted: (_, __) => onRefresh(),
+                      ),
                     );
                   },
-                  icon: const Icon(Icons.star, size: 16),
-                  label: const Text(
-                    'Noter',
-                    style: TextStyle(fontSize: 12),
-                  ),
+                  icon: const Icon(Icons.star_outline, size: 16),
+                  label: const Text('Noter', style: TextStyle(fontSize: 12)),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFFFD400),
-                    side: const BorderSide(color: Color(0xFFFFD400)),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    minimumSize: Size.zero,
+                    foregroundColor: Colors.black,
+                    side: const BorderSide(color: Color(0xFFE0B800)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
-              ],
-
-              // Bouton détails
+              if (isCompleted) const SizedBox(width: 8),
               ElevatedButton.icon(
                 onPressed: () {
-                  // TODO: Naviguer vers les détails de la mission
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Détails bientôt disponibles')),
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.agentMissionDetail,
+                    arguments: {'mission': mission},
                   );
                 },
                 icon: const Icon(Icons.info_outline, size: 16),
-                label: const Text(
-                  'Détails',
-                  style: TextStyle(fontSize: 12),
-                ),
+                label: const Text('Détails', style: TextStyle(fontSize: 12)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFFD400),
                   foregroundColor: Colors.black,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                 ),
               ),
             ],
@@ -437,22 +338,11 @@ class _MissionHistoryCard extends StatelessWidget {
     );
   }
 
-  /// Formate la date pour l'affichage
   String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays == 0) {
-      return 'Aujourd\'hui';
-    } else if (difference.inDays == 1) {
-      return 'Hier';
-    } else if (difference.inDays < 7) {
-      return 'Il y a ${difference.inDays} jours';
-    } else if (difference.inDays < 30) {
-      final weeks = (difference.inDays / 7).floor();
-      return 'Il y a $weeks semaine${weeks > 1 ? 's' : ''}';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
-    }
+    final diff = DateTime.now().difference(date);
+    if (diff.inDays == 0) return 'Aujourd\'hui';
+    if (diff.inDays == 1) return 'Hier';
+    if (diff.inDays < 7) return 'Il y a ${diff.inDays} jours';
+    return '${date.day}/${date.month}/${date.year}';
   }
 }

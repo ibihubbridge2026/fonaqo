@@ -15,5 +15,11 @@ Future<void> navigateAfterAuth(BuildContext context, AuthProvider auth) async {
   AppBootstrapService.preloadSessionData(context);
 
   if (!context.mounted) return;
+
+  if (auth.isAgent && auth.currentUser?.isKycLocked == true) {
+    Navigator.pushReplacementNamed(context, AppRoutes.agentKycLock);
+    return;
+  }
+
   Navigator.pushReplacementNamed(context, AppRoutes.mainShell);
 }
