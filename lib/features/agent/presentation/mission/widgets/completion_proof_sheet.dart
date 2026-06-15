@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -87,10 +88,7 @@ class _CompletionProofSheetState extends State<CompletionProofSheet> {
       await context.read<AgentProvider>().fetchWalletDetails();
       if (!mounted) return;
 
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        AppRoutes.agentDashboard,
-        (route) => false,
-      );
+      context.go(AppRoutes.agentDashboard);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

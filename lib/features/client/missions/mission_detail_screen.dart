@@ -21,6 +21,7 @@ import 'package:fonaco/core/widgets/fon_dialog.dart';
 import 'package:fonaco/features/chat/chat_repository.dart';
 import 'mission_repository.dart';
 import 'widgets/mission_invoice_card.dart';
+import 'package:go_router/go_router.dart';
 
 class MissionDetailScreen extends StatefulWidget {
   final String? missionId;
@@ -70,13 +71,26 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
   }
 
   void _initializeMission() {
-    // 1. Priorité au missionId passé par le constructeur
-    // 2. Sinon, on cherche dans les arguments de la route
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    _resolvedMissionId = widget.missionId ?? args?['missionId']?.toString();
+    String? missionId = widget.missionId;
 
-    if (_resolvedMissionId != null) {
+    if (missionId == null || missionId.isEmpty) {
+      final extra = GoRouterState.of(context).extra;
+      if (extra is Map<String, dynamic>) {
+        missionId = extra['missionId']?.toString();
+      } else if (extra is Map) {
+        missionId = extra['missionId']?.toString();
+      }
+    }
+
+    if (missionId == null || missionId.isEmpty) {
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      missionId = args?['missionId']?.toString();
+    }
+
+    _resolvedMissionId = missionId;
+
+    if (_resolvedMissionId != null && _resolvedMissionId!.isNotEmpty) {
       _loadMissionDetails();
     } else {
       setState(() {
@@ -303,10 +317,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
                                   onPressed: _resolvedMissionId == null
                                       ? null
                                       : () {
-                                          Navigator.pushNamed(
-                                            context,
-                                            AppRoutes.missionTracking,
-                                            arguments: {
+                                          context.push(AppRoutes.missionTracking, extra: {
                                               'missionId': _resolvedMissionId,
                                             },
                                           );
@@ -737,7 +748,6 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
   Future<void> _confirmReleaseFunds(BuildContext context) async {
     if (!context.mounted) return;
     final missionProvider = context.read<MissionProvider>();
-    final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
 
     final confirmed = await showDialog<bool>(
@@ -770,9 +780,9 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
       missionProvider.upsertMission(updated);
       await MissionAudioCleanup.purgeTemporaryRecordings();
       if (!mounted) return;
-      navigator.pushNamed(
+      context.push(
         AppRoutes.rating,
-        arguments: {'missionId': _resolvedMissionId},
+        extra: {'missionId': _resolvedMissionId},
       );
       messenger.showSnackBar(const SnackBar(
           content: Text('Fonds libérés !'), backgroundColor: Colors.green));
@@ -1238,10 +1248,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
           // Bouton rouge
           ElevatedButton(
             onPressed: () {
-              Navigator.pushNamed(
-                context,
-                AppRoutes.litige,
-                arguments: {'missionId': _resolvedMissionId},
+              context.push(AppRoutes.litige, extra: {'missionId': _resolvedMissionId},
               );
             },
             style: ElevatedButton.styleFrom(
@@ -1319,7 +1326,6 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
     if (_mission == null || _resolvedMissionId == null) return;
     if (!context.mounted) return;
 
-    final navigator = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
     final currentUserId =
         Provider.of<AuthProvider>(context, listen: false).currentUser?.id;
@@ -1350,9 +1356,9 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
         }
 
         if (conversationId != null) {
-          navigator.pushNamed(
+          context.push(
             AppRoutes.chatDetail,
-            arguments: {
+            extra: {
               'conversationId': conversationId,
               'userName': userName,
               'missionId': _resolvedMissionId,

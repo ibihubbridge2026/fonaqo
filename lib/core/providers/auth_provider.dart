@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -11,7 +12,6 @@ import 'package:logger/logger.dart';
 import '../api/base_client.dart';
 import '../api/token_refresh_result.dart';
 import '../models/user_model.dart';
-import '../routes/app_routes.dart';
 import '../services/notification_service.dart';
 
 export '../api/base_client.dart' show ApiException, ApiErrorType;
@@ -56,7 +56,7 @@ class AuthProvider extends ChangeNotifier {
 
   AuthProvider() {
     _loadUserData();
-    _baseClient.setOnTokenExpiredCallback(handleTokenExpired);
+    // Pas de déconnexion auto : session conservée jusqu'au logout explicite.
   }
 
   // =========================
@@ -86,29 +86,9 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Appelé uniquement quand le refresh token est révoqué/expiré côté serveur.
+  /// Conservé pour compatibilité — ne déconnecte plus automatiquement.
   Future<void> handleTokenExpired() async {
-    if (!_isAuthenticated) return;
-    _logger.w('Session révoquée — déconnexion propre');
-
-    await _memoryCache.clear();
-    await _secureStorage.deleteAll();
-    _clearUserDataAndNotify();
-    _setError('Votre session a expiré. Veuillez vous reconnecter.');
-
-    final nav = FeedbackService.navigatorKey?.currentState;
-    if (nav != null) {
-      nav.pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
-      final ctx = FeedbackService.navigatorKey?.currentContext;
-      if (ctx != null && ctx.mounted) {
-        FeedbackService.show(
-          ctx,
-          message: 'Votre session a expiré. Veuillez vous reconnecter.',
-          type: FeedbackType.warning,
-          duration: const Duration(seconds: 5),
-        );
-      }
-    }
+    _logger.w('Token expiré côté API — session locale conservée (logout manuel requis)');
   }
 
   /// Nettoie les données utilisateur et notifie les listeners
@@ -450,58 +430,19 @@ class AuthProvider extends ChangeNotifier {
       _logger.i('🔍 Vérification de l\'authentification au démarrage...');
 
       if (token != null && userDataString != null) {
-        // VÉRIFIER L'EXPIRATION DU TOKEN
-        if (_isTokenExpired(token)) {
-          _logger.w('⚠️ Token expiré détecté au démarrage');
-
-          // Tenter de rafraîchir le token
-          final refreshed = await refreshToken();
-
-          if (refreshed) {
-            _logger.i('✅ Token rafraîchi avec succès');
-            // Recharger depuis le cache après refresh
-            await _memoryCache.loadFromStorage();
-            final newToken = _memoryCache.accessToken;
-
-            if (newToken != null && !_isTokenExpired(newToken)) {
-              try {
-                _currentUser = UserModel.fromJson(jsonDecode(userDataString));
-                _isAuthenticated = true;
-                _logger.i(
-                    '✅ Utilisateur authentifié après refresh: ${_currentUser?.email}');
-                notifyListeners();
-                return;
-              } catch (e) {
-                _logger.e('❌ Erreur parsing utilisateur: $e');
-              }
-            }
-          }
-
-          // Refresh échoué : conserver la session locale (déconnexion = bouton uniquement).
-          _logger.w(
-              '⚠️ Refresh échoué au démarrage — session locale conservée');
-          try {
-            _currentUser = UserModel.fromJson(jsonDecode(userDataString));
-            _isAuthenticated = true;
-          } catch (e) {
-            _logger.e('❌ Erreur parsing utilisateur: $e');
-            _currentUser = null;
-            _isAuthenticated = false;
-          }
-          notifyListeners();
-          return;
-        }
-
-        // Token valide, charger l'utilisateur
         try {
           _currentUser = UserModel.fromJson(jsonDecode(userDataString));
           _isAuthenticated = true;
-          _logger.i('✅ Utilisateur chargé: ${_currentUser?.email}');
-          _logger.i('📍 Session valide (token non expiré)');
+          _logger.i('✅ Session restaurée: ${_currentUser?.email}');
         } catch (e) {
           _logger.e('❌ Erreur parsing utilisateur: $e');
-          _isAuthenticated = _memoryCache.accessToken != null;
+          _isAuthenticated = false;
           _currentUser = null;
+        }
+
+        if (_isTokenExpired(token)) {
+          _logger.w('⚠️ Access token expiré — refresh silencieux');
+          unawaited(refreshToken());
         }
       } else {
         _logger.w('⚠️ Aucun token ou user data trouvé');

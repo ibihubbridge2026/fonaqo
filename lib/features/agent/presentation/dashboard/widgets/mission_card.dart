@@ -7,6 +7,7 @@ import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/features/agent/providers/agent_provider.dart';
+import 'package:go_router/go_router.dart';
 
 /// Carte mission avec action d'acceptation (dashboard agent).
 class MissionCard extends StatefulWidget {
@@ -121,10 +122,7 @@ class _MissionCardState extends State<MissionCard> {
         ),
       );
       final mission = result.mission ?? widget.mission;
-      Navigator.pushNamed(
-        context,
-        AppRoutes.agentMissionTracking,
-        arguments: {'mission': mission},
+      context.push(AppRoutes.agentMissionTracking, extra: {'mission': mission},
       );
       return;
     }

@@ -1,16 +1,54 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
 
-/// Stub no-op du service de monitoring d'erreurs.
-/// Sentry a été retiré du projet (incompatibilité Kotlin 1.6).
-/// Toutes les méthodes loggent en debug uniquement.
+import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+/// Monitoring d'erreurs : stub local + capture globale.
+/// Sentry côté Flutter reste optionnel (incompatibilité Kotlin historique) ;
+/// le backend Django utilise `SENTRY_DSN` dans `.env`.
 class ErrorMonitoringService {
   static final ErrorMonitoringService _instance =
       ErrorMonitoringService._internal();
   factory ErrorMonitoringService() => _instance;
   ErrorMonitoringService._internal();
 
-  Future<void> init({required String dsn}) async {
-    debugPrint('[ErrorMonitoring] init() (stub no-op)');
+  bool _initialized = false;
+  String? _dsn;
+
+  Future<void> init({String? dsn}) async {
+    if (_initialized) return;
+
+    try {
+      await dotenv.load(fileName: '.env');
+    } catch (_) {
+      // .env absent en prod CI — acceptable
+    }
+
+    _dsn = dsn ??
+        dotenv.env['SENTRY_DSN'] ??
+        const String.fromEnvironment('SENTRY_DSN');
+    if (_dsn != null && _dsn!.isEmpty) _dsn = null;
+
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      unawaited(
+        captureException(
+          details.exception,
+          stackTrace: details.stack,
+          message: details.context?.toDescription(),
+        ),
+      );
+    };
+
+    PlatformDispatcher.instance.onError = (error, stack) {
+      unawaited(captureException(error, stackTrace: stack));
+      return true;
+    };
+
+    _initialized = true;
+    debugPrint(
+      '[ErrorMonitoring] init() — DSN ${_dsn != null ? "configuré (backend)" : "non configuré"}',
+    );
   }
 
   Future<String?> captureException(
@@ -19,8 +57,11 @@ class ErrorMonitoringService {
     String? message,
     Map<String, dynamic>? context,
   }) async {
-    debugPrint('🚨 [ErrorMonitoring] captureException: $exception');
+    debugPrint('🚨 [ErrorMonitoring] ${message ?? "captureException"}: $exception');
     if (stackTrace != null) debugPrint(stackTrace.toString());
+    if (context != null && context.isNotEmpty) {
+      debugPrint('[ErrorMonitoring] context: $context');
+    }
     return null;
   }
 

@@ -8,6 +8,7 @@ import 'package:fonaco/features/agent/presentation/profile/screens/agent_help_ce
 import 'package:fonaco/features/agent/presentation/profile/screens/agent_security_settings_screen.dart';
 import 'package:fonaco/features/agent/providers/agent_provider.dart';
 import 'package:fonaco/features/client/profile/screens/notifications_settings_screen.dart';
+import 'package:go_router/go_router.dart';
 
 /// Profil agent — stats, KYC, paramètres agent.
 class AgentProfileScreen extends StatefulWidget {
@@ -73,10 +74,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
     agentProvider.reset();
 
     if (!context.mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      AppRoutes.login,
-      (route) => false,
-    );
+    context.go(AppRoutes.login);
   }
 
   @override
@@ -168,9 +166,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
-                        onPressed: () => Navigator.pushNamed(
-                          context,
-                          AppRoutes.agentKycLock,
+                        onPressed: () => context.push(AppRoutes.agentKycLock,
                         ),
                         icon: const Icon(Icons.upload_file),
                         label: const Text('Soumettre mes documents'),
@@ -205,15 +201,13 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                         title: 'Booster mon profil',
                         subtitle: 'Priorité missions + visibilité',
                         onTap: () =>
-                            Navigator.pushNamed(context, AppRoutes.agentBoost),
+                            context.push(AppRoutes.agentBoost),
                       ),
                       ProfileParamItem(
                         icon: Icons.person_outline,
                         title: 'Informations personnelles',
                         subtitle: 'Compétences, contact, zone...',
-                        onTap: () => Navigator.pushNamed(
-                          context,
-                          AppRoutes.agentProfilePersonalInfo,
+                        onTap: () => context.push(AppRoutes.agentProfilePersonalInfo,
                         ),
                       ),
                       ProfileParamItem(

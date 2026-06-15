@@ -6,6 +6,7 @@ import 'package:logger/logger.dart';
 import 'package:fonaco/core/api/base_client.dart';
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/services/cache_service.dart';
+import 'package:fonaco/features/client/domain/repositories/client_mission_repository.dart';
 
 /// Données pour créer une mission (POST /missions/).
 class MissionCreatePayload {
@@ -72,7 +73,7 @@ class MissionCreatePayload {
 }
 
 /// Repository pour la gestion des missions.
-class MissionRepository {
+class MissionRepository implements ClientMissionRepository {
   final BaseClient _baseClient;
   final Logger _logger = Logger();
   final CacheService _cacheService = CacheService();

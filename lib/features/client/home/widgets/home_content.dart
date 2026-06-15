@@ -17,6 +17,7 @@ import 'package:provider/provider.dart';
 
 import 'package:fonaco/features/client/missions/mission_repository.dart';
 import 'package:fonaco/features/client/screens/client_agent_profile_screen.dart';
+import 'package:go_router/go_router.dart';
 
 /// Constante pour la couleur des liens "Voir tous"
 /// Peut être changée en Colors.grey[700] pour un look plus discret
@@ -285,7 +286,7 @@ class _HomeContentState extends State<HomeContent>
         // Désactivé temporairement — réactivation prévue prochainement.
         // VocalCreateMissionButton(
         //   onPressed: () {
-        //     Navigator.pushNamed(context, AppRoutes.createMissionVocal);
+        //     context.push(AppRoutes.createMissionVocal);
         //   },
         // ),
         SectionTitleStrip(
@@ -327,7 +328,7 @@ class _HomeContentState extends State<HomeContent>
           onSeeAllPressed: shell == null
               ? null
               : () {
-                  Navigator.pushNamed(context, AppRoutes.favoriteAgents);
+                  context.push(AppRoutes.favoriteAgents);
                 },
         ),
         const SizedBox(height: 12),
@@ -939,7 +940,7 @@ class AvailableMissionsPreview extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () =>
-                  Navigator.pushNamed(context, '/missions-available'),
+                  context.push('/missions-available'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFFD400),
                 foregroundColor: Colors.black,
@@ -1025,7 +1026,7 @@ class ReportLitigeCardPanel extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: TextButton(
-                onPressed: () => Navigator.pushNamed(context, AppRoutes.litige),
+                onPressed: () => context.push(AppRoutes.litige),
                 style: TextButton.styleFrom(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1497,10 +1498,7 @@ class OngoingMissionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        Navigator.pushNamed(
-          context,
-          AppRoutes.missionDetail,
-          arguments: {'missionId': missionId},
+        context.push(AppRoutes.missionDetail, extra: {'missionId': missionId},
         );
       },
       borderRadius: BorderRadius.circular(18),
@@ -1608,10 +1606,7 @@ class QuickHistoryEntries extends StatelessWidget {
         for (final m in missions)
           InkWell(
             onTap: () {
-              Navigator.pushNamed(
-                context,
-                AppRoutes.missionDetail,
-                arguments: {'missionId': m.id},
+              context.push(AppRoutes.missionDetail, extra: {'missionId': m.id},
               );
             },
             borderRadius: BorderRadius.circular(12),

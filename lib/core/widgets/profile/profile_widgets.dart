@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
+import 'package:go_router/go_router.dart';
 
 /// Élément de menu profil (design V1 partagé Client / Agent).
 class ProfileParamItem extends StatelessWidget {
@@ -115,7 +116,7 @@ class ProfileHeader extends StatelessWidget {
                 ),
               ),
               InkWell(
-                onTap: () => Navigator.pushNamed(context, editRoute),
+                onTap: () => context.push(editRoute),
                 borderRadius: BorderRadius.circular(99),
                 child: Container(
                   padding: const EdgeInsets.all(8),

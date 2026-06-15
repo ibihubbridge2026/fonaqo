@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/routes/app_routes.dart';
+import 'package:go_router/go_router.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -121,9 +122,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             curve: Curves.ease,
                           );
                         } else {
-                          Navigator.pushReplacementNamed(
-                            context,
-                            AppRoutes.login,
+                          context.replace(AppRoutes.login,
                           );
                         }
                       },

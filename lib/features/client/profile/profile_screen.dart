@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/widgets/profile/profile_widgets.dart';
+import 'package:go_router/go_router.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -25,24 +26,20 @@ class ProfileScreen extends StatelessWidget {
                   icon: Icons.person_outline,
                   title: 'Informations personnelles',
                   subtitle: 'Modifier nom, email...',
-                  onTap: () => Navigator.pushNamed(
-                    context,
-                    AppRoutes.profilePersonalInfo,
+                  onTap: () => context.push(AppRoutes.profilePersonalInfo,
                   ),
                 ),
                 ProfileParamItem(
                   icon: Icons.account_balance_wallet_outlined,
                   title: 'Mon Portefeuille',
                   subtitle: 'Solde et historique des transactions',
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.wallet),
+                  onTap: () => context.push(AppRoutes.wallet),
                 ),
                 ProfileParamItem(
                   icon: Icons.notifications_none,
                   title: 'Notifications',
                   subtitle: 'Gérer vos alertes',
-                  onTap: () => Navigator.pushNamed(
-                    context,
-                    AppRoutes.profileNotifications,
+                  onTap: () => context.push(AppRoutes.profileNotifications,
                   ),
                 ),
                 ProfileParamItem(
@@ -50,14 +47,14 @@ class ProfileScreen extends StatelessWidget {
                   title: 'Sécurité',
                   subtitle: 'Mot de passe, biométrie',
                   onTap: () =>
-                      Navigator.pushNamed(context, AppRoutes.profileSecurity),
+                      context.push(AppRoutes.profileSecurity),
                 ),
                 ProfileParamItem(
                   icon: Icons.location_on_outlined,
                   title: 'Ma Localisation',
                   subtitle: 'Position actuelle et adresses',
                   onTap: () {
-                    Navigator.pushNamed(context, AppRoutes.profileLocation);
+                    context.push(AppRoutes.profileLocation);
                   },
                 ),
                 ProfileParamItem(
@@ -65,14 +62,14 @@ class ProfileScreen extends StatelessWidget {
                   title: 'Langue',
                   subtitle: 'Français (FR)',
                   onTap: () =>
-                      Navigator.pushNamed(context, AppRoutes.profileLanguage),
+                      context.push(AppRoutes.profileLanguage),
                 ),
                 ProfileParamItem(
                   icon: Icons.help_outline,
                   title: 'Centre d\'aide',
                   subtitle: 'FAQ et support',
                   onTap: () =>
-                      Navigator.pushNamed(context, AppRoutes.profileHelp),
+                      context.push(AppRoutes.profileHelp),
                 ),
                 const SizedBox(height: 20),
                 ProfileParamItem(
@@ -104,10 +101,7 @@ class ProfileScreen extends StatelessWidget {
                     if (confirm == true && context.mounted) {
                       await context.read<AuthProvider>().logout();
                       if (!context.mounted) return;
-                      Navigator.of(context).pushNamedAndRemoveUntil(
-                        AppRoutes.login,
-                        (route) => false,
-                      );
+                      context.go(AppRoutes.login);
                     }
                   },
                 ),

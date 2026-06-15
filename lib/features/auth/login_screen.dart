@@ -6,11 +6,13 @@ import 'package:provider/provider.dart';
 import '../../core/models/country_model.dart' as country_model;
 import '../../core/providers/auth_provider.dart';
 import '../../core/routes/app_routes.dart';
+import '../../core/services/session_bootstrap_monitor.dart';
 import '../../core/utils/auth_navigation.dart';
 import '../../core/services/feedback_service.dart';
 import '../../core/services/location_service.dart';
 import 'widgets/input_card.dart';
 import 'widgets/phone_input_card.dart';
+import 'package:go_router/go_router.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -42,6 +44,8 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    SessionBootstrapMonitor.instance.beginLogin();
+
     final success = await authProvider.login({
       'phone_number': identifier,
       'password': password,
@@ -64,6 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (success && mounted) {
+      SessionBootstrapMonitor.instance.mark('login_api_success');
       final authProvider = context.read<AuthProvider>();
       await navigateAfterAuth(context, authProvider);
       _requestLocationAfterLogin();
@@ -240,9 +245,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {
-                        Navigator.pushNamed(
-                          context,
-                          AppRoutes.forgotPassword,
+                        context.push(AppRoutes.forgotPassword,
                         );
                       },
                       child: Text(
@@ -308,9 +311,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       TextButton(
                         onPressed: () {
-                          Navigator.pushNamed(
-                            context,
-                            AppRoutes.register,
+                          context.push(AppRoutes.register,
                           );
                         },
                         child: Text(

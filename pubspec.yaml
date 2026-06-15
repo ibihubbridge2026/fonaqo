@@ -15,6 +15,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: ^0.20.2
 
   # =========================
   # UI & DESIGN
@@ -76,6 +79,11 @@ dependencies:
   app_settings: ^5.2.0
 
   # =========================
+  # NAVIGATION
+  # =========================
+  go_router: ^14.8.1
+
+  # =========================
   # API & DONNÉES
   # =========================
   dio: ^5.8.0+1
@@ -130,6 +138,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true
 
   assets:
     - .env

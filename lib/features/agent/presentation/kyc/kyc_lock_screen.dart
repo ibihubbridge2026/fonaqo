@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:fonaco/core/providers/auth_provider.dart';
@@ -15,10 +16,7 @@ class KycLockScreen extends StatelessWidget {
     await auth.logout();
     agent.reset();
     if (!context.mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      AppRoutes.login,
-      (route) => false,
-    );
+    context.go(AppRoutes.login);
   }
 
   @override

@@ -5,6 +5,7 @@ import '../core/routes/app_routes.dart';
 import '../core/providers/auth_provider.dart';
 import '../core/providers/notification_provider.dart';
 import 'main_wrapper.dart';
+import 'package:go_router/go_router.dart';
 
 /// Variante d'en-tête : logo marque pour l’accueil shell, titre d’onglet, ou pile détail avec retour.
 enum CustomAppBarVariant {
@@ -37,6 +38,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   /// Titre centré lorsque `variant == mainShellSection`.
   final String? sectionTitle;
 
+  /// Titre texte en mode pile (si [detailTitleWidget] absent).
+  final String? detailTitle;
+
   /// Rubrique titre optionnel pour l’empilement (chat, détail mission, etc.).
   final Widget? detailTitleWidget;
 
@@ -57,6 +61,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.onSupportPressed,
   })  : variant = CustomAppBarVariant.mainShellHome,
         sectionTitle = null,
+        detailTitle = null,
         detailTitleWidget = null,
         detailTrailingActions = null,
         leadingOnBackPressed = null;
@@ -66,6 +71,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     required String this.sectionTitle,
     this.profileTabIndex = 4,
   })  : variant = CustomAppBarVariant.mainShellSection,
+        detailTitle = null,
         detailTitleWidget = null,
         detailTrailingActions = null,
         leadingOnBackPressed = null,
@@ -78,9 +84,10 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.detailTitleWidget,
     this.leadingOnBackPressed,
     this.detailTrailingActions,
-    required String title,
+    String? title,
   })  : variant = CustomAppBarVariant.detailStack,
         sectionTitle = null,
+        detailTitle = title,
         onNotificationsPressed = null,
         onSupportPressed = null;
 
@@ -147,8 +154,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             color: Colors.black,
             size: 20,
           ),
-          onPressed:
-              leadingOnBackPressed ?? () => Navigator.of(context).maybePop(),
+          onPressed: leadingOnBackPressed ?? () => context.pop(),
         );
     }
   }
@@ -176,7 +182,18 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           child: Align(
             alignment: Alignment.centerLeft,
             widthFactor: 1,
-            child: detailTitleWidget ?? const SizedBox.shrink(),
+            child: detailTitleWidget ??
+                (detailTitle != null && detailTitle!.isNotEmpty
+                    ? Text(
+                        detailTitle!,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 17,
+                        ),
+                      )
+                    : const SizedBox.shrink()),
           ),
         );
     }
@@ -186,9 +203,9 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     switch (variant) {
       case CustomAppBarVariant.mainShellHome:
         final bell = onNotificationsPressed ??
-            () => Navigator.pushNamed(context, AppRoutes.notifications);
+            () => context.push(AppRoutes.notifications);
         final support = onSupportPressed ??
-            () => Navigator.pushNamed(context, AppRoutes.aiAssistant);
+            () => context.push(AppRoutes.aiAssistant);
 
         final notificationProvider = Provider.of<NotificationProvider>(context);
 

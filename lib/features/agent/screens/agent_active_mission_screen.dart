@@ -657,8 +657,10 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
       _gpsAgentId = agentId;
 
       // Connecter au WebSocket GPS avec authentification
-      final wsUrl =
-          'ws://${ApiConfig.apiHostAndPort}/ws/gps/$_missionId/?token=$token';
+      final wsUrl = ApiConfig.wsUrl(
+        '/ws/gps/$_missionId/',
+        query: {'token': token},
+      );
       _gpsWebSocket = WebSocketChannel.connect(Uri.parse(wsUrl));
 
       // Listen for WebSocket messages (pong, errors, disconnection)

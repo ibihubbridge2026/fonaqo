@@ -13,6 +13,7 @@ import 'package:fonaco/core/widgets/skeleton_loading.dart';
 import 'package:fonaco/widgets/main_wrapper.dart';
 import 'mission_repository.dart';
 import 'screens/create_mission_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class MissionsScreen extends StatefulWidget {
   /// Contrôle si on affiche la liste des missions ou le flux de création.
@@ -544,10 +545,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
                           showUnarchiveAction: _filter == 'archived',
                           onArchive: () => _archiveMission(mission.id),
                           onUnarchive: () => _unarchiveMission(mission.id),
-                          onTap: () => Navigator.pushNamed(
-                            context,
-                            AppRoutes.missionDetail,
-                            arguments: {'missionId': mission.id},
+                          onTap: () => context.push(AppRoutes.missionDetail, extra: {'missionId': mission.id},
                           ),
                         ),
                       );
@@ -610,7 +608,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
           if (isAuthError)
             ElevatedButton.icon(
               onPressed: () {
-                Navigator.pushReplacementNamed(context, AppRoutes.login);
+                context.replace(AppRoutes.login);
               },
               icon: const Icon(Icons.login),
               label: const Text('Se connecter'),

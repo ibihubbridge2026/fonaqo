@@ -11,7 +11,7 @@ import '../features/client/home/home_screen.dart';
 import '../features/client/missions/missions_screen.dart';
 import '../features/client/profile/profile_screen.dart';
 import '../features/client/agents_screen.dart';
-import '../features/client/artisans_screen.dart';
+import '../features/client/leboncoin/screens/le_bon_coin_screen.dart';
 import '../features/agent/presentation/kyc/kyc_lock_screen.dart';
 import '../features/agent/presentation/dashboard/screens/agent_dashboard_screen.dart';
 import '../features/agent/screens/agent_missions_screen.dart';
@@ -23,6 +23,7 @@ import '../features/agent/widgets/agent_bottom_nav.dart';
 import '../core/routes/app_routes.dart';
 import 'custom_app_bar.dart';
 import 'main_navigation_bar.dart';
+import 'package:go_router/go_router.dart';
 
 /// Accès aux méthodes du shell principal (changement d’onglet).
 class MainShellScope extends InheritedWidget {
@@ -67,7 +68,7 @@ class _MainWrapperState extends State<MainWrapper> {
     const HomeScreen(),
     MissionsScreen(showCreateMissionListenable: _showCreateMission),
     const AgentsScreen(),
-    const ArtisansScreen(),
+    const LeBonCoinScreen(),
     const ProfileScreen(),
   ];
 
@@ -164,7 +165,7 @@ class _MainWrapperState extends State<MainWrapper> {
         );
       },
       onSupportPressed: () {
-        Navigator.pushNamed(context, AppRoutes.aiAssistant);
+        context.push(AppRoutes.aiAssistant);
       },
     );
   }

@@ -5,6 +5,7 @@ import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/features/agent/providers/agent_provider.dart';
 import 'package:fonaco/features/agent/widgets/rating_dialog.dart';
+import 'package:go_router/go_router.dart';
 
 /// Écran d'historique détaillé des missions de l'agent.
 class AgentMissionHistoryScreen extends StatefulWidget {
@@ -314,10 +315,7 @@ class _MissionHistoryCard extends StatelessWidget {
               if (isCompleted) const SizedBox(width: 8),
               ElevatedButton.icon(
                 onPressed: () {
-                  Navigator.pushNamed(
-                    context,
-                    AppRoutes.agentMissionDetail,
-                    arguments: {'mission': mission},
+                  context.push(AppRoutes.agentMissionDetail, extra: {'mission': mission},
                   );
                 },
                 icon: const Icon(Icons.info_outline, size: 16),

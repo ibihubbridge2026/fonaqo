@@ -7,7 +7,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:logger/logger.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
-import '../api/base_client.dart';
+import '../config/api_config.dart';
 import 'memory_auth_cache.dart';
 
 /// WebSocket `ws://<hôte>/ws/gps/<mission_id>/?token=…` (Django Channels + JWT).
@@ -56,9 +56,9 @@ class GpsWebSocketService extends ChangeNotifier {
       throw StateError(_lastError!);
     }
 
-    final host = BaseClient.apiHostAndPort;
-    final uri = Uri.parse('ws://$host/ws/gps/$missionId/')
-        .replace(queryParameters: {'token': token});
+    final uri = Uri.parse(
+      ApiConfig.wsUrl('/ws/gps/$missionId/', query: {'token': token}),
+    );
 
     _logger.i('Connexion GPS WS: $uri');
     _channel = WebSocketChannel.connect(uri);

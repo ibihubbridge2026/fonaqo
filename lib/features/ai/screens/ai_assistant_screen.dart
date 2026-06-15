@@ -7,6 +7,7 @@ import 'package:fonaco/features/ai/ai_assistant_repository.dart';
 import 'package:fonaco/features/client/models/agent_model.dart';
 import 'package:fonaco/features/client/widgets/ai_agent_card.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
+import 'package:go_router/go_router.dart';
 
 /// Assistant IA Moki — aide via API backend + suggestions agents dynamiques.
 class AiAssistantScreen extends StatefulWidget {
@@ -163,10 +164,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   }
 
   void _openAgentProfile(AgentModel agent) {
-    Navigator.pushNamed(
-      context,
-      AppRoutes.agentProfile,
-      arguments: {
+    context.push(AppRoutes.agentProfile, extra: {
         'agentId': agent.id,
         'agent': {
           'id': agent.id,

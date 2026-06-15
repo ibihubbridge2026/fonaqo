@@ -6,6 +6,7 @@ import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/features/agent/presentation/dashboard/widgets/mission_card.dart';
 import 'package:fonaco/features/agent/providers/agent_provider.dart';
 import 'package:fonaco/features/agent/widgets/shimmer_loading_card.dart';
+import 'package:go_router/go_router.dart';
 
 /// Page Missions agent : recherche, filtres et onglets Disponibles / Attribué / En cours.
 class AgentMissionsScreen extends StatefulWidget {
@@ -265,10 +266,7 @@ class _MissionList extends StatelessWidget {
             onConflict: onRefresh,
             onMissionAccepted: onRefresh,
             onDeclined: onRefresh,
-            onTap: () => Navigator.pushNamed(
-              context,
-              AppRoutes.agentMissionDetail,
-              arguments: {'mission': mission},
+            onTap: () => context.push(AppRoutes.agentMissionDetail, extra: {'mission': mission},
             ),
           );
         },

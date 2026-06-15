@@ -1,0 +1,21 @@
+{
+  "@@locale": "fr",
+  "appTitle": "FONACO",
+  "navHome": "Accueil",
+  "navMissions": "Missions",
+  "navAgents": "Agents",
+  "navLeBonCoin": "LeBonCoin",
+  "navSettings": "Paramètres",
+  "leBonCoinTitle": "LeBonCoin",
+  "leBonCoinSubtitle": "Artisans experts et bons plans près de chez vous.",
+  "leBonCoinSearchHint": "Rechercher un lieu, un artisan…",
+  "leBonCoinMap": "Carte",
+  "leBonCoinList": "Liste",
+  "leBonCoinWebsite": "Site web",
+  "leBonCoinEmpty": "Aucun résultat pour cette recherche.",
+  "filterAll": "Tous",
+  "filterArtisans": "Artisans",
+  "filterRestaurants": "Restaurants",
+  "filterShops": "Commerces",
+  "filterLeisure": "Sorties"
+}

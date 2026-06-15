@@ -1,0 +1,21 @@
+{
+  "@@locale": "en",
+  "appTitle": "FONACO",
+  "navHome": "Home",
+  "navMissions": "Missions",
+  "navAgents": "Agents",
+  "navLeBonCoin": "LeBonCoin",
+  "navSettings": "Settings",
+  "leBonCoinTitle": "LeBonCoin",
+  "leBonCoinSubtitle": "Expert artisans and local gems near you.",
+  "leBonCoinSearchHint": "Search a place, an artisan…",
+  "leBonCoinMap": "Map",
+  "leBonCoinList": "List",
+  "leBonCoinWebsite": "Website",
+  "leBonCoinEmpty": "No results for this search.",
+  "filterAll": "All",
+  "filterArtisans": "Artisans",
+  "filterRestaurants": "Restaurants",
+  "filterShops": "Shops",
+  "filterLeisure": "Outings"
+}

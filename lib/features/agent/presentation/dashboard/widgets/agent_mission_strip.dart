@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/features/agent/presentation/dashboard/widgets/mission_card.dart';
+import 'package:go_router/go_router.dart';
 
 /// Carrousel horizontal de cartes mission (design dashboard agent).
 class AgentMissionStrip extends StatelessWidget {
@@ -22,10 +23,7 @@ class AgentMissionStrip extends StatelessWidget {
   });
 
   void _openDetail(BuildContext context, MissionModel mission) {
-    Navigator.pushNamed(
-      context,
-      AppRoutes.agentMissionDetail,
-      arguments: {'mission': mission},
+    context.push(AppRoutes.agentMissionDetail, extra: {'mission': mission},
     );
   }
 

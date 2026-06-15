@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/routes/app_routes.dart';
+import 'package:go_router/go_router.dart';
 
 class EventsScreen extends StatelessWidget {
   const EventsScreen({super.key});
@@ -40,10 +41,7 @@ class EventsScreen extends StatelessWidget {
   Widget _buildEventCard(String title, String date, String place, String status,
       String imagePath, BuildContext context) {
     return InkWell(
-      onTap: () => Navigator.pushNamed(
-        context,
-        AppRoutes.eventDetail,
-        arguments: {
+      onTap: () => context.push(AppRoutes.eventDetail, extra: {
           'title': title,
           'date': date,
           'place': place,

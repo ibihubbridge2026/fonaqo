@@ -12,6 +12,7 @@ import 'package:fonaco/features/client/missions/mission_repository.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 
 /// Suivi GPS live + barre de statut (ACCEPTED → IN_PROGRESS → COMPLETED).
 class MissionTrackingScreen extends StatefulWidget {
@@ -395,10 +396,7 @@ class _MissionTrackingScreenState extends State<MissionTrackingScreen> {
       if (!mounted) return;
       setState(() => _isChatLoading = false);
       if (conversation != null) {
-        Navigator.pushNamed(
-          context,
-          AppRoutes.chatDetail,
-          arguments: {
+        context.push(AppRoutes.chatDetail, extra: {
             'chatId': conversation['id']?.toString(),
             'userName': _mission!.agentName ?? 'Agent',
             'agentAvatar': _mission!.avatarUrl,
@@ -545,9 +543,6 @@ class _AnimatedLinearProgressIndicatorState
 
 /// Ouvre l’écran de suivi (à utiliser depuis la liste / détail mission).
 void openMissionTracking(BuildContext context, String missionId) {
-  Navigator.pushNamed(
-    context,
-    AppRoutes.missionTracking,
-    arguments: {'missionId': missionId},
+  context.push(AppRoutes.missionTracking, extra: {'missionId': missionId},
   );
 }

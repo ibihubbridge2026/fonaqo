@@ -6,6 +6,7 @@ import 'package:fonaco/core/api/base_client.dart';
 import 'package:fonaco/core/providers/notification_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
+import 'package:go_router/go_router.dart';
 
 /// Liste des notifications côté client (Requester).
 class NotificationsScreen extends StatefulWidget {
@@ -141,29 +142,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     switch (resolvedAction) {
       case 'mission':
         if (resolvedTarget.isNotEmpty) {
-          await Navigator.pushNamed(
-            context,
-            AppRoutes.missionDetail,
-            arguments: {'missionId': resolvedTarget},
+          await context.push(AppRoutes.missionDetail, extra: {'missionId': resolvedTarget},
           );
         }
         break;
       case 'chat':
         if (resolvedTarget.isNotEmpty) {
-          await Navigator.pushNamed(
-            context,
-            AppRoutes.chatDetail,
-            arguments: {
+          await context.push(AppRoutes.chatDetail, extra: {
               'conversationId': resolvedTarget,
               'chatId': resolvedTarget,
             },
           );
         } else {
-          await Navigator.pushNamed(context, AppRoutes.chatList);
+          await context.push(AppRoutes.chatList);
         }
         break;
       case 'wallet':
-        await Navigator.pushNamed(context, AppRoutes.wallet);
+        await context.push(AppRoutes.wallet);
         break;
       default:
         break;

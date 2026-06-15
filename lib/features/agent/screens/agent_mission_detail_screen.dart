@@ -9,6 +9,7 @@ import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/features/agent/providers/agent_provider.dart';
+import 'package:go_router/go_router.dart';
 
 class AgentMissionDetailScreen extends StatefulWidget {
   final MissionModel? mission;
@@ -23,11 +24,10 @@ class AgentMissionDetailScreen extends StatefulWidget {
 class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
   static const _black = Color(0xFF000000);
 
+  MissionModel? _mission;
   bool _isAccepting = false;
   bool _isDeclining = false;
   Timer? _countdownTimer;
-
-  MissionModel? get _mission => widget.mission;
 
   String? get _agentUsername =>
       context.read<AuthProvider>().currentUser?.djangoUsername;
@@ -44,9 +44,20 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _mission = widget.mission;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _startCountdown();
+      _resolveMissionFromRoute();
+      if (_mission != null) _startCountdown();
     });
+  }
+
+  void _resolveMissionFromRoute() {
+    if (_mission != null) return;
+    final extra = GoRouterState.of(context).extra;
+    if (extra is Map && extra['mission'] is MissionModel) {
+      setState(() => _mission = extra['mission'] as MissionModel);
+      _startCountdown();
+    }
   }
 
   @override
@@ -199,10 +210,7 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
                       isDeclining: _isDeclining,
                       onAccept: _acceptMission,
                       onDecline: _declineMission,
-                      onContinue: () => Navigator.pushNamed(
-                        context,
-                        AppRoutes.agentMissionTracking,
-                        arguments: {'mission': mission},
+                      onContinue: () => context.push(AppRoutes.agentMissionTracking, extra: {'mission': mission},
                       ),
                     ),
                   ],
@@ -235,10 +243,9 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
           ),
         );
         final mission = result.mission ?? _mission!;
-        Navigator.pushReplacementNamed(
-          context,
+        context.replace(
           AppRoutes.agentMissionTracking,
-          arguments: {'mission': mission},
+          extra: {'mission': mission},
         );
       } else if (result.conflict) {
         ScaffoldMessenger.of(context).showSnackBar(

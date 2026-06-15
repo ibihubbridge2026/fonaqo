@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/routes/app_routes.dart';
+import 'package:go_router/go_router.dart';
 
 /// Redirige vers l'écran de chat unifié.
 class AgentChatScreen extends StatelessWidget {
@@ -16,10 +17,9 @@ class AgentChatScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Navigator.pushReplacementNamed(
-        context,
+      context.replace(
         AppRoutes.chatDetail,
-        arguments: {
+        extra: {
           'missionId': missionId,
           'userName': userName,
         },

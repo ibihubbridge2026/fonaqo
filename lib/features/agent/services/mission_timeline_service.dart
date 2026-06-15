@@ -15,7 +15,7 @@ class MissionTimelineService {
   void connectToTimeline(
       String missionId, Function(Map<String, dynamic>) onStepUpdate) {
     try {
-      final wsUrl = 'ws://${ApiConfig.apiHostAndPort}/ws/timeline/$missionId/';
+      final wsUrl = ApiConfig.wsUrl('/ws/timeline/$missionId/');
       _timelineWebSocket = WebSocketChannel.connect(Uri.parse(wsUrl));
 
       _timelineWebSocket!.stream.listen(

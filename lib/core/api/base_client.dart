@@ -238,7 +238,7 @@ class BaseClient {
         return ApiException(
           message: 'Session expirée. Veuillez vous reconnecter.',
           type: ApiErrorType.unauthorized,
-          shouldLogout: true,
+          shouldLogout: false,
         );
 
       case 403:
@@ -438,8 +438,7 @@ class _AuthInterceptor extends Interceptor {
         _refreshCompleter = null;
 
         if (refreshResult == TokenRefreshResult.sessionRevoked) {
-          _logger.e('🚨 Refresh token révoqué/expiré — déconnexion requise');
-          onTokenExpired?.call();
+          _logger.w('Refresh token rejeté — session locale conservée');
           return handler.reject(err);
         }
 

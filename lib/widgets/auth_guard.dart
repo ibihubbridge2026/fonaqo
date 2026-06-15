@@ -9,6 +9,7 @@ import '../core/providers/auth_provider.dart';
 import '../core/routes/app_routes.dart';
 import '../core/utils/auth_navigation.dart';
 import '../features/onboarding/getting_screen.dart';
+import 'package:go_router/go_router.dart';
 
 /// Auth Guard Widget - Gère le flux d'authentification au démarrage
 ///
@@ -49,7 +50,7 @@ class _AuthGuardState extends State<AuthGuard> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isFirstTime', false);
 
-        Navigator.pushReplacementNamed(context, AppRoutes.onboarding);
+        context.replace(AppRoutes.onboarding);
       }
     } else {
       // Lancement normal: vérifier l'auth
@@ -61,7 +62,7 @@ class _AuthGuardState extends State<AuthGuard> {
         if (authProvider.isAuthenticated) {
           await navigateAfterAuth(context, authProvider);
         } else {
-          Navigator.pushReplacementNamed(context, AppRoutes.login);
+          context.replace(AppRoutes.login);
         }
       }
     }

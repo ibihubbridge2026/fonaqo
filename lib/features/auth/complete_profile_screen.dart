@@ -7,6 +7,7 @@ import '../../core/routes/app_routes.dart';
 import '../../core/utils/auth_navigation.dart';
 import '../../core/services/feedback_service.dart';
 import 'widgets/phone_input_card.dart';
+import 'package:go_router/go_router.dart';
 
 /// Écran pour compléter le profil avec le numéro de téléphone (obligatoire après Google Auth)
 class CompleteProfileScreen extends StatefulWidget {
@@ -79,7 +80,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () {
             // Retour à l'écran de login si l'utilisateur refuse de compléter
-            Navigator.pushReplacementNamed(context, AppRoutes.login);
+            context.replace(AppRoutes.login);
           },
         ),
       ),

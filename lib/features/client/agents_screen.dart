@@ -13,6 +13,7 @@ import 'package:fonaco/features/client/missions/mission_repository.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:logger/logger.dart';
+import 'package:go_router/go_router.dart';
 
 class AgentsScreen extends StatefulWidget {
   const AgentsScreen({super.key});
@@ -1056,10 +1057,7 @@ class AgentListTile extends StatelessWidget {
                 height: 32,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pushNamed(
-                      context,
-                      AppRoutes.agentProfile,
-                      arguments: {
+                    context.push(AppRoutes.agentProfile, extra: {
                         'agentId': agent['id']?.toString() ?? '',
                         'agent': agent,
                       },
@@ -1089,10 +1087,7 @@ class AgentListTile extends StatelessWidget {
                 height: 32,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pushNamed(
-                      context,
-                      '/agent-profile',
-                      arguments: {
+                    context.push('/agent-profile', extra: {
                         'agentId': agent['id']?.toString() ?? '',
                         'agent': agent,
                       },

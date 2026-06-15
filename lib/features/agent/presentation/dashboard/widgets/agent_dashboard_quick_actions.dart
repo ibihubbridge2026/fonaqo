@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/features/agent/providers/agent_provider.dart';
 import 'package:fonaco/widgets/main_wrapper.dart';
+import 'package:go_router/go_router.dart';
 
 /// Boutons d'action rapide sur le dashboard agent.
 class AgentDashboardQuickActions extends StatefulWidget {
@@ -66,7 +67,7 @@ class _AgentDashboardQuickActionsState extends State<AgentDashboardQuickActions>
           _ActionIcon(
             icon: Icons.rocket_launch_outlined,
             label: 'Booster',
-            onTap: () => Navigator.pushNamed(context, AppRoutes.agentBoost),
+            onTap: () => context.push(AppRoutes.agentBoost),
           ),
           _ActionIcon(
             icon: Icons.description_outlined,

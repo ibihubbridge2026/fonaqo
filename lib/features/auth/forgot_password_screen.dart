@@ -6,6 +6,7 @@ import '../../core/providers/auth_provider.dart';
 import '../../core/routes/app_routes.dart';
 import '../../core/services/feedback_service.dart';
 import 'widgets/input_card.dart';
+import 'package:go_router/go_router.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -280,9 +281,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ),
                         TextButton(
                           onPressed: () {
-                            Navigator.pushReplacementNamed(
-                              context,
-                              AppRoutes.login,
+                            context.replace(AppRoutes.login,
                             );
                           },
                           child: const Text(

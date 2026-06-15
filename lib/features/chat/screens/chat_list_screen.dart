@@ -7,6 +7,7 @@ import '../../../core/widgets/skeleton_loading.dart';
 import '../../../widgets/custom_app_bar.dart';
 import '../models/chat_room.dart';
 import '../providers/chat_provider.dart';
+import 'package:go_router/go_router.dart';
 
 /// Liste des conversations — shimmer au chargement initial, transition fluide.
 class ChatListScreen extends StatefulWidget {
@@ -38,10 +39,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     final other = room.getOtherParticipant(
       context.read<AuthProvider>().currentUser?.id ?? '',
     );
-    Navigator.pushNamed(
-      context,
-      AppRoutes.chatDetail,
-      arguments: {
+    context.push(AppRoutes.chatDetail, extra: {
         'conversationId': room.id,
         'chatId': room.id,
         'userName': other?.userName ?? room.name,

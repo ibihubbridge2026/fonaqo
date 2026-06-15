@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:fonaco/l10n/app_localizations.dart';
+
 /// Barre de navigation inférieure du shell principal.
 ///
 /// [currentIndex]: index de l'onglet actif (0 = accueil, suivi missions / Agents / profil).
@@ -20,6 +22,7 @@ class MainNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       height: 85,
       decoration: const BoxDecoration(
@@ -35,7 +38,7 @@ class MainNavigationBar extends StatelessWidget {
               index: 0,
               currentIndex: currentIndex,
               icon: Icons.home_filled,
-              label: 'Home',
+              label: l10n.navHome,
               onTap: onTap,
             ),
           ),
@@ -44,7 +47,7 @@ class MainNavigationBar extends StatelessWidget {
               index: 1,
               currentIndex: currentIndex,
               icon: Icons.assignment_rounded,
-              label: 'Missions',
+              label: l10n.navMissions,
               onTap: onTap,
             ),
           ),
@@ -53,7 +56,7 @@ class MainNavigationBar extends StatelessWidget {
               index: 2,
               currentIndex: currentIndex,
               icon: Icons.group_work,
-              label: 'Agents',
+              label: l10n.navAgents,
               onTap: onTap,
             ),
           ),
@@ -61,8 +64,8 @@ class MainNavigationBar extends StatelessWidget {
             child: _NavItem(
               index: 3,
               currentIndex: currentIndex,
-              icon: Icons.construction_rounded,
-              label: 'Artisans',
+              icon: Icons.storefront_rounded,
+              label: l10n.navLeBonCoin,
               onTap: onTap,
             ),
           ),
@@ -71,7 +74,7 @@ class MainNavigationBar extends StatelessWidget {
               index: 4,
               currentIndex: currentIndex,
               icon: Icons.settings_outlined,
-              label: 'Paramètres',
+              label: l10n.navSettings,
               onTap: onTap,
             ),
           ),

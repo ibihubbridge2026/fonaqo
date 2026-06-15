@@ -1,6 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:provider/provider.dart';
+
+import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 
 /// Écran de profil d'un agent accessible par le client
@@ -16,6 +19,8 @@ class ClientAgentProfileScreen extends StatelessWidget {
   final bool isVerified;
   final bool isOnline;
 
+  final bool showSelectAgentButton;
+
   const ClientAgentProfileScreen({
     super.key,
     required this.agentId,
@@ -26,6 +31,7 @@ class ClientAgentProfileScreen extends StatelessWidget {
     this.rating,
     this.isVerified = false,
     this.isOnline = false,
+    this.showSelectAgentButton = true,
   });
 
   factory ClientAgentProfileScreen.fromRouteArguments(
@@ -45,6 +51,8 @@ class ClientAgentProfileScreen extends StatelessWidget {
         (expertiseTags.isNotEmpty ? expertiseTags.first : 'Agent Fonaqo');
     final rating = (agent['rating'] as num?)?.toDouble();
 
+    final showSelect = args?['showSelectAgentButton'] != false;
+
     return ClientAgentProfileScreen(
       agentId: agentId,
       name: displayName,
@@ -54,11 +62,15 @@ class ClientAgentProfileScreen extends StatelessWidget {
       rating: rating,
       isVerified: agent['is_verified'] == true,
       isOnline: agent['is_online'] == true,
+      showSelectAgentButton: showSelect,
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isAgentUser = context.watch<AuthProvider>().isAgent;
+    final showSelect = showSelectAgentButton && !isAgentUser;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: CustomAppBar.detailStack(
@@ -232,7 +244,8 @@ class ClientAgentProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 30),
-            // Bouton de sélection
+            if (showSelect) ...[
+            // Bouton de sélection (client uniquement)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: SizedBox(
@@ -269,6 +282,7 @@ class ClientAgentProfileScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
+            ],
             // Bouton contact
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
