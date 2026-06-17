@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 /// Contrat profil et présence agent.
 abstract class AgentProfileRepository {
   Future<bool> updateStatus({required bool isOnline});
@@ -26,4 +28,5 @@ abstract class AgentProfileRepository {
   Future<List<Map<String, dynamic>>> getBoostPlans();
 
   Future<Map<String, dynamic>?> getActiveBoost();
+  Future<bool> submitKycDocuments(FormData formData);
 }

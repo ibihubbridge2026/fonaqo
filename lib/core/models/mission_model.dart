@@ -89,6 +89,8 @@ class MissionModel {
   final String? targetAgentUsername;
   final List<String>? tags;
   final double? clientRating;
+  final String? endPhotoUrl;
+  final bool priceNegotiationAllowed;
 
   const MissionModel({
     required this.id,
@@ -125,6 +127,8 @@ class MissionModel {
     this.targetAgentUsername,
     this.tags,
     this.clientRating,
+    this.endPhotoUrl,
+    this.priceNegotiationAllowed = false,
   });
 
   /// Crée un MissionModel à partir d'un JSON (réponse API).
@@ -168,6 +172,8 @@ class MissionModel {
         targetAgentUsername: json['target_agent_username']?.toString(),
         tags: _readStringList(json['tags']),
         clientRating: _readDouble(json['client_rating']),
+        endPhotoUrl: json['end_photo_url']?.toString(),
+        priceNegotiationAllowed: _readBool(json['price_negotiation_allowed']),
       );
     } catch (e, st) {
       _missionLogger.e(

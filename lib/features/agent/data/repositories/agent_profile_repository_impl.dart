@@ -184,4 +184,19 @@ class AgentProfileRepositoryImpl implements AgentProfileRepository {
       return null;
     }
   }
+
+  @override
+  Future<bool> submitKycDocuments(FormData formData) async {
+    try {
+      final response = await _baseClient.post(
+        'accounts/kyc/submit/',
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e, st) {
+      _logger.e('submitKycDocuments', error: e, stackTrace: st);
+      return false;
+    }
+  }
 }

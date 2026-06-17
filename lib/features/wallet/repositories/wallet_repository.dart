@@ -92,7 +92,7 @@ class WalletRepository {
         },
       );
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         final data = response.data;
         if (data is Map<String, dynamic>) {
           final payload = data['data'];

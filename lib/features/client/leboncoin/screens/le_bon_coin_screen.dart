@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -41,9 +42,27 @@ class _LeBonCoinScreenState extends State<LeBonCoinScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final items = await _repo.fetchListings(
+
+    double? lat;
+    double? lng;
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+        ),
+      );
+      lat = position.latitude;
+      lng = position.longitude;
+    } catch (_) {
+      lat = leBonCoinDefaultLat;
+      lng = leBonCoinDefaultLng;
+    }
+
+    final items = await _repo.fetchListingsWithPlaces(
       filter: _filter,
       query: _searchController.text,
+      latitude: lat,
+      longitude: lng,
     );
     if (!mounted) return;
     setState(() {
@@ -83,6 +102,10 @@ class _LeBonCoinScreenState extends State<LeBonCoinScreen> {
         return BitmapDescriptor.hueAzure;
       case 'leisure':
         return BitmapDescriptor.hueGreen;
+      case 'gym':
+        return BitmapDescriptor.hueRose;
+      case 'museum':
+        return BitmapDescriptor.hueViolet;
       default:
         return BitmapDescriptor.hueRed;
     }

@@ -9,6 +9,7 @@ import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/features/agent/providers/agent_provider.dart';
+import 'package:fonaco/features/agent/screens/agent_active_mission_screen.dart';
 import 'package:go_router/go_router.dart';
 
 class AgentMissionDetailScreen extends StatefulWidget {
@@ -111,6 +112,10 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
     }
 
     final mission = _mission!;
+    if (_isActive || mission.status == MissionStatus.IN_PROGRESS_REVIEW) {
+      return AgentActiveMissionScreen(mission: mission);
+    }
+
     final boostRemaining = _boostRemaining;
 
     return Scaffold(
@@ -210,8 +215,7 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
                       isDeclining: _isDeclining,
                       onAccept: _acceptMission,
                       onDecline: _declineMission,
-                      onContinue: () => context.push(AppRoutes.agentMissionTracking, extra: {'mission': mission},
-                      ),
+                      onContinue: () {},
                     ),
                   ],
                 ),
@@ -243,10 +247,7 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
           ),
         );
         final mission = result.mission ?? _mission!;
-        context.replace(
-          AppRoutes.agentMissionTracking,
-          extra: {'mission': mission},
-        );
+        setState(() => _mission = mission);
       } else if (result.conflict) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

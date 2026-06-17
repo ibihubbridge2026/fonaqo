@@ -99,99 +99,88 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final status = _mission.status;
+    final showAction = _mission.status != MissionStatus.IN_PROGRESS_REVIEW &&
+        _mission.status != MissionStatus.COMPLETED &&
+        _primaryActionLabel != null &&
+        !_isDisputed;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       body: SafeArea(
         child: Column(
           children: [
-            // HEADER
+            // Bandeau de statut coloré
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 18,
-              ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(
-                  bottom: BorderSide(
-                    color: Color(0xFFEAEAEA),
-                  ),
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              decoration: BoxDecoration(
+                color: status.badgeBackgroundColor,
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(20),
                 ),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      height: 42,
-                      width: 42,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.arrow_back_ios_new_rounded),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  const Expanded(
-                    child: Text(
-                      "Mission active",
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Text(
-                      "En cours",
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  // Bouton d'urgence litige
-                  PopupMenuButton<String>(
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Icon(
-                        Icons.warning_amber,
-                        color: Colors.orange,
-                        size: 20,
-                      ),
-                    ),
-                    onSelected: (value) {
-                      if (value == 'dispute') {
-                        _showDisputeBottomSheet();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'dispute',
-                        child: Row(
-                          children: [
-                            Icon(Icons.warning_amber, color: Colors.orange),
-                            SizedBox(width: 8),
-                            Text('Signaler un problème'),
-                          ],
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          height: 40,
+                          width: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.arrow_back_ios_new_rounded,
+                              size: 18),
                         ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _mission.formattedStatus,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: status.badgeColor,
+                          ),
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        icon: Icon(Icons.more_vert, color: status.badgeColor),
+                        onSelected: (value) {
+                          if (value == 'dispute') _showDisputeBottomSheet();
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: 'dispute',
+                            child: Row(
+                              children: [
+                                Icon(Icons.warning_amber, color: Colors.orange),
+                                SizedBox(width: 8),
+                                Text('Signaler un problème'),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
+                  if (_mission.description.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _mission.description,
+                      style: const TextStyle(
+                        color: Color(0xFF000000),
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -418,6 +407,7 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 16,
+                                        color: Color(0xFF000000),
                                       ),
                                     ),
                                     const SizedBox(height: 28),
@@ -430,10 +420,13 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      widget.mission.address ?? 'Non spécifié',
+                                      widget.mission.destinationAddress ??
+                                          widget.mission.address ??
+                                          'Non spécifié',
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 16,
+                                        color: Color(0xFF000000),
                                       ),
                                     ),
                                   ],
@@ -481,52 +474,103 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
 
                     MissionStepTimeline(currentStatus: _mission.status),
 
-                    const SizedBox(height: 30),
-
-                    if (_primaryActionLabel != null && !_isDisputed)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: _isProcessing ? null : _handlePrimaryAction,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFFFD400),
-                            foregroundColor: Colors.black,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                          ),
-                          child: _isProcessing
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.black,
-                                  ),
-                                )
-                              : Text(
-                                  _primaryActionLabel!,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                        ),
-                      )
-                    else if (_isDisputed)
-                      const Text(
-                        'Mission suspendue (litige ouvert)',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.red),
-                      ),
-
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
+
+            // Barre d'actions en bas
+            if (_mission.status == MissionStatus.IN_PROGRESS_REVIEW)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                ),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: const Text(
+                    'En attente de validation client',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: Color(0xFF000000),
+                    ),
+                  ),
+                ),
+              )
+            else if (showAction)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 12,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                ),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: _isProcessing ? null : _handlePrimaryAction,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFD400),
+                      foregroundColor: Colors.black,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    child: _isProcessing
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black,
+                            ),
+                          )
+                        : Text(
+                            _primaryActionLabel!,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 16,
+                            ),
+                          ),
+                  ),
+                ),
+              )
+            else if (_isDisputed)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                color: Colors.white,
+                child: const Text(
+                  'Mission suspendue (litige ouvert)',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+                ),
+              ),
           ],
         ),
       ),

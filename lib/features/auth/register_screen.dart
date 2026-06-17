@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/auth_provider.dart';
+import '../../core/services/referral_storage_service.dart';
 import '../../core/utils/auth_navigation.dart';
 import '../../core/models/country_model.dart';
 import '../../core/services/location_service.dart';
@@ -21,6 +22,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _promoCodeController = TextEditingController();
 
   bool _isLoading = false;
   bool _isObscure = true;
@@ -28,11 +30,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Country _selectedCountry = Country.defaultCountry;
 
   @override
+  void initState() {
+    super.initState();
+    _loadReferralCode();
+  }
+
+  Future<void> _loadReferralCode() async {
+    final code = await ReferralStorageService.instance.read();
+    if (code != null && mounted) {
+      _promoCodeController.text = code;
+    }
+  }
+
+  @override
   void dispose() {
     _usernameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _promoCodeController.dispose();
     super.dispose();
   }
 
@@ -51,10 +67,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       return;
     }
-    if (_usernameController.text.trim().isEmpty) {
+    if (_selectedRole == 'agent' && _usernameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Le nom d\'utilisateur est obligatoire'),
+          content: Text('Le nom d\'utilisateur est obligatoire pour les agents'),
+        ),
+      );
+      return;
+    }
+    if (_selectedRole == 'agent' && _emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('L\'adresse email est obligatoire pour les agents'),
         ),
       );
       return;
@@ -76,18 +100,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
       try {
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
+        final referralCode = await ReferralStorageService.instance.read();
+
         final registerData = {
           'phone_number':
               '${_selectedCountry.dialCode}${_phoneController.text.trim()}',
-          'username': _usernameController.text.trim(),
+          if (_selectedRole == 'agent')
+            'username': _usernameController.text.trim(),
           'password': _passwordController.text.trim(),
           'role': _selectedRole,
-          'email': _emailController.text.trim(),
+          if (_selectedRole == 'agent' || _emailController.text.trim().isNotEmpty)
+            'email': _emailController.text.trim(),
+          if (_selectedRole == 'client' &&
+              _promoCodeController.text.trim().isNotEmpty)
+            'promo_code': _promoCodeController.text.trim(),
+          if (referralCode != null && referralCode.isNotEmpty)
+            'referral_code_cache': referralCode,
         };
 
         final success = await authProvider.register(registerData);
 
         if (success && mounted) {
+          await ReferralStorageService.instance.clear();
           await _requestLocationAfterRegistration();
           await navigateAfterAuth(context, authProvider);
         } else if (mounted && authProvider.errorMessage != null) {
@@ -224,21 +258,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     const SizedBox(height: 25),
 
-                    const Text(
-                      'Nom d\'utilisateur',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.black,
+                    if (_selectedRole == 'agent') ...[
+                      const Text(
+                        'Nom d\'utilisateur',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    _buildField(
-                      controller: _usernameController,
-                      hint: 'Nom d\'utilisateur',
-                      icon: Icons.alternate_email,
-                    ),
-                    const SizedBox(height: 15),
+                      const SizedBox(height: 8),
+                      _buildField(
+                        controller: _usernameController,
+                        hint: 'Nom d\'utilisateur',
+                        icon: Icons.alternate_email,
+                      ),
+                      const SizedBox(height: 15),
+                    ],
 
                     PhoneInputCard(
                       country: _selectedCountry,
@@ -271,11 +307,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                     _buildField(
                       controller: _emailController,
-                      hint: "Email (Optionnel)",
+                      hint: _selectedRole == 'agent'
+                          ? 'Email (obligatoire)'
+                          : 'Email (optionnel)',
                       icon: Icons.alternate_email,
                       type: TextInputType.emailAddress,
+                      requireEmail: _selectedRole == 'agent',
                     ),
                     const SizedBox(height: 15),
+
+                    if (_selectedRole == 'client') ...[
+                      const Text(
+                        'Code Promo / Code Team',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildField(
+                        controller: _promoCodeController,
+                        hint: 'Optionnel',
+                        icon: Icons.card_giftcard_outlined,
+                      ),
+                      const SizedBox(height: 15),
+                    ],
 
                     const Text(
                       'Mot de passe',
@@ -536,6 +593,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String hint,
     required IconData icon,
     bool isPass = false,
+    bool requireEmail = false,
     TextInputType type = TextInputType.text,
   }) {
     return TextFormField(
@@ -551,9 +609,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             }
           : type == TextInputType.emailAddress
               ? (v) {
-                  if (v != null &&
-                      v.trim().isNotEmpty &&
-                      !v.contains('@')) {
+                  final value = v?.trim() ?? '';
+                  if (requireEmail && value.isEmpty) {
+                    return 'Email obligatoire pour les agents';
+                  }
+                  if (value.isNotEmpty && !value.contains('@')) {
                     return 'Email invalide';
                   }
                   return null;

@@ -366,8 +366,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
                             children: [_buildSafetyRules()],
                           ),
                           const SizedBox(height: 24),
-                          // Bouton de validation
-                          if (_mission!.status == MissionStatus.COMPLETED)
+                          // Validation client après preuve agent
+                          if (_mission!.status == MissionStatus.IN_PROGRESS_REVIEW)
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(
@@ -377,8 +377,9 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFF7C600),
                                   foregroundColor: const Color(0xFF121212),
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 16),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
@@ -391,11 +392,12 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
                                           strokeWidth: 2,
                                           valueColor:
                                               AlwaysStoppedAnimation<Color>(
-                                                  Color(0xFF121212)),
+                                            Color(0xFF121212),
+                                          ),
                                         ),
                                       )
                                     : const Text(
-                                        'VALIDER ET LIBÉRER LES FONDS',
+                                        'Finaliser et Valider la mission',
                                         style: TextStyle(
                                           fontWeight: FontWeight.w900,
                                           fontSize: 14,
@@ -403,7 +405,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
                                       ),
                               ),
                             ),
-                          const SizedBox(height: 16),
+                          if (_mission!.status == MissionStatus.IN_PROGRESS_REVIEW)
+                            const SizedBox(height: 16),
                           if (_mission!.status == MissionStatus.COMPLETED)
                             MissionInvoiceCard(
                               mission: _mission!,
@@ -780,12 +783,15 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
       missionProvider.upsertMission(updated);
       await MissionAudioCleanup.purgeTemporaryRecordings();
       if (!mounted) return;
-      context.push(
-        AppRoutes.rating,
-        extra: {'missionId': _resolvedMissionId},
-      );
       messenger.showSnackBar(const SnackBar(
-          content: Text('Fonds libérés !'), backgroundColor: Colors.green));
+          content: Text('Mission validée — fonds libérés'),
+          backgroundColor: Colors.green));
+      if (updated.status == MissionStatus.COMPLETED) {
+        context.push(
+          AppRoutes.rating,
+          extra: {'missionId': _resolvedMissionId},
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _isReleasingFunds = false);
@@ -1094,30 +1100,48 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
   }
 
   Widget _buildDocumentsSection() {
+    final proofUrl = _mission?.endPhotoUrl;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
         children: [
-          Container(
-            height: 120,
-            decoration: BoxDecoration(
-              color: Colors.grey[100],
+          if (proofUrl != null && proofUrl.isNotEmpty)
+            ClipRRect(
               borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.description, color: Colors.grey, size: 40),
-                  SizedBox(height: 8),
-                  Text(
-                    'Aucun document pour le moment',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
+              child: CachedNetworkImage(
+                imageUrl: proofUrl,
+                height: 200,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(
+                  height: 200,
+                  color: Colors.grey.shade200,
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+                errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
+              ),
+            )
+          else
+            Container(
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.description, color: Colors.grey, size: 40),
+                    SizedBox(height: 8),
+                    Text(
+                      'Aucune preuve pour le moment',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );

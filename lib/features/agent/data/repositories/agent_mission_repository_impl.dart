@@ -377,7 +377,7 @@ class AgentMissionRepositoryImpl implements AgentMissionRepository {
         queryParameters: {'month': monthKey},
         options: Options(
           responseType: ResponseType.bytes,
-          headers: {'Accept': '*/*'},
+          headers: {'Accept': 'application/pdf'},
         ),
       );
 

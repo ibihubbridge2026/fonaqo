@@ -73,6 +73,29 @@ class KycLockScreen extends StatelessWidget {
               const SizedBox(height: 28),
               _ProgressSteps(isRejected: isRejected),
               const Spacer(),
+              if (isRejected || kycStatus == 'PENDING') ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.push(AppRoutes.agentKycSubmit),
+                    icon: const Icon(Icons.upload_file),
+                    label: Text(
+                      isRejected
+                          ? 'Soumettre à nouveau mes documents'
+                          : 'Soumettre mes documents',
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFD400),
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               SizedBox(
                 width: double.infinity,
                 height: 52,

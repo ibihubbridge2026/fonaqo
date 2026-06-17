@@ -6,6 +6,7 @@ abstract final class AppRoutes {
   static const onboarding = '/onboarding';
   static const login = '/login';
   static const register = '/register';
+  static const referralJoin = '/join/:code';
   static const forgotPassword = '/forgot-password';
   static const completeProfile = '/complete-profile';
 
@@ -87,5 +88,6 @@ abstract final class AppRoutes {
   static const String agentDashboard = '/agent/dashboard';
   static const String agentMissionTracking = '/agent/mission-tracking';
   static const String agentKycLock = '/agent/kyc-lock';
+  static const String agentKycSubmit = '/agent/kyc-submit';
   static const String agentBoost = '/agent/boost';
 }

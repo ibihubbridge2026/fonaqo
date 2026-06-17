@@ -1,36 +1,18 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
-import 'package:fonaco/core/providers/auth_provider.dart';
+import 'package:fonaco/core/api/base_client.dart';
+import 'package:fonaco/core/widgets/agent_progress_badge.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 
-/// Écran de profil d'un agent accessible par le client
-class ClientAgentProfileScreen extends StatelessWidget {
-  static const String _fallbackAvatarAsset = 'assets/images/avatar/user.png';
-
+/// Écran de profil d'un agent accessible par le client (données API).
+class ClientAgentProfileScreen extends StatefulWidget {
   final String agentId;
-  final String name;
-  final String role;
-  final String? avatarUrl;
-  final List<String> expertiseTags;
-  final double? rating;
-  final bool isVerified;
-  final bool isOnline;
-
   final bool showSelectAgentButton;
 
   const ClientAgentProfileScreen({
     super.key,
     required this.agentId,
-    required this.name,
-    required this.role,
-    this.avatarUrl,
-    this.expertiseTags = const [],
-    this.rating,
-    this.isVerified = false,
-    this.isOnline = false,
     this.showSelectAgentButton = true,
   });
 
@@ -40,350 +22,266 @@ class ClientAgentProfileScreen extends StatelessWidget {
     final agent = args?['agent'] as Map<String, dynamic>? ?? {};
     final agentId =
         args?['agentId']?.toString() ?? agent['id']?.toString() ?? '';
-    final name =
-        '${agent['first_name'] ?? ''} ${agent['last_name'] ?? ''}'.trim();
-    final displayName = name.isEmpty ? 'Agent' : name;
-    final expertiseTags = (agent['expertise_tags'] as List<dynamic>?)
-            ?.map((tag) => tag.toString())
-            .toList() ??
-        const <String>[];
-    final role = agent['specialty']?.toString() ??
-        (expertiseTags.isNotEmpty ? expertiseTags.first : 'Agent Fonaqo');
-    final rating = (agent['rating'] as num?)?.toDouble();
-
-    final showSelect = args?['showSelectAgentButton'] != false;
-
     return ClientAgentProfileScreen(
       agentId: agentId,
-      name: displayName,
-      role: role,
-      avatarUrl: agent['avatar_url']?.toString(),
-      expertiseTags: expertiseTags,
-      rating: rating,
-      isVerified: agent['is_verified'] == true,
-      isOnline: agent['is_online'] == true,
-      showSelectAgentButton: showSelect,
+      showSelectAgentButton: args?['showSelectAgentButton'] != false,
     );
   }
 
   @override
+  State<ClientAgentProfileScreen> createState() =>
+      _ClientAgentProfileScreenState();
+}
+
+class _ClientAgentProfileScreenState extends State<ClientAgentProfileScreen> {
+  static const _fallbackAvatar = 'assets/images/avatar/user.png';
+  final _client = BaseClient();
+
+  Map<String, dynamic>? _data;
+  bool _loading = true;
+  int _reviewsVisible = 5;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (widget.agentId.isEmpty) {
+      setState(() => _loading = false);
+      return;
+    }
+    try {
+      final res = await _client.get('public/artisans/${widget.agentId}/');
+      final body = res.data;
+      if (body is Map && body['data'] is Map) {
+        _data = Map<String, dynamic>.from(body['data'] as Map);
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isAgentUser = context.watch<AuthProvider>().isAgent;
-    final showSelect = showSelectAgentButton && !isAgentUser;
+    if (_loading) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFFFFD400)),
+        ),
+      );
+    }
+
+    final d = _data ?? {};
+    final name =
+        '${d['first_name'] ?? ''} ${d['last_name'] ?? ''}'.trim().isEmpty
+            ? 'Agent'
+            : '${d['first_name'] ?? ''} ${d['last_name'] ?? ''}'.trim();
+    final role = d['specialty']?.toString() ??
+        d['service_domain']?.toString() ??
+        'Agent FONACO';
+    final bio = d['bio']?.toString() ?? d['biography']?.toString() ?? '';
+    final rating = (d['rating'] as num?)?.toDouble() ?? 0;
+    final completed = d['completed_missions']?.toString() ?? '0';
+    final avatar = d['avatar_url']?.toString();
+    final isBoosted = d['is_boosted'] == true;
+    final reviews = (d['reviews'] as List<dynamic>?) ?? [];
+    final showSelect = widget.showSelectAgentButton;
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: CustomAppBar.detailStack(
         title: 'Profil Agent',
         detailTrailingActions: [
-          IconButton(
-            icon: Icon(
-              isOnline ? Icons.circle : Icons.circle_outlined,
-              color: isOnline ? Colors.green : Colors.grey,
-              size: 12,
-            ),
-            onPressed: null,
-          ),
+          if (d['certified'] == true)
+            const Icon(Icons.verified, color: Colors.blue, size: 22),
         ],
       ),
       body: SingleChildScrollView(
         child: Column(
           children: [
             const SizedBox(height: 20),
-            // Avatar et informations principales
-            Center(
-              child: Column(
-                children: [
-                  Stack(
-                    alignment: Alignment.bottomRight,
-                    children: [
-                      CircleAvatar(
-                        radius: 60,
-                        backgroundColor: Colors.grey[200],
-                        child: ClipOval(
-                          child: _buildAvatarImage(),
-                        ),
-                      ),
-                      if (isVerified)
-                        Container(
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                          ),
-                          padding: const EdgeInsets.all(2),
-                          child: const Icon(
-                            Icons.verified,
-                            color: Colors.blue,
-                            size: 24,
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    role,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (rating != null)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.star,
-                          color: Color(0xFFFFD400),
-                          size: 20,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          rating!.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                          ),
-                        ),
-                      ],
-                    ),
-                ],
+            CircleAvatar(
+              radius: 60,
+              backgroundColor: Colors.grey.shade200,
+              backgroundImage: avatar != null && avatar.isNotEmpty
+                  ? CachedNetworkImageProvider(avatar)
+                  : const AssetImage(_fallbackAvatar) as ImageProvider,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              name,
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF000000),
               ),
             ),
-            const SizedBox(height: 30),
-            // Tags d'expertise
-            if (expertiseTags.isNotEmpty) ...[
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20),
-                child: Align(
-                  alignment: Alignment.centerLeft,
+            Text(role, style: TextStyle(color: Colors.grey.shade600)),
+            const SizedBox(height: 8),
+            AgentProgressBadge(
+              badge: d['badge'] is Map
+                  ? Map<String, dynamic>.from(d['badge'] as Map)
+                  : null,
+            ),
+            if (isBoosted)
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFD400),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Boosté',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF000000),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.star, color: Color(0xFFFFD400)),
+                const SizedBox(width: 4),
+                Text(
+                  rating.toStringAsFixed(1),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 18,
+                    color: Color(0xFF000000),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  '$completed missions',
+                  style: const TextStyle(color: Color(0xFF000000)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            if (showSelect)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFD400),
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Text(
+                      'Sélectionner cet agent',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 24),
+            if (bio.isNotEmpty) ...[
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
                   child: Text(
-                    'Expertise',
+                    'À propos',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      color: Color(0xFF000000),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: expertiseTags.map((tag) {
-                    return Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFD400).withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: const Color(0xFFFFD400),
-                          width: 1,
-                        ),
-                      ),
-                      child: Text(
-                        '#$tag',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF715D00),
-                        ),
-                      ),
-                    );
-                  }).toList(),
+                child: Text(
+                  bio,
+                  style: const TextStyle(
+                    height: 1.5,
+                    color: Color(0xFF000000),
+                  ),
                 ),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 24),
             ],
-            // Statistiques
-            _buildStatRow('Missions complétées', '125'),
-            _buildStatRow('Taux de réponse', '98%'),
-            _buildStatRow('Temps de réponse moyen', '5 min'),
-            const SizedBox(height: 30),
-            // Section À propos
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Align(
-                alignment: Alignment.centerLeft,
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
                 child: Text(
-                  'À propos',
+                  'Avis et Commentaires',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: Color(0xFF000000),
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text(
-                'Agent professionnel et vérifié, spécialisé dans les services de proximité. Je m\'engage à fournir un service de qualité avec ponctualité et professionnalisme.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.black87,
-                  height: 1.5,
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-            if (showSelect) ...[
-            // Bouton de sélection (client uniquement)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Agent sélectionné pour votre mission'),
-                        backgroundColor: Colors.green,
-                        duration: Duration(seconds: 2),
+            if (reviews.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: Text('Aucun avis pour le moment'),
+              )
+            else
+              ...reviews.take(_reviewsVisible).map((r) {
+                final review = r as Map<String, dynamic>;
+                final comment = review['comment']?.toString() ?? '';
+                final short = comment.length > 120
+                    ? '${comment.substring(0, 120)}…'
+                    : comment;
+                return Container(
+                  margin:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9F9F9),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            review['client_name']?.toString() ?? 'Client',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF000000),
+                            ),
+                          ),
+                          const Spacer(),
+                          Text('★ ${review['rating']}'),
+                        ],
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.check_circle, size: 22),
-                  label: const Text(
-                    'Sélectionner cet agent',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                      if (short.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text(short, style: const TextStyle(height: 1.4)),
+                      ],
+                    ],
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFD400),
-                    foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
+                );
+              }),
+            if (reviews.length > _reviewsVisible)
+              TextButton(
+                onPressed: () => setState(() => _reviewsVisible += 5),
+                child: const Text('Charger plus'),
               ),
-            ),
-            const SizedBox(height: 20),
-            ],
-            // Bouton contact
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    // Navigation vers le chat
-                  },
-                  icon: const FaIcon(
-                    FontAwesomeIcons.commentDots,
-                    size: 20,
-                  ),
-                  label: const Text(
-                    'Contacter',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.black,
-                    side: BorderSide(color: Colors.grey[300]!),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 32),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildStatRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey[600],
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAvatarImage() {
-    final url = avatarUrl?.trim();
-    if (url != null && url.isNotEmpty) {
-      return CachedNetworkImage(
-        imageUrl: url,
-        width: 120,
-        height: 120,
-        fit: BoxFit.cover,
-        placeholder: (_, __) => Image.asset(
-          _fallbackAvatarAsset,
-          width: 120,
-          height: 120,
-          fit: BoxFit.cover,
-        ),
-        errorWidget: (_, __, ___) => Image.asset(
-          _fallbackAvatarAsset,
-          width: 120,
-          height: 120,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Icon(
-            Icons.person,
-            color: Colors.black54,
-            size: 60,
-          ),
-        ),
-      );
-    }
-
-    return Image.asset(
-      _fallbackAvatarAsset,
-      width: 120,
-      height: 120,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => const Icon(
-        Icons.person,
-        color: Colors.black54,
-        size: 60,
       ),
     );
   }

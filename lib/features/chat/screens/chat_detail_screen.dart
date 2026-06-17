@@ -379,6 +379,45 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   _pickFile();
                 },
               ),
+              if (!context.read<AuthProvider>().isAgent &&
+                  widget.missionId != null)
+                ListTile(
+                  leading: const Icon(Icons.price_change_outlined,
+                      color: Colors.black87),
+                  title: const Text(
+                    'Autoriser une proposition de tarif',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final missionId = widget.missionId!;
+                    try {
+                      final updated =
+                          await _missionRepository.setPriceNegotiationAllowed(
+                        missionId: missionId,
+                        allowed: true,
+                      );
+                      if (mounted) setState(() => _mission = updated);
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'L\'agent peut maintenant proposer un tarif',
+                          ),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    } catch (e) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Erreur : $e')),
+                      );
+                    }
+                  },
+                ),
             ],
           ),
         ),
@@ -493,7 +532,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                                 },
                               ),
                             ),
-                            if (isAgent)
+                            if (isAgent &&
+                                (_mission?.priceNegotiationAllowed ?? false))
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(
                                   12, 0, 12, 6,

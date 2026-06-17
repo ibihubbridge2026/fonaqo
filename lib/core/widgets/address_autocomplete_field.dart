@@ -98,8 +98,39 @@ class _AddressAutocompleteFieldState extends State<AddressAutocompleteField> {
   }
 
   void _selectSuggestion(AddressSuggestion s) {
-    widget.controller.text = s.label;
-    widget.onLocationSelected?.call(s.label, s.latitude, s.longitude);
+    unawaited(_applySuggestion(s));
+  }
+
+  Future<void> _applySuggestion(AddressSuggestion s) async {
+    AddressSuggestion resolved = s;
+    if (s.needsPlaceDetails && s.placeId != null) {
+      setState(() => _loadingSearch = true);
+      final details = await _search.getDetailsPlace(s.placeId!);
+      if (!mounted) return;
+      setState(() => _loadingSearch = false);
+      if (details != null) {
+        resolved = details;
+      }
+    }
+
+    final lat = resolved.latitude;
+    final lng = resolved.longitude;
+    if (lat == null || lng == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Impossible de récupérer les coordonnées de ce lieu.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    widget.controller.text = resolved.label;
+    widget.controller.selection = TextSelection.collapsed(
+      offset: resolved.label.length,
+    );
+    widget.onLocationSelected?.call(resolved.label, lat, lng);
     setState(() => _suggestions = []);
     _removeOverlay();
     FocusScope.of(context).unfocus();

@@ -322,7 +322,8 @@ class _MissionsScreenState extends State<MissionsScreen> {
                 m.status == MissionStatus.ACCEPTED ||
                 m.status == MissionStatus.ON_THE_WAY ||
                 m.status == MissionStatus.ARRIVED ||
-                m.status == MissionStatus.IN_PROGRESS)
+                m.status == MissionStatus.IN_PROGRESS ||
+                m.status == MissionStatus.IN_PROGRESS_REVIEW)
             .toList();
       case 'completed':
         return visible
@@ -339,8 +340,18 @@ class _MissionsScreenState extends State<MissionsScreen> {
     }
   }
 
+  List<MissionModel> _prioritizeReviewMissions(List<MissionModel> missions) {
+    final review = missions
+        .where((m) => m.status == MissionStatus.IN_PROGRESS_REVIEW)
+        .toList();
+    final others = missions
+        .where((m) => m.status != MissionStatus.IN_PROGRESS_REVIEW)
+        .toList();
+    return [...review, ...others];
+  }
+
   List<MissionModel> get _displayMissions {
-    final base = _filteredMissions;
+    final base = _prioritizeReviewMissions(_filteredMissions);
     final q = _searchQuery.trim().toLowerCase();
     if (q.isEmpty) return base;
     return base.where((m) {
@@ -694,6 +705,8 @@ class MissionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasArchiveAction = showArchiveAction && onArchive != null;
     final hasUnarchiveAction = showUnarchiveAction && onUnarchive != null;
+    final needsUrgentValidation =
+        missionStatus == MissionStatus.IN_PROGRESS_REVIEW;
 
     Widget cardBody = Container(
       margin: const EdgeInsets.only(bottom: 15),
@@ -701,16 +714,52 @@ class MissionCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: needsUrgentValidation
+            ? Border.all(color: const Color(0xFFE65100), width: 1.5)
+            : null,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 8,
+            color: needsUrgentValidation
+                ? const Color(0xFFE65100).withValues(alpha: 0.12)
+                : Colors.black.withValues(alpha: 0.04),
+            blurRadius: needsUrgentValidation ? 12 : 8,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (needsUrgentValidation) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded,
+                      color: Color(0xFFE65100), size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Action requise : validation urgente',
+                      style: TextStyle(
+                        color: Color(0xFFE65100),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+          Row(
+            children: [
           const Icon(
             Icons.assignment_outlined,
             color: Colors.black54,
@@ -765,6 +814,8 @@ class MissionCard extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+            ],
           ),
         ],
       ),

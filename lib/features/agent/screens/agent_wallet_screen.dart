@@ -347,17 +347,18 @@ class _RechargeBottomSheetState extends State<_RechargeBottomSheet> {
     try {
       String? reference;
       if (method == 'feexpay') {
-        final paid = await FeexPayService.instance.requestPayment(
+        final result = await FeexPayService.instance.requestPayment(
           context: context,
           amount: amount,
           description: 'Recharge portefeuille agent',
+          purpose: 'wallet_deposit',
         );
-        if (!paid || !mounted) return;
-        reference = 'FEEX-${DateTime.now().millisecondsSinceEpoch}';
+        if (result == null || !mounted) return;
+        reference = result.externalReference;
       }
 
       final ok = await context.read<AgentProvider>().depositWallet(
-            amount: amount,
+            amount: amount.roundToDouble(),
             paymentMethod: method,
             paymentReference: reference,
           );

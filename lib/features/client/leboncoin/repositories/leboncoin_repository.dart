@@ -4,13 +4,18 @@ import 'package:fonaco/core/api/base_client.dart';
 import 'package:fonaco/core/constants/app_constants.dart';
 import 'package:fonaco/core/seeds/dev_seed_leboncoin.dart';
 import 'package:fonaco/features/client/leboncoin/models/local_listing_model.dart';
+import 'package:fonaco/features/client/leboncoin/services/google_places_service.dart';
 
 class LeBonCoinRepository {
   final BaseClient _baseClient;
+  final GooglePlacesService _placesService;
   final Logger _logger = Logger();
 
-  LeBonCoinRepository({BaseClient? baseClient})
-      : _baseClient = baseClient ?? BaseClient();
+  LeBonCoinRepository({
+    BaseClient? baseClient,
+    GooglePlacesService? placesService,
+  })  : _baseClient = baseClient ?? BaseClient(),
+        _placesService = placesService ?? GooglePlacesService();
 
   Future<List<LocalListingModel>> fetchListings({
     LeBonCoinFilter filter = LeBonCoinFilter.all,
@@ -66,6 +71,40 @@ class LeBonCoinRepository {
       }).toList();
     }
     return items;
+  }
+
+  Future<List<LocalListingModel>> fetchListingsWithPlaces({
+    LeBonCoinFilter filter = LeBonCoinFilter.all,
+    String? query,
+    double? latitude,
+    double? longitude,
+    int radiusMeters = 15000,
+  }) async {
+    final local = await fetchListings(
+      filter: filter,
+      query: query,
+      latitude: latitude,
+      longitude: longitude,
+      radiusMeters: radiusMeters,
+    );
+
+    if (latitude == null || longitude == null) return local;
+
+    final places = await _placesService.searchNearby(
+      latitude: latitude,
+      longitude: longitude,
+      filter: filter,
+      radiusMeters: radiusMeters,
+    );
+
+    final merged = [...local, ...places];
+    final seen = <String>{};
+    return merged.where((item) {
+      final key = '${item.name}_${item.latitude}_${item.longitude}';
+      if (seen.contains(key)) return false;
+      seen.add(key);
+      return true;
+    }).toList();
   }
 
   List<LocalListingModel> _parseList(dynamic raw) {

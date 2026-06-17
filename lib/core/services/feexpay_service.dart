@@ -1,18 +1,74 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../api/base_client.dart';
 import '../widgets/fon_dialog.dart';
 
-/// Placeholder FeexPay — intégration réelle à venir.
-/// Pour l'instant, simule un paiement réussi après confirmation utilisateur.
+/// Intégration FeexPay — init API backend + confirmation sandbox.
 class FeexPayService {
   FeexPayService._();
   static final FeexPayService instance = FeexPayService._();
 
-  /// Affiche un dialogue FeexPay et retourne `true` si l'utilisateur confirme.
-  Future<bool> requestPayment({
+  final BaseClient _client = BaseClient();
+
+  /// Initialise un paiement FeexPay et retourne la référence externe si succès.
+  Future<FeexPayPaymentResult?> initPayment({
+    required double amount,
+    required String purpose,
+    Map<String, dynamic>? metadata,
+    String paymentMethod = 'MTN',
+  }) async {
+    final amountInt = amount.round();
+    if (amountInt <= 0) return null;
+
+    try {
+      final response = await _client.post(
+        'payments/feexpay/init/',
+        data: {
+          'amount': amountInt,
+          'purpose': purpose,
+          'payment_method': paymentMethod,
+          if (metadata != null) 'metadata': metadata,
+        },
+      );
+      final body = response.data;
+      if (body is! Map) return null;
+      return FeexPayPaymentResult(
+        paymentId: body['payment_id']?.toString() ?? '',
+        externalReference: body['external_reference']?.toString() ?? '',
+        amount: amountInt,
+      );
+    } on DioException {
+      return null;
+    }
+  }
+
+  /// Confirme le paiement (sandbox) et crédite le wallet côté serveur.
+  Future<bool> confirmPayment({
+    required String paymentId,
+    required String externalReference,
+  }) async {
+    try {
+      final response = await _client.post(
+        'payments/feexpay/confirm/',
+        data: {
+          'payment_id': paymentId,
+          'external_reference': externalReference,
+        },
+      );
+      return response.statusCode == 200;
+    } on DioException {
+      return false;
+    }
+  }
+
+  /// Affiche le dialogue FeexPay, initie et confirme le paiement.
+  Future<FeexPayPaymentResult?> requestPayment({
     required BuildContext context,
     required double amount,
     required String description,
+    String purpose = 'wallet_deposit',
+    Map<String, dynamic>? metadata,
   }) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -33,7 +89,7 @@ class FeexPayService {
                 border: Border.all(color: const Color(0xFFE8E8E8)),
               ),
               child: Text(
-                '${amount.toStringAsFixed(0)} FCFA',
+                '${amount.round()} FCFA',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 24,
@@ -44,8 +100,7 @@ class FeexPayService {
             ),
             const SizedBox(height: 12),
             Text(
-              'FeexPay sera intégré prochainement. Le paiement est accepté '
-              'automatiquement pour le moment.',
+              'Mobile Money Bénin — MTN, Moov, Wave, Celtiis',
               style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
           ],
@@ -65,6 +120,31 @@ class FeexPayService {
       ),
     );
 
-    return confirmed == true;
+    if (confirmed != true) return null;
+
+    final init = await initPayment(
+      amount: amount,
+      purpose: purpose,
+      metadata: metadata,
+    );
+    if (init == null) return null;
+
+    final ok = await confirmPayment(
+      paymentId: init.paymentId,
+      externalReference: init.externalReference,
+    );
+    return ok ? init : null;
   }
+}
+
+class FeexPayPaymentResult {
+  final String paymentId;
+  final String externalReference;
+  final int amount;
+
+  const FeexPayPaymentResult({
+    required this.paymentId,
+    required this.externalReference,
+    required this.amount,
+  });
 }

@@ -864,6 +864,7 @@ class AgentListTile extends StatelessWidget {
     final reliability = (agent['reliability_score'] ?? 100).toDouble();
 
     final isVerified = agent['is_verified'] ?? false;
+    final isBoosted = agent['is_boosted'] == true;
 
     final avatarUrl = agent['avatar_url'];
 
@@ -874,14 +875,16 @@ class AgentListTile extends StatelessWidget {
         [];
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -891,21 +894,41 @@ class AgentListTile extends StatelessWidget {
             alignment: Alignment.bottomRight,
             children: [
               CircleAvatar(
-                radius: 30,
-                backgroundColor: Colors.blue[100],
+                radius: 28,
+                backgroundColor: Colors.grey.shade200,
                 backgroundImage: avatarUrl != null
                     ? CachedNetworkImageProvider(avatarUrl) as ImageProvider
                     : null,
                 child: avatarUrl == null
                     ? Text(
                         name.isNotEmpty ? name[0].toUpperCase() : 'A',
-                        style: TextStyle(
-                          color: Colors.blue[700],
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       )
                     : null,
               ),
+              if (isBoosted)
+                Positioned(
+                  top: -2,
+                  left: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFD400),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Boosté',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF000000),
+                      ),
+                    ),
+                  ),
+                ),
               if (isVerified)
                 const CircleAvatar(
                   radius: 10,
@@ -963,7 +986,8 @@ class AgentListTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.grey,
+                    color: Color(0xFF000000),
+                    fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
                 ),

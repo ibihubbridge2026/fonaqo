@@ -122,15 +122,20 @@ class _ClientWalletScreenState extends State<ClientWalletScreen> {
 
     if (!mounted || amount == null) return;
 
-    final paid = await FeexPayService.instance.requestPayment(
+    final result = await FeexPayService.instance.requestPayment(
       context: context,
       amount: amount,
       description: 'Recharge de votre portefeuille Fonaqo',
+      purpose: 'wallet_deposit',
     );
-    if (!mounted || !paid) return;
+    if (!mounted || result == null) return;
 
     try {
-      await _repo.deposit(amount: amount);
+      await _repo.deposit(
+        amount: amount.roundToDouble(),
+        paymentMethod: 'feexpay',
+        paymentReference: result.externalReference,
+      );
       if (!mounted) return;
       await context.read<WalletProvider>().fetchBalance();
       await _loadTransactions();

@@ -89,7 +89,10 @@ enum LeBonCoinFilter {
   artisan,
   restaurant,
   shop,
+  service,
   leisure,
+  gym,
+  museum,
 }
 
 extension LeBonCoinFilterX on LeBonCoinFilter {
@@ -103,8 +106,14 @@ extension LeBonCoinFilterX on LeBonCoinFilter {
         return l10n.filterRestaurants;
       case LeBonCoinFilter.shop:
         return l10n.filterShops;
+      case LeBonCoinFilter.service:
+        return 'Services';
       case LeBonCoinFilter.leisure:
         return l10n.filterLeisure;
+      case LeBonCoinFilter.gym:
+        return 'Salles de sport';
+      case LeBonCoinFilter.museum:
+        return 'Musées';
     }
   }
 
@@ -118,8 +127,14 @@ extension LeBonCoinFilterX on LeBonCoinFilter {
         return 'restaurant';
       case LeBonCoinFilter.shop:
         return 'shop';
+      case LeBonCoinFilter.service:
+        return 'service';
       case LeBonCoinFilter.leisure:
         return 'leisure';
+      case LeBonCoinFilter.gym:
+        return 'gym';
+      case LeBonCoinFilter.museum:
+        return 'museum';
     }
   }
 }

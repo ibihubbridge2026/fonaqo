@@ -318,14 +318,6 @@ class _FavoriteAgentsScreenState extends State<FavoriteAgentsScreen> {
                         MaterialPageRoute(
                           builder: (_) => ClientAgentProfileScreen(
                             agentId: agentId,
-                            name: displayName,
-                            role: specialties.isNotEmpty
-                                ? specialties.first
-                                : 'Agent Fonaqo',
-                            avatarUrl: avatarUrl,
-                            expertiseTags: specialties,
-                            rating: double.tryParse(rating),
-                            isVerified: isVerified,
                           ),
                         ),
                       );

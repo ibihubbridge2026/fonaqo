@@ -14,7 +14,7 @@ import 'package:fonaco/core/providers/mission_provider.dart';
 import 'package:fonaco/core/providers/wallet_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/services/dashboard_refresh_service.dart';
-import 'package:fonaco/core/services/mission_audio_cleanup.dart';
+import 'package:fonaco/core/services/platform_config_service.dart';
 import 'package:fonaco/core/services/feexpay_service.dart';
 import 'package:fonaco/core/services/feedback_service.dart';
 import 'package:fonaco/core/services/location_service.dart';
@@ -93,6 +93,7 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
     };
     _loadGpsPosition();
     _loadCategories();
+    _loadPlatformFees();
   }
 
   @override
@@ -122,6 +123,11 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
         }
       }
     } catch (_) {}
+  }
+
+  Future<void> _loadPlatformFees() async {
+    await PlatformConfigService.instance.ensureLoaded();
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadCategories() async {
@@ -156,8 +162,8 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
   }
 
   double get _optionsCost =>
-      (_isUrgent ? AppConstants.optionCost : 0) +
-      (_isConfidential ? AppConstants.optionCost : 0);
+      (_isUrgent ? PlatformConfigService.instance.feesUrgent : 0) +
+      (_isConfidential ? PlatformConfigService.instance.feesConfidential : 0);
 
   double get _fonnaqoFee => _serviceAmountValue * 0.10;
 
@@ -371,12 +377,13 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
     final destination = _destinationController.text.trim();
 
     if (_paymentMethod == 'feexpay') {
-      final paid = await FeexPayService.instance.requestPayment(
+      final result = await FeexPayService.instance.requestPayment(
         context: context,
         amount: totalRequired,
         description: 'Paiement mission « ${_buildTitle()} »',
+        purpose: 'mission_payment',
       );
-      if (!paid || !mounted) return;
+      if (result == null || !mounted) return;
     } else {
       if (!context.mounted) return;
       final wallet = context.read<WalletProvider>();
@@ -431,7 +438,6 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
           longitude: missionLng,
           price: _serviceAmountValue,
           serviceFee: serviceFee,
-          requiresProcuration: false,
           isUrgent: _isUrgent,
           isConfidential: _isConfidential,
           isVocalDescription: _isVocalMode,
@@ -720,13 +726,13 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
         const SizedBox(height: 8),
         _OptionSwitch(
           title: 'Mission urgente',
-          subtitle: '+${AppConstants.optionCost.toStringAsFixed(0)} FCFA',
+          subtitle: '+${PlatformConfigService.instance.feesUrgent.toStringAsFixed(0)} FCFA',
           value: _isUrgent,
           onChanged: (v) => setState(() => _isUrgent = v),
         ),
         _OptionSwitch(
           title: 'Agent Interne Fonaqo',
-          subtitle: '+${AppConstants.optionCost.toStringAsFixed(0)} FCFA',
+          subtitle: '+${PlatformConfigService.instance.feesConfidential.toStringAsFixed(0)} FCFA',
           value: _isConfidential,
           onChanged: (v) => setState(() => _isConfidential = v),
         ),

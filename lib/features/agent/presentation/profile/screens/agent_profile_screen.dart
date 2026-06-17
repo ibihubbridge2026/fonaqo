@@ -166,8 +166,7 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
-                        onPressed: () => context.push(AppRoutes.agentKycLock,
-                        ),
+                        onPressed: () => context.push(AppRoutes.agentKycSubmit),
                         icon: const Icon(Icons.upload_file),
                         label: const Text('Soumettre mes documents'),
                       ),

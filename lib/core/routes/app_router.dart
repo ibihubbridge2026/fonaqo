@@ -3,8 +3,10 @@ import 'package:go_router/go_router.dart';
 
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
+import 'package:fonaco/core/services/referral_storage_service.dart';
 import 'package:fonaco/features/agent/presentation/dashboard/screens/agent_dashboard_screen.dart';
 import 'package:fonaco/features/agent/presentation/dashboard/screens/agent_mission_tracking_screen.dart';
+import 'package:fonaco/features/agent/presentation/kyc/agent_kyc_submit_screen.dart';
 import 'package:fonaco/features/agent/presentation/kyc/kyc_lock_screen.dart';
 import 'package:fonaco/features/agent/presentation/profile/screens/agent_personal_info_screen.dart';
 import 'package:fonaco/features/agent/screens/agent_boost_screen.dart';
@@ -55,6 +57,16 @@ GoRouter createAppRouter({
       GoRoute(
         path: AppRoutes.register,
         builder: (_, __) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.referralJoin,
+        redirect: (context, state) async {
+          final code = state.pathParameters['code'];
+          if (code != null && code.trim().isNotEmpty) {
+            await ReferralStorageService.instance.save(code);
+          }
+          return AppRoutes.register;
+        },
       ),
       GoRoute(
         path: AppRoutes.forgotPassword,
@@ -192,6 +204,10 @@ GoRouter createAppRouter({
       GoRoute(
         path: AppRoutes.agentKycLock,
         builder: (_, __) => const KycLockScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.agentKycSubmit,
+        builder: (_, __) => const AgentKycSubmitScreen(),
       ),
       GoRoute(
         path: AppRoutes.agentBoost,

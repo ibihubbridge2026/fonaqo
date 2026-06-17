@@ -10,8 +10,7 @@ class ApiConfig {
   /// URL de base du serveur (sans /api/vX/).
   static const String serverUrl = String.fromEnvironment(
     'SERVER_URL',
-    // defaultValue: 'http://192.168.1.73:8000',
-    defaultValue: 'http://192.168.11.120:8000',
+    defaultValue: 'http://192.168.1.73:8000',    
   );
 
   /// URL de base de l'API backend.

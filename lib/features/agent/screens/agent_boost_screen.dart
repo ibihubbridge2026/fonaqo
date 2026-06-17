@@ -81,13 +81,15 @@ class _AgentBoostScreenState extends State<AgentBoostScreen> {
           return;
         }
       } else {
-        final paid = await FeexPayService.instance.requestPayment(
+        final result = await FeexPayService.instance.requestPayment(
           context: context,
           amount: price,
           description: 'Boost $name',
+          purpose: 'boost_purchase',
+          metadata: {'plan_name': name},
         );
-        if (!paid || !mounted) return;
-        transactionId = 'FEEX-${DateTime.now().millisecondsSinceEpoch}';
+        if (result == null || !mounted) return;
+        transactionId = result.externalReference;
       }
 
       final ok = await provider.profileRepository.purchaseBoost(

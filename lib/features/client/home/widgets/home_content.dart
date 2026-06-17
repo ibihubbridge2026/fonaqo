@@ -1299,13 +1299,6 @@ class AgentCard extends StatelessWidget {
                 MaterialPageRoute(
                   builder: (_) => ClientAgentProfileScreen(
                     agentId: agentId,
-                    name: name,
-                    role: role,
-                    avatarUrl: avatarUrl,
-                    expertiseTags: expertiseTags,
-                    rating: rating,
-                    isVerified: isVerified,
-                    isOnline: isOnline,
                   ),
                 ),
               );

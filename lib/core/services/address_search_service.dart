@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:logger/logger.dart';
 
@@ -7,18 +8,25 @@ import 'location_service.dart';
 class AddressSuggestion {
   final String label;
   final String? subtitle;
-  final double latitude;
-  final double longitude;
+  final double? latitude;
+  final double? longitude;
+  final String? placeId;
 
   const AddressSuggestion({
     required this.label,
     this.subtitle,
-    required this.latitude,
-    required this.longitude,
+    this.latitude,
+    this.longitude,
+    this.placeId,
   });
+
+  bool get needsPlaceDetails =>
+      placeId != null &&
+      placeId!.isNotEmpty &&
+      (latitude == null || longitude == null);
 }
 
-/// Recherche d'adresses via Nominatim (OSM) avec repli géocodage natif.
+/// Recherche d'adresses : Google Places (si clé) puis Nominatim / géocodage natif.
 class AddressSearchService {
   final Logger _logger = Logger();
   final LocationService _location = LocationService();
@@ -33,17 +41,126 @@ class AddressSearchService {
       },
     ),
   );
+  final Dio _google = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 8),
+      receiveTimeout: const Duration(seconds: 8),
+    ),
+  );
 
   DateTime? _lastNominatimCall;
+
+  String? get _googleApiKey {
+    final fromEnv = dotenv.env['GOOGLE_PLACES_API_KEY'];
+    if (fromEnv != null && fromEnv.trim().isNotEmpty) {
+      return fromEnv.trim();
+    }
+    return null;
+  }
 
   Future<List<AddressSuggestion>> search(String query) async {
     final q = query.trim();
     if (q.length < 2) return [];
 
+    if (_googleApiKey != null) {
+      final google = await _searchGooglePlaces(q);
+      if (google.isNotEmpty) return google;
+    }
+
     final nominatim = await _searchNominatim(q);
     if (nominatim.isNotEmpty) return nominatim;
 
     return _searchGeocoding(q);
+  }
+
+  /// Résout lat/lng et adresse formatée à partir d'un placeId Google.
+  Future<AddressSuggestion?> getDetailsPlace(String placeId) async {
+    final apiKey = _googleApiKey;
+    if (apiKey == null || placeId.trim().isEmpty) return null;
+
+    try {
+      final response = await _google.get<Map<String, dynamic>>(
+        'https://maps.googleapis.com/maps/api/place/details/json',
+        queryParameters: {
+          'place_id': placeId,
+          'fields': 'formatted_address,geometry,name',
+          'key': apiKey,
+          'language': 'fr',
+        },
+      );
+      final data = response.data;
+      if (data == null) return null;
+      if (data['status']?.toString() != 'OK') return null;
+
+      final result = data['result'];
+      if (result is! Map) return null;
+
+      final geometry = result['geometry']?['location'];
+      final lat = geometry is Map ? geometry['lat'] : null;
+      final lng = geometry is Map ? geometry['lng'] : null;
+      final latitude = lat is num ? lat.toDouble() : double.tryParse('$lat');
+      final longitude = lng is num ? lng.toDouble() : double.tryParse('$lng');
+      if (latitude == null || longitude == null) return null;
+
+      final formatted = result['formatted_address']?.toString().trim();
+      final name = result['name']?.toString().trim();
+      final label = (formatted != null && formatted.isNotEmpty)
+          ? formatted
+          : (name ?? 'Adresse sélectionnée');
+
+      return AddressSuggestion(
+        label: label,
+        latitude: latitude,
+        longitude: longitude,
+        placeId: placeId,
+      );
+    } catch (e, st) {
+      _logger.w('Google Place Details: $e', stackTrace: st);
+      return null;
+    }
+  }
+
+  Future<List<AddressSuggestion>> _searchGooglePlaces(String query) async {
+    final apiKey = _googleApiKey!;
+    try {
+      final response = await _google.get<Map<String, dynamic>>(
+        'https://maps.googleapis.com/maps/api/place/autocomplete/json',
+        queryParameters: {
+          'input': query,
+          'key': apiKey,
+          'language': 'fr',
+          'components': 'country:bj',
+        },
+      );
+      final data = response.data;
+      if (data == null) return [];
+      final status = data['status']?.toString();
+      if (status != 'OK' && status != 'ZERO_RESULTS') {
+        _logger.w('Google Autocomplete status: $status');
+        return [];
+      }
+
+      final predictions = data['predictions'];
+      if (predictions is! List) return [];
+
+      return predictions.map((raw) {
+        final map = Map<String, dynamic>.from(raw as Map);
+        final description = map['description']?.toString() ?? query;
+        final structured = map['structured_formatting'];
+        String? subtitle;
+        if (structured is Map) {
+          subtitle = structured['secondary_text']?.toString();
+        }
+        return AddressSuggestion(
+          label: description,
+          subtitle: subtitle,
+          placeId: map['place_id']?.toString(),
+        );
+      }).toList();
+    } catch (e, st) {
+      _logger.w('Google Autocomplete: $e', stackTrace: st);
+      return [];
+    }
   }
 
   Future<List<AddressSuggestion>> _searchNominatim(String query) async {

@@ -17,7 +17,6 @@ class MissionCreatePayload {
   final double longitude;
   final double price;
   final double serviceFee;
-  final bool requiresProcuration;
   final String? targetAgentUsername;
   final bool isUrgent;
   final bool isConfidential;
@@ -36,7 +35,6 @@ class MissionCreatePayload {
     required this.longitude,
     required this.price,
     required this.serviceFee,
-    this.requiresProcuration = false,
     this.targetAgentUsername,
     this.isUrgent = false,
     this.isConfidential = false,
@@ -56,7 +54,6 @@ class MissionCreatePayload {
         'longitude': longitude,
         'price': price,
         'service_fee': serviceFee,
-        'requires_procuration': requiresProcuration,
         'is_urgent': isUrgent,
         'is_confidential': isConfidential,
         'is_vocal_description': isVocalDescription,
@@ -376,16 +373,6 @@ class MissionRepository implements ClientMissionRepository {
     return MissionModel.fromJson(_extractObjectFromEnvelope(response.data));
   }
 
-  /// Termine la mission (agent, flux live) → COMPLETED + notification WebSocket.
-  Future<MissionModel> markMissionCompletedLive(String missionId) async {
-    final response =
-        await _baseClient.post('missions/$missionId/mark_completed_live/');
-    if (response.statusCode != 200 && response.statusCode != 201) {
-      throw Exception('Impossible de clôturer la mission');
-    }
-    return MissionModel.fromJson(_extractObjectFromEnvelope(response.data));
-  }
-
   Map<String, dynamic> _parseMissionBody(dynamic body) {
     try {
       return _extractObjectFromEnvelope(body);
@@ -596,6 +583,27 @@ class MissionRepository implements ClientMissionRepository {
       );
     }
     throw Exception('Réponse négociation invalide');
+  }
+
+  /// Autorise ou interdit les propositions tarifaires agent.
+  Future<MissionModel> setPriceNegotiationAllowed({
+    required String missionId,
+    required bool allowed,
+  }) async {
+    final response = await _baseClient.post(
+      'missions/$missionId/allow_price_negotiation/',
+      data: {'allowed': allowed},
+    );
+    if (response.statusCode != 200) {
+      throw Exception('Impossible de modifier la négociation');
+    }
+    final body = response.data;
+    if (body is Map && body['data'] is Map) {
+      return MissionModel.fromJson(
+        Map<String, dynamic>.from(body['data'] as Map),
+      );
+    }
+    throw Exception('Réponse invalide');
   }
 
   /// Refuse une proposition tarifaire.

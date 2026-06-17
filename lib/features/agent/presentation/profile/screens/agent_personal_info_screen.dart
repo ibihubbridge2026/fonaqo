@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import 'package:fonaco/core/providers/auth_provider.dart';
+import 'package:fonaco/core/widgets/agent_progress_badge.dart';
 import 'package:fonaco/core/widgets/profile/profile_form_widgets.dart';
 import 'package:fonaco/features/agent/providers/agent_provider.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
@@ -26,6 +27,7 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
   final TextEditingController _phone = TextEditingController();
   final TextEditingController _city = TextEditingController();
   final TextEditingController _coverageZone = TextEditingController();
+  final TextEditingController _bio = TextEditingController();
 
   static const _skillOptions = [
     'Transport & Logistique',
@@ -48,6 +50,8 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
     _loadProfile();
   }
 
+  Map<String, dynamic>? _agentBadge;
+
   Future<void> _loadProfile() async {
     final authUser = context.read<AuthProvider>().currentUser;
     final profile =
@@ -64,6 +68,19 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
         profile['phone_number']?.toString() ?? authUser?.phoneNumber ?? '';
     _city.text = profile['city']?.toString() ?? '';
     _coverageZone.text = profile['address']?.toString() ?? '';
+    final agentProfile = profile['agent_profile'];
+    if (agentProfile is Map) {
+      _bio.text = agentProfile['bio']?.toString() ?? '';
+      final badge = agentProfile['badge'];
+      if (badge is Map) {
+        _agentBadge = Map<String, dynamic>.from(badge);
+      } else {
+        _agentBadge = null;
+      }
+    } else {
+      _bio.text = profile['bio']?.toString() ?? '';
+      _agentBadge = null;
+    }
     final domain = profile['service_domain']?.toString().trim() ?? '';
     if (domain.isEmpty || domain.toLowerCase() == 'polyvalent') {
       _isPolyvalent = true;
@@ -85,6 +102,7 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
     _phone.dispose();
     _city.dispose();
     _coverageZone.dispose();
+    _bio.dispose();
     super.dispose();
   }
 
@@ -129,6 +147,7 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
           'city': _city.text.trim(),
           'address': _coverageZone.text.trim(),
           'service_domain': serviceDomain,
+          'bio': _bio.text.trim(),
           'profile_picture': await MultipartFile.fromFile(
             _profileImage!.path,
             filename: 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
@@ -142,6 +161,7 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
           'city': _city.text.trim(),
           'address': _coverageZone.text.trim(),
           'service_domain': serviceDomain,
+          'bio': _bio.text.trim(),
         };
       }
 
@@ -204,6 +224,8 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
                 onPickImage: _pickImage,
               ),
               const SizedBox(height: 12),
+              AgentProgressBadge(badge: _agentBadge),
+              const SizedBox(height: 12),
               ProfileFieldCard(
                 label: 'Prénom',
                 controller: _firstName,
@@ -240,6 +262,13 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
                 controller: _coverageZone,
                 keyboardType: TextInputType.text,
                 maxLines: 2,
+              ),
+              const SizedBox(height: 12),
+              ProfileFieldCard(
+                label: 'Bio',
+                controller: _bio,
+                keyboardType: TextInputType.multiline,
+                maxLines: 5,
               ),
               const SizedBox(height: 12),
               Container(

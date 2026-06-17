@@ -6,8 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:logger/logger.dart';
 
-import '../../core/api/base_client.dart';
-import '../../core/services/feedback_service.dart';
+import 'package:fonaco/core/api/base_client.dart';
+import 'package:fonaco/core/services/feedback_service.dart';
+import 'package:fonaco/core/services/memory_auth_cache.dart';
 
 /// Service de gestion des notifications Firebase
 class NotificationService {
@@ -254,6 +255,11 @@ class NotificationService {
     );
 
     _fcmToken = token;
+
+    final accessToken = MemoryAuthCache().accessToken;
+    if (accessToken != null && accessToken.isNotEmpty) {
+      await sendTokenToBackend(accessToken);
+    }
   }
 
   // =========================
