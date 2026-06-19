@@ -29,4 +29,10 @@ abstract class AgentProfileRepository {
 
   Future<Map<String, dynamic>?> getActiveBoost();
   Future<bool> submitKycDocuments(FormData formData);
+
+  Future<Map<String, dynamic>> getProBadgeStatus();
+
+  Future<bool> requestProBadge(FormData formData);
+
+  Future<String?> downloadProBadge();
 }

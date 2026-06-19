@@ -89,7 +89,8 @@ class _SwitchTile extends StatelessWidget {
         ],
       ),
       child: SwitchListTile(
-        activeThumbColor: const Color(0xFFFFD400),
+        activeColor: const Color(0xFF2EC4B6),
+        activeTrackColor: const Color(0xFF2EC4B6).withOpacity(0.35),
         value: value,
         onChanged: onChanged,
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),

@@ -1,4 +1,5 @@
 import 'package:logger/logger.dart';
+import 'package:flutter/material.dart';
 
 import 'package:fonaco/core/api/base_client.dart';
 import 'package:fonaco/features/agent/domain/repositories/agent_wallet_repository.dart';
@@ -54,18 +55,78 @@ class AgentWalletRepositoryImpl implements AgentWalletRepository {
       final response = await _baseClient.get('wallets/transactions/');
       if (response.statusCode == 200) {
         final raw = response.data;
+        List<dynamic> items = [];
         if (raw is Map && raw['results'] is List) {
-          return List<Map<String, dynamic>>.from(raw['results'] as List);
+          items = raw['results'] as List;
+        } else if (raw is Map && raw['data'] is List) {
+          items = raw['data'] as List;
+        } else if (raw is List) {
+          items = raw;
         }
-        if (raw is Map && raw['data'] is List) {
-          return List<Map<String, dynamic>>.from(raw['data'] as List);
-        }
+        return items
+            .whereType<Map>()
+            .map((tx) => _mapTransaction(Map<String, dynamic>.from(tx)))
+            .toList();
       }
       return [];
     } catch (e, st) {
       _logger.e('getTransactions', error: e, stackTrace: st);
       return [];
     }
+  }
+
+  Map<String, dynamic> _mapTransaction(Map<String, dynamic> tx) {
+    final type = (tx['transaction_type'] ?? tx['type'] ?? '').toString();
+    final amount = _readAmount(tx['amount']);
+    final isCredit = amount >= 0 ||
+        type == 'DEPOSIT' ||
+        type == 'ESCROW_RELEASE' ||
+        type == 'REFERRAL_BONUS' ||
+        type == 'REFUND';
+    final absAmount = amount.abs();
+    final sign = isCredit ? '+' : '-';
+    return {
+      'id': tx['id']?.toString() ?? '',
+      'title': tx['description']?.toString() ?? _labelForType(type),
+      'subtitle': _formatDate(tx['created_at']),
+      'amount': '$sign${absAmount.toStringAsFixed(0)} FCFA',
+      'rawAmount': amount,
+      'type': type,
+      'status': tx['status']?.toString() ?? '',
+      'reference': tx['reference']?.toString(),
+      'description': tx['description']?.toString() ?? '',
+      'createdAt': tx['created_at']?.toString(),
+      'icon': isCredit ? Icons.arrow_downward : Icons.arrow_upward,
+      'iconColor': isCredit ? Colors.green : Colors.red,
+      'amountColor': isCredit ? Colors.green.shade700 : Colors.red.shade700,
+      'isIncome': isCredit,
+    };
+  }
+
+  String _labelForType(String type) {
+    switch (type) {
+      case 'DEPOSIT':
+        return 'Dépôt';
+      case 'WITHDRAWAL':
+        return 'Retrait';
+      case 'MISSION_PAYMENT':
+        return 'Paiement mission';
+      case 'ESCROW_LOCK':
+        return 'Blocage séquestre';
+      case 'ESCROW_RELEASE':
+        return 'Libération séquestre';
+      case 'BOOST_PAYMENT':
+        return 'Achat boost';
+      default:
+        return 'Transaction';
+    }
+  }
+
+  String _formatDate(dynamic value) {
+    if (value == null) return '';
+    final dt = DateTime.tryParse(value.toString());
+    if (dt == null) return value.toString();
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
   }
 
   String? _extractErrorMessage(dynamic data) {

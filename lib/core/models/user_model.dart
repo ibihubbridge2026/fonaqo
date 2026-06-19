@@ -150,9 +150,8 @@ class UserModel {
   /// KYC approuvé (agents uniquement).
   bool get isKycApproved => !isAgent || kycStatus == 'APPROVED';
 
-  /// Agent bloqué par KYC (PENDING ou REJECTED).
-  bool get isKycLocked =>
-      isAgent && (kycStatus == null || kycStatus == 'PENDING' || kycStatus == 'REJECTED');
+  /// Agent bloqué tant que KYC non approuvé.
+  bool get isKycLocked => isAgent && kycStatus != 'APPROVED';
 
   /// Retourne true si l'utilisateur est un agent
   bool get isAgent => role == 'agent';

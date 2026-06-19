@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 
+import 'package:fonaco/core/providers/mission_provider.dart';
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
@@ -58,10 +59,23 @@ class _MissionsScreenState extends State<MissionsScreen> {
     });
     // Écouter les changements pour rafraîchir la liste quand on quitte le mode création
     widget.showCreateMissionListenable.addListener(_onCreateModeChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<MissionProvider>().addListener(_onMissionProviderChanged);
+      }
+    });
+  }
+
+  void _onMissionProviderChanged() {
+    if (!mounted) return;
+    _loadMissions();
   }
 
   @override
   void dispose() {
+    try {
+      context.read<MissionProvider>().removeListener(_onMissionProviderChanged);
+    } catch (_) {}
     _scrollController.dispose();
     widget.showCreateMissionListenable.removeListener(_onCreateModeChanged);
     super.dispose();

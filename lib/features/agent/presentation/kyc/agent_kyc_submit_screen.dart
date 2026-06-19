@@ -125,7 +125,11 @@ class _AgentKycSubmitScreenState extends State<AgentKycSubmitScreen> {
           children: [
             const Text(
               'Pièce d\'identité et selfie',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF000000),
+              ),
             ),
             const SizedBox(height: 8),
             Text(

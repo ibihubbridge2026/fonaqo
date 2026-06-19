@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:logger/logger.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'package:fonaco/core/api/base_client.dart';
 import 'package:fonaco/features/agent/domain/repositories/agent_profile_repository.dart';
@@ -57,14 +60,19 @@ class AgentProfileRepositoryImpl implements AgentProfileRepository {
       );
       if (response.statusCode == 200) {
         final body = response.data;
-        if (body is Map && body['data'] is Map) {
-          return Map<String, dynamic>.from(body['data'] as Map);
+        if (body is Map) {
+          if (body['data'] is Map) {
+            return Map<String, dynamic>.from(body['data'] as Map);
+          }
+          if (body['id'] != null) {
+            return Map<String, dynamic>.from(body);
+          }
         }
       }
       return {};
     } catch (e, st) {
       _logger.e('updateProfile', error: e, stackTrace: st);
-      return {};
+      rethrow;
     }
   }
 
@@ -197,6 +205,59 @@ class AgentProfileRepositoryImpl implements AgentProfileRepository {
     } catch (e, st) {
       _logger.e('submitKycDocuments', error: e, stackTrace: st);
       return false;
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> getProBadgeStatus() async {
+    try {
+      final response = await _baseClient.get('accounts/agent/badge/');
+      if (response.statusCode == 200) {
+        final body = response.data;
+        if (body is Map && body['data'] is Map) {
+          return Map<String, dynamic>.from(body['data'] as Map);
+        }
+      }
+      return {};
+    } catch (e, st) {
+      _logger.e('getProBadgeStatus', error: e, stackTrace: st);
+      return {};
+    }
+  }
+
+  @override
+  Future<bool> requestProBadge(FormData formData) async {
+    try {
+      final response = await _baseClient.post(
+        'accounts/agent/badge/request/',
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (e, st) {
+      _logger.e('requestProBadge', error: e, stackTrace: st);
+      return false;
+    }
+  }
+
+  @override
+  Future<String?> downloadProBadge() async {
+    try {
+      final response = await _baseClient.get(
+        'accounts/agent/badge/download/',
+        options: Options(responseType: ResponseType.bytes),
+      );
+      if (response.statusCode != 200) return null;
+      final bytes = response.data;
+      if (bytes == null) return null;
+      final dir = await getTemporaryDirectory();
+      final path = '${dir.path}/badge_fonaco.pdf';
+      final file = File(path);
+      await file.writeAsBytes(bytes as List<int>);
+      return path;
+    } catch (e, st) {
+      _logger.e('downloadProBadge', error: e, stackTrace: st);
+      return null;
     }
   }
 }

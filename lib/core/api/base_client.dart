@@ -7,6 +7,7 @@ import 'package:logger/logger.dart';
 
 import '../config/api_config.dart';
 import '../services/memory_auth_cache.dart';
+import '../utils/api_response_parser.dart';
 import '../utils/retry_utils.dart';
 import 'token_refresh_result.dart';
 
@@ -63,6 +64,7 @@ class BaseClient {
     // _dio.interceptors.add(_LoggingInterceptor(_logger));
     _dio.interceptors
         .add(RetryUtils.createRetryInterceptor(logger: _logger, dio: _dio));
+    _dio.interceptors.add(_EnvelopeInterceptor());
   }
 
   /// Méthode GET
@@ -438,7 +440,8 @@ class _AuthInterceptor extends Interceptor {
         _refreshCompleter = null;
 
         if (refreshResult == TokenRefreshResult.sessionRevoked) {
-          _logger.w('Refresh token rejeté — session locale conservée');
+          _logger.w('Refresh token rejeté — déconnexion forcée');
+          onTokenExpired?.call();
           return handler.reject(err);
         }
 
@@ -535,6 +538,22 @@ class _AuthInterceptor extends Interceptor {
       _logger.e('Échec du rafraîchissement du token: $e');
       return TokenRefreshResult.failed;
     }
+  }
+}
+
+/// Désenveloppe automatiquement `{ status, message, data }` des réponses API.
+class _EnvelopeInterceptor extends Interceptor {
+  @override
+  void onResponse(Response response, ResponseInterceptorHandler handler) {
+    final status = response.statusCode ?? 0;
+    if (status >= 200 && status < 300) {
+      final raw = response.data;
+      if (raw is Map) {
+        response.extra['api_envelope'] = raw;
+        response.data = ApiResponseParser.unwrap(raw);
+      }
+    }
+    handler.next(response);
   }
 }
 

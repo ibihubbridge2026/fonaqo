@@ -9,9 +9,11 @@ import 'package:fonaco/features/agent/presentation/dashboard/screens/agent_missi
 import 'package:fonaco/features/agent/presentation/kyc/agent_kyc_submit_screen.dart';
 import 'package:fonaco/features/agent/presentation/kyc/kyc_lock_screen.dart';
 import 'package:fonaco/features/agent/presentation/profile/screens/agent_personal_info_screen.dart';
+import 'package:fonaco/features/agent/presentation/profile/screens/agent_pro_badge_screen.dart';
 import 'package:fonaco/features/agent/screens/agent_boost_screen.dart';
 import 'package:fonaco/features/agent/screens/agent_mission_detail_screen.dart';
 import 'package:fonaco/features/ai/screens/ai_assistant_screen.dart';
+import 'package:fonaco/features/auth/account_suspended_screen.dart';
 import 'package:fonaco/features/auth/complete_profile_screen.dart';
 import 'package:fonaco/features/auth/forgot_password_screen.dart';
 import 'package:fonaco/features/auth/login_screen.dart';
@@ -63,7 +65,7 @@ GoRouter createAppRouter({
         redirect: (context, state) async {
           final code = state.pathParameters['code'];
           if (code != null && code.trim().isNotEmpty) {
-            await ReferralStorageService.instance.save(code);
+            await ReferralStorageService.instance.captureFromDeepLink(code);
           }
           return AppRoutes.register;
         },
@@ -71,6 +73,10 @@ GoRouter createAppRouter({
       GoRoute(
         path: AppRoutes.forgotPassword,
         builder: (_, __) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.accountSuspended,
+        builder: (_, __) => const AccountSuspendedScreen(),
       ),
       GoRoute(
         path: AppRoutes.onboarding,
@@ -212,6 +218,10 @@ GoRouter createAppRouter({
       GoRoute(
         path: AppRoutes.agentBoost,
         builder: (_, __) => const AgentBoostScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.agentProBadge,
+        builder: (_, __) => const AgentProBadgeScreen(),
       ),
       GoRoute(
         path: AppRoutes.chatDetail,

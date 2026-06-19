@@ -21,6 +21,7 @@ class AgentPersonalInfoScreen extends StatefulWidget {
 }
 
 class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
+  final TextEditingController _username = TextEditingController();
   final TextEditingController _firstName = TextEditingController();
   final TextEditingController _lastName = TextEditingController();
   final TextEditingController _email = TextEditingController();
@@ -37,8 +38,18 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
     'Ménage & Nettoyage',
   ];
 
+  static const _expertiseOptions = [
+    'Électricité',
+    'Plomberie',
+    'Informatique',
+    'Livraison express',
+    'Garde d\'enfants',
+    'Réparation auto',
+  ];
+
   bool _isPolyvalent = true;
   final Set<String> _selectedSkills = {};
+  final Set<String> _selectedExpertises = {};
 
   final ImagePicker _imagePicker = ImagePicker();
   File? _profileImage;
@@ -59,6 +70,8 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
 
     if (!mounted) return;
 
+    _username.text =
+        profile['username']?.toString() ?? authUser?.djangoUsername ?? '';
     _firstName.text =
         profile['first_name']?.toString() ?? authUser?.firstName ?? '';
     _lastName.text =
@@ -91,11 +104,18 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
         ..clear()
         ..addAll(domain.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty));
     }
+    final exp = profile['expertises']?.toString().trim() ?? '';
+    if (exp.isNotEmpty) {
+      _selectedExpertises
+        ..clear()
+        ..addAll(exp.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty));
+    }
     setState(() {});
   }
 
   @override
   void dispose() {
+    _username.dispose();
     _firstName.dispose();
     _lastName.dispose();
     _email.dispose();
@@ -136,17 +156,19 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
         : (_selectedSkills.isEmpty
             ? 'Polyvalent'
             : _selectedSkills.join(', '));
+    final expertises = _selectedExpertises.join(', ');
 
     try {
       final dynamic payload;
       if (_profileImage != null) {
         payload = FormData.fromMap({
+          'username': _username.text.trim(),
           'first_name': _firstName.text.trim(),
           'last_name': _lastName.text.trim(),
-          'email': _email.text.trim(),
           'city': _city.text.trim(),
           'address': _coverageZone.text.trim(),
           'service_domain': serviceDomain,
+          'expertises': expertises,
           'bio': _bio.text.trim(),
           'profile_picture': await MultipartFile.fromFile(
             _profileImage!.path,
@@ -155,12 +177,13 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
         });
       } else {
         payload = {
+          'username': _username.text.trim(),
           'first_name': _firstName.text.trim(),
           'last_name': _lastName.text.trim(),
-          'email': _email.text.trim(),
           'city': _city.text.trim(),
           'address': _coverageZone.text.trim(),
           'service_domain': serviceDomain,
+          'expertises': expertises,
           'bio': _bio.text.trim(),
         };
       }
@@ -227,6 +250,12 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
               AgentProgressBadge(badge: _agentBadge),
               const SizedBox(height: 12),
               ProfileFieldCard(
+                label: 'Nom d\'utilisateur',
+                controller: _username,
+                keyboardType: TextInputType.text,
+              ),
+              const SizedBox(height: 12),
+              ProfileFieldCard(
                 label: 'Prénom',
                 controller: _firstName,
                 keyboardType: TextInputType.name,
@@ -242,6 +271,7 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
                 label: 'Email',
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,
+                readOnly: true,
               ),
               const SizedBox(height: 12),
               ProfileFieldCard(
@@ -283,7 +313,7 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Mes Compétences',
+                      'Compétences générales',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 15,
@@ -325,6 +355,55 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
                         }).toList(),
                       ),
                     ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Expertises spécifiques',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Sélectionnez une ou plusieurs expertises (cumulables avec la polyvalence)',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _expertiseOptions.map((exp) {
+                        final selected = _selectedExpertises.contains(exp);
+                        return FilterChip(
+                          label: Text(exp),
+                          selected: selected,
+                          selectedColor: const Color(0xFFFFD400).withOpacity(0.4),
+                          onSelected: (sel) {
+                            setState(() {
+                              if (sel) {
+                                _selectedExpertises.add(exp);
+                              } else {
+                                _selectedExpertises.remove(exp);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
                   ],
                 ),
               ),

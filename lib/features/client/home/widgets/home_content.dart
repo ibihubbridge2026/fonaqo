@@ -370,19 +370,19 @@ class WelcomeHeader extends StatelessWidget {
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
         final first = auth.currentUser?.firstName?.trim();
-        final login = auth.currentUser?.djangoUsername?.trim();
-        final greet = (first != null && first.isNotEmpty)
-            ? first
-            : (login != null && login.isNotEmpty)
-                ? login
-                : 'Invité';
+        final last = auth.currentUser?.lastName?.trim();
+        final hasName = (first != null && first.isNotEmpty) ||
+            (last != null && last.isNotEmpty);
+        final greet = hasName
+            ? 'Bonjour, ${[first, last].whereType<String>().where((s) => s.isNotEmpty).join(' ')} !'
+            : 'Bonjour !';
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Bonjour, $greet !',
+                greet,
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,

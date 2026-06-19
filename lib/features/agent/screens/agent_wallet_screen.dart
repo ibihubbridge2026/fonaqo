@@ -80,6 +80,46 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
     );
   }
 
+  void _showTransactionDetail(BuildContext context, Map<String, dynamic> tx) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              tx['title']?.toString() ?? 'Transaction',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              tx['amount']?.toString() ?? '',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: tx['amountColor'] as Color? ?? Colors.black,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if ((tx['description']?.toString() ?? '').isNotEmpty)
+              Text(tx['description'].toString()),
+            if ((tx['type']?.toString() ?? '').isNotEmpty)
+              Text('Type : ${tx['type']}'),
+            if ((tx['status']?.toString() ?? '').isNotEmpty)
+              Text('Statut : ${tx['status']}'),
+            if ((tx['subtitle']?.toString() ?? '').isNotEmpty)
+              Text('Date : ${tx['subtitle']}'),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AgentProvider>(
@@ -129,25 +169,27 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
                     const SizedBox(height: 20),
                     Row(
                       children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () =>
-                                _showWithdraw(context, provider.balance),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFFFD400),
-                              foregroundColor: Colors.black,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                        if (provider.balance > 2000)
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () =>
+                                  _showWithdraw(context, provider.balance),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFFD400),
+                                foregroundColor: Colors.black,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              child: const Text(
+                                'Retirer',
+                                style: TextStyle(fontWeight: FontWeight.w800),
                               ),
                             ),
-                            child: const Text(
-                              'Retirer',
-                              style: TextStyle(fontWeight: FontWeight.w800),
-                            ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
+                        if (provider.balance > 2000) const SizedBox(width: 10),
                         Expanded(
                           child: OutlinedButton(
                             onPressed: () => _showRecharge(context),
@@ -242,7 +284,7 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
                       amountColor:
                           tx['amountColor'] as Color? ?? Colors.black,
                       isIncome: tx['isIncome'] == true,
-                      onTap: () {},
+                      onTap: () => _showTransactionDetail(context, tx),
                     ),
                   );
                 }),

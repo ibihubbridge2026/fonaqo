@@ -8,6 +8,7 @@ abstract final class AppRoutes {
   static const register = '/register';
   static const referralJoin = '/join/:code';
   static const forgotPassword = '/forgot-password';
+  static const accountSuspended = '/account-suspended';
   static const completeProfile = '/complete-profile';
 
   /// Conteneur principal avec barre inférieure (post-authentification).
@@ -90,4 +91,5 @@ abstract final class AppRoutes {
   static const String agentKycLock = '/agent/kyc-lock';
   static const String agentKycSubmit = '/agent/kyc-submit';
   static const String agentBoost = '/agent/boost';
+  static const String agentProBadge = '/agent/pro-badge';
 }

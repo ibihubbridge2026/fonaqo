@@ -22,24 +22,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _promoCodeController = TextEditingController();
 
   bool _isLoading = false;
   bool _isObscure = true;
+  bool _acceptedTerms = false;
   String _selectedRole = 'client';
   Country _selectedCountry = Country.defaultCountry;
+  ReferralPending? _referralFromLink;
 
   @override
   void initState() {
     super.initState();
-    _loadReferralCode();
+    _loadReferralFromLink();
   }
 
-  Future<void> _loadReferralCode() async {
-    final code = await ReferralStorageService.instance.read();
-    if (code != null && mounted) {
-      _promoCodeController.text = code;
+  Future<void> _loadReferralFromLink() async {
+    final valid = await ReferralStorageService.instance.revalidateStored();
+    if (!mounted) return;
+    if (!valid) {
+      setState(() => _referralFromLink = null);
+      return;
     }
+    final pending = await ReferralStorageService.instance.readPending();
+    if (!mounted) return;
+    setState(() => _referralFromLink = pending);
   }
 
   @override
@@ -48,7 +54,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _promoCodeController.dispose();
     super.dispose();
   }
 
@@ -91,6 +96,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
       return;
     }
+    if (!_acceptedTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _selectedRole == 'agent'
+                ? 'Veuillez accepter les CGU, la politique de confidentialité et le contrat de prestation'
+                : 'Veuillez accepter les CGU et la politique de confidentialité',
+          ),
+        ),
+      );
+      return;
+    }
 
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -99,8 +116,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       try {
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
-
-        final referralCode = await ReferralStorageService.instance.read();
 
         final registerData = {
           'phone_number':
@@ -111,11 +126,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'role': _selectedRole,
           if (_selectedRole == 'agent' || _emailController.text.trim().isNotEmpty)
             'email': _emailController.text.trim(),
-          if (_selectedRole == 'client' &&
-              _promoCodeController.text.trim().isNotEmpty)
-            'promo_code': _promoCodeController.text.trim(),
-          if (referralCode != null && referralCode.isNotEmpty)
-            'referral_code_cache': referralCode,
+          if (_selectedRole == 'client' && _referralFromLink != null)
+            'referral_code_cache': _referralFromLink!.code,
         };
 
         final success = await authProvider.register(registerData);
@@ -316,20 +328,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ),
                     const SizedBox(height: 15),
 
-                    if (_selectedRole == 'client') ...[
-                      const Text(
-                        'Code Promo / Code Team',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black,
+                    if (_selectedRole == 'client' && _referralFromLink != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildField(
-                        controller: _promoCodeController,
-                        hint: 'Optionnel',
-                        icon: Icons.card_giftcard_outlined,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFD400).withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFFD400)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.link, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _referralFromLink!.influencerName != null
+                                    ? 'Parrainage via lien — ${_referralFromLink!.influencerName}'
+                                    : 'Parrainage activé via votre lien d\'invitation',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 15),
                     ],
@@ -352,7 +379,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       isPass: true,
                     ),
 
-                    const SizedBox(height: 25),
+                    const SizedBox(height: 16),
+
+                    CheckboxListTile(
+                      value: _acceptedTerms,
+                      onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      activeColor: Colors.black,
+                      title: Text(
+                        _selectedRole == 'agent'
+                            ? "J'accepte les conditions générales, la politique de confidentialité et le contrat de prestation FONACO."
+                            : "J'accepte les conditions générales d'utilisation et la politique de confidentialité de FONACO.",
+                        style: const TextStyle(fontSize: 13, height: 1.35),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
 
                     // BOUTON PRINCIPAL (NOIR POUR LE CONTRASTE)
                     SizedBox(

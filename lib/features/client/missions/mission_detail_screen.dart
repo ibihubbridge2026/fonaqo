@@ -151,6 +151,10 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
 
   bool get _canCancelMission {
     if (_mission == null) return false;
+    if (_mission!.status == MissionStatus.PENDING &&
+        (_mission!.agentName == null || _mission!.agentName!.isEmpty)) {
+      return true;
+    }
     return _mission!.status == MissionStatus.ACCEPTED ||
         _mission!.status == MissionStatus.IN_PROGRESS;
   }
@@ -160,13 +164,19 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
     final missionProvider = context.read<MissionProvider>();
     final messenger = ScaffoldMessenger.of(context);
 
+    final isFreeCancel = _mission?.status == MissionStatus.PENDING &&
+        (_mission?.agentName == null || _mission!.agentName!.isEmpty);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => FonDialog.alert(
         title: const Text('Annuler la mission'),
-        content: const Text(
-          "Attention, l'annulation d'une mission en cours entraîne un "
-          'dédommagement obligatoire de 20% pour l\'agent. Confirmer ?',
+        content: Text(
+          isFreeCancel
+              ? "Cette mission n'a pas encore été acceptée par un agent. "
+                  "L'annulation est gratuite et le montant sera intégralement remboursé."
+              : "Attention, l'annulation d'une mission en cours entraîne un "
+                  "dédommagement obligatoire de 20% pour l'agent. Confirmer ?",
         ),
         actions: [
           TextButton(
@@ -196,9 +206,11 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
         _isCancelling = false;
       });
       missionProvider.upsertMission(updated);
+      await missionProvider.refreshMissions();
       messenger.showSnackBar(
         const SnackBar(content: Text('Mission annulée')),
       );
+      if (mounted) Navigator.of(context).pop(updated);
     } catch (e) {
       if (!mounted) return;
       setState(() => _isCancelling = false);

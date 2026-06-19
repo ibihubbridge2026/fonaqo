@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -7,7 +8,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
-import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/features/agent/providers/agent_provider.dart';
 import 'package:fonaco/features/agent/screens/agent_active_mission_screen.dart';
 import 'package:go_router/go_router.dart';
@@ -143,6 +143,11 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
                     ],
                     const SizedBox(height: 16),
                     _ClientCard(mission: mission),
+                    if (mission.descriptionAudioUrl != null &&
+                        mission.descriptionAudioUrl!.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _VoiceDescriptionCard(audioUrl: mission.descriptionAudioUrl!),
+                    ],
                     const SizedBox(height: 24),
                     const _SectionTitle('Informations'),
                     const SizedBox(height: 12),
@@ -467,10 +472,12 @@ class _ClientCard extends StatelessWidget {
           CircleAvatar(
             radius: 28,
             backgroundColor: const Color(0xFFFFD400).withValues(alpha: 0.2),
-            backgroundImage: mission.avatarUrl != null
-                ? CachedNetworkImageProvider(mission.avatarUrl!)
+            backgroundImage: (mission.clientAvatarUrl ?? mission.avatarUrl) != null
+                ? CachedNetworkImageProvider(
+                    mission.clientAvatarUrl ?? mission.avatarUrl!,
+                  )
                 : null,
-            child: mission.avatarUrl == null
+            child: (mission.clientAvatarUrl ?? mission.avatarUrl) == null
                 ? const Icon(Icons.person, color: _AgentMissionDetailScreenState._black)
                 : null,
           ),
@@ -713,6 +720,66 @@ class _ActionArea extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
       ],
+    );
+  }
+}
+
+class _VoiceDescriptionCard extends StatefulWidget {
+  final String audioUrl;
+
+  const _VoiceDescriptionCard({required this.audioUrl});
+
+  @override
+  State<_VoiceDescriptionCard> createState() => _VoiceDescriptionCardState();
+}
+
+class _VoiceDescriptionCardState extends State<_VoiceDescriptionCard> {
+  final AudioPlayer _player = AudioPlayer();
+  bool _playing = false;
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    if (_playing) {
+      await _player.pause();
+      setState(() => _playing = false);
+      return;
+    }
+    await _player.play(UrlSource(widget.audioUrl));
+    setState(() => _playing = true);
+    _player.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _playing = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: _toggle,
+            icon: Icon(_playing ? Icons.pause_circle_filled : Icons.play_circle_fill),
+            color: const Color(0xFFFFD400),
+            iconSize: 40,
+          ),
+          const Expanded(
+            child: Text(
+              'Description vocale du client',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

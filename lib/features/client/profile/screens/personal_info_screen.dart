@@ -28,15 +28,20 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _loadFormFromUser();
   }
 
-  void _loadUserData() {
+  void _loadFormFromUser() {
     final user = Provider.of<AuthProvider>(context, listen: false).currentUser;
     if (user != null) {
       _firstName.text = user.firstName ?? '';
       _lastName.text = user.lastName ?? '';
-      _email.text = user.email ?? '';
+      final email = user.email;
+      if (email.contains('@internal.fonaqo.local')) {
+        _email.text = '';
+      } else {
+        _email.text = email;
+      }
     }
   }
 
@@ -97,6 +102,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         profileData = FormData.fromMap({
           'first_name': _firstName.text.trim(),
           'last_name': _lastName.text.trim(),
+          if (_email.text.trim().isNotEmpty) 'email': _email.text.trim(),
           'profile_picture': await MultipartFile.fromFile(
             _profileImage!.path,
             filename: 'profile_${DateTime.now().millisecondsSinceEpoch}.jpg',
@@ -106,6 +112,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         profileData = {
           'first_name': _firstName.text.trim(),
           'last_name': _lastName.text.trim(),
+          if (_email.text.trim().isNotEmpty) 'email': _email.text.trim(),
         };
       }
 
@@ -187,7 +194,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   label: 'Email',
                   controller: _email,
                   keyboardType: TextInputType.emailAddress,
-                  readOnly: true,
                 ),
                 const SizedBox(height: 24),
                 ProfileSaveButton(

@@ -44,7 +44,7 @@ class FeexPayService {
   }
 
   /// Confirme le paiement (sandbox) et crédite le wallet côté serveur.
-  Future<bool> confirmPayment({
+  Future<int?> confirmPayment({
     required String paymentId,
     required String externalReference,
   }) async {
@@ -56,9 +56,14 @@ class FeexPayService {
           'external_reference': externalReference,
         },
       );
-      return response.statusCode == 200;
+      if (response.statusCode != 200) return null;
+      final body = response.data;
+      if (body is Map && body['new_balance'] != null) {
+        return (body['new_balance'] as num).round();
+      }
+      return 0;
     } on DioException {
-      return false;
+      return null;
     }
   }
 
@@ -129,11 +134,11 @@ class FeexPayService {
     );
     if (init == null) return null;
 
-    final ok = await confirmPayment(
+    final newBalance = await confirmPayment(
       paymentId: init.paymentId,
       externalReference: init.externalReference,
     );
-    return ok ? init : null;
+    return newBalance != null ? init : null;
   }
 }
 

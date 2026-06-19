@@ -79,7 +79,11 @@ class MissionRepository implements ClientMissionRepository {
       : _baseClient = baseClient ?? BaseClient();
 
   List<dynamic> _extractListFromEnvelope(dynamic body) {
+    if (body is List<dynamic>) return body;
     if (body is! Map) return [];
+    if (body['results'] is List<dynamic>) {
+      return body['results'] as List<dynamic>;
+    }
     final data = body['data'];
     if (data is List<dynamic>) return data;
     if (data is Map<String, dynamic>) {
@@ -97,12 +101,16 @@ class MissionRepository implements ClientMissionRepository {
   }
 
   Map<String, dynamic> _extractObjectFromEnvelope(dynamic body) {
-    if (body is! Map<String, dynamic>) {
+    if (body is Map && body['id'] != null) {
+      return Map<String, dynamic>.from(body);
+    }
+    if (body is! Map) {
       throw Exception('Réponse JSON invalide');
     }
     final data = body['data'];
     if (data is Map<String, dynamic>) return data;
-    throw Exception('Réponse sans objet « data »');
+    if (data is Map) return Map<String, dynamic>.from(data);
+    throw Exception('Réponse sans objet mission');
   }
 
   /// Missions disponibles pour les agents (proximité optionnelle).
@@ -604,6 +612,21 @@ class MissionRepository implements ClientMissionRepository {
       );
     }
     throw Exception('Réponse invalide');
+  }
+
+  /// Agent : marque la mission terminée (suivi live → validation client).
+  Future<MissionModel> markMissionCompletedLive(String missionId) async {
+    final response = await _baseClient.post(
+      'missions/$missionId/mark_completed_live/',
+    );
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      final body = response.data;
+      final msg = body is Map
+          ? body['message']?.toString() ?? body['errors']?.toString()
+          : null;
+      throw Exception(msg ?? 'Impossible de clôturer la mission');
+    }
+    return MissionModel.fromJson(_parseMissionBody(response.data));
   }
 
   /// Refuse une proposition tarifaire.

@@ -30,6 +30,7 @@ class AuthProvider extends ChangeNotifier {
 
   bool _isAuthenticated = false;
   bool _isLoading = false;
+  bool _accountSuspended = false;
   String? _errorMessage;
   UserModel? _currentUser;
 
@@ -39,6 +40,7 @@ class AuthProvider extends ChangeNotifier {
 
   bool get isAuthenticated => _isAuthenticated;
   bool get isLoading => _isLoading;
+  bool get accountSuspended => _accountSuspended;
   String? get errorMessage => _errorMessage;
   UserModel? get currentUser => _currentUser;
   String? get accessToken => _memoryCache.accessToken;
@@ -86,15 +88,17 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Conservé pour compatibilité — ne déconnecte plus automatiquement.
+  /// Session invalidée (flush DB, refresh rejeté) — déconnexion complète.
   Future<void> handleTokenExpired() async {
-    _logger.w('Token expiré côté API — session locale conservée (logout manuel requis)');
+    _logger.w('Session invalidée — déconnexion forcée');
+    await logout();
   }
 
   /// Nettoie les données utilisateur et notifie les listeners
   void _clearUserDataAndNotify() {
     _currentUser = null;
     _isAuthenticated = false;
+    _accountSuspended = false;
     notifyListeners();
   }
 
@@ -156,11 +160,24 @@ class AuthProvider extends ChangeNotifier {
           await _baseClient.post('accounts/login/', data: cleanedCredentials);
 
       if (response.statusCode != 200) {
-        // Gestion spécifique des erreurs 400 (identifiants incorrects)
         String errorMessage = 'Erreur de connexion';
+        if (response.statusCode == 403) {
+          final data = response.data;
+          final code = data is Map ? data['code']?.toString() : null;
+          if (code == 'ACCOUNT_SUSPENDED') {
+            errorMessage = (data is Map ? data['message'] : null)?.toString() ??
+                'Votre compte a été suspendu. Contactez le support.';
+            _setError(errorMessage);
+            _accountSuspended = true;
+            notifyListeners();
+            return false;
+          }
+        }
         if (response.statusCode == 400) {
           // Erreur 400 : extraire les erreurs par champ depuis response.data
-          errorMessage = _extractApiErrors(response.data);
+          errorMessage = _extractApiErrors(
+            response.extra['api_envelope'] ?? response.data,
+          );
           _logger.e('🔴 Erreur 400 login: $errorMessage');
         } else if (response.statusCode == 401) {
           errorMessage = 'Identifiants incorrects';
@@ -176,8 +193,12 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      final data = response.data['data'];
-      await _saveAuthData(data);
+      final data = response.data;
+      if (data is! Map || data['access_token'] == null) {
+        _setError('Réponse connexion invalide');
+        return false;
+      }
+      await _saveAuthData(Map<String, dynamic>.from(data));
       return true;
     } on ApiException catch (e) {
       _setError(e.message);
@@ -199,6 +220,9 @@ class AuthProvider extends ChangeNotifier {
     _setLoading(true);
 
     try {
+      // Jamais de code promo saisi manuellement — parrainage = deep link uniquement.
+      userData.remove('promo_code');
+
       final response =
           await _baseClient.post('accounts/register/', data: userData);
 
@@ -208,8 +232,16 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      final data = response.data['data'];
-      await _saveAuthData(data);
+      final raw = response.data;
+      Map<String, dynamic>? authPayload;
+      if (raw is Map && raw['access_token'] != null) {
+        authPayload = Map<String, dynamic>.from(raw);
+      }
+      if (authPayload == null) {
+        _setError('Réponse inscription invalide');
+        return false;
+      }
+      await _saveAuthData(authPayload);
       return true;
     } on ApiException catch (e) {
       _setError(e.message);
@@ -250,13 +282,12 @@ class AuthProvider extends ChangeNotifier {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = response.data['data'];
-        await _saveAuthData(data);
-
-        // Charger immédiatement les données utilisateur pour mettre à jour l'UI
-        await _loadUserData();
-
-        return true;
+        final data = response.data;
+        if (data is Map && data['access_token'] != null) {
+          await _saveAuthData(Map<String, dynamic>.from(data));
+          await _loadUserData();
+          return true;
+        }
       }
       return false;
     } catch (e) {
@@ -477,12 +508,39 @@ class AuthProvider extends ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        final userData = response.data['data'];
-        _currentUser = UserModel.fromJson(userData);
-        await _secureStorage.write(key: _userKey, value: jsonEncode(userData));
-        notifyListeners();
-        return true;
+        final userData = response.data;
+        if (userData is Map) {
+          final map = Map<String, dynamic>.from(userData);
+          if (map.containsKey('data') && map['data'] is Map) {
+            final inner = Map<String, dynamic>.from(map['data'] as Map);
+            _currentUser = UserModel.fromJson(inner);
+          } else {
+            _currentUser = UserModel.fromJson(map);
+          }
+          final encoded = jsonEncode(_currentUser != null
+              ? {
+                  'id': _currentUser!.id,
+                  'email': _currentUser!.email,
+                  'username': _currentUser!.djangoUsername,
+                  'first_name': _currentUser!.firstName,
+                  'last_name': _currentUser!.lastName,
+                  'role': _currentUser!.role,
+                  'avatar_url': _currentUser!.avatarUrl,
+                }
+              : map);
+          await _secureStorage.write(key: _userKey, value: encoded);
+          await _memoryCache.saveUserData(encoded);
+          notifyListeners();
+          return true;
+        }
       }
+      _setError(_extractApiErrors(response.extra['api_envelope'] ?? response.data));
+      return false;
+    } on ApiException catch (e) {
+      _setError(e.message);
+      return false;
+    } on DioException catch (e) {
+      _setError(_messageFromDio(e, fallback: 'Erreur mise à jour profil'));
       return false;
     } catch (e) {
       _setError('Erreur lors de la mise à jour : $e');
@@ -499,31 +557,36 @@ class AuthProvider extends ChangeNotifier {
 
     try {
       final response = await _baseClient.get('accounts/profile/');
-      if (response.statusCode == 200) {
-        final userData = response.data['data'];
-        if (userData is Map) {
-          final map = Map<String, dynamic>.from(userData);
-          _currentUser = UserModel.fromJson(map);
-          final encoded = jsonEncode(map);
-          await _secureStorage.write(key: _userKey, value: encoded);
-          await _memoryCache.saveUserData(encoded);
-          notifyListeners();
-        }
+      if (response.statusCode == 200 && response.data is Map) {
+        final map = Map<String, dynamic>.from(response.data as Map);
+        _currentUser = UserModel.fromJson(map);
+        final encoded = jsonEncode(map);
+        await _secureStorage.write(key: _userKey, value: encoded);
+        await _memoryCache.saveUserData(encoded);
+        notifyListeners();
       }
     } on ApiException catch (e) {
       if (e.type == ApiErrorType.unauthorized) {
-        await refreshToken();
+        final ok = await refreshToken();
+        if (!ok) await handleTokenExpired();
+      }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        final ok = await refreshToken();
+        if (!ok) await handleTokenExpired();
+      } else {
+        _logger.w('Vérification profil serveur ignorée: $e');
       }
     } catch (e) {
       _logger.w('Vérification profil serveur ignorée: $e');
     }
 
-    if (_isAuthenticated) {
-      await NotificationService().initialize();
-      final token = accessToken;
-      if (token != null) {
-        await NotificationService().sendTokenToBackend(token);
-      }
+    if (!_isAuthenticated) return;
+
+    await NotificationService().initialize();
+    final token = accessToken;
+    if (token != null) {
+      await NotificationService().sendTokenToBackend(token);
     }
   }
 
@@ -593,30 +656,48 @@ class AuthProvider extends ChangeNotifier {
   String _extractApiErrors(dynamic responseData) {
     if (responseData is! Map) return 'Erreur de validation';
 
-    // Structure standardisée: { "status": "error", "message": "...", "data": { "field": ["error"] } }
-    final data = responseData['data'];
-    final message = responseData['message'] as String?;
+    final map = Map<String, dynamic>.from(responseData);
 
-    if (data is Map && data.isNotEmpty) {
-      final errors = <String>[];
-
-      // Extraire les erreurs par champ
-      data.forEach((key, value) {
-        if (value is List && value.isNotEmpty) {
-          final fieldErrors = value.whereType<String>().join(', ');
-          errors.add('$key: $fieldErrors');
-        } else if (value is String) {
-          errors.add('$key: $value');
-        }
-      });
-
-      if (errors.isNotEmpty) {
-        return errors.join('\n');
+    // Enveloppe complète
+    if (map.containsKey('status') && map['status'] == 'error') {
+      final data = map['data'];
+      if (data is Map && data.isNotEmpty) {
+        return _formatFieldErrors(data);
       }
+      return map['message']?.toString() ?? 'Erreur de validation';
     }
 
-    // Fallback sur le message général
-    return message ?? 'Erreur de validation';
+    // Payload déjà désenveloppé (erreurs par champ)
+    if (!map.containsKey('access_token') && !map.containsKey('id')) {
+      final fieldErr = _formatFieldErrors(map);
+      if (fieldErr.isNotEmpty) return fieldErr;
+    }
+
+    return map['message']?.toString() ?? 'Erreur de validation';
+  }
+
+  String _formatFieldErrors(Map data) {
+    const fieldLabels = {
+      'phone_number': 'Téléphone',
+      'password': 'Mot de passe',
+      'email': 'Email',
+      'username': 'Nom d\'utilisateur',
+      'promo_code': 'Code promo',
+      'referral_code_cache': 'Code parrainage',
+      'role': 'Rôle',
+      'non_field_errors': 'Erreur',
+    };
+
+    final errors = <String>[];
+    data.forEach((key, value) {
+      final label = fieldLabels[key] ?? key.toString();
+      if (value is List && value.isNotEmpty) {
+        errors.add('$label : ${value.whereType<String>().join(', ')}');
+      } else if (value is String && value.isNotEmpty) {
+        errors.add('$label : $value');
+      }
+    });
+    return errors.join('\n');
   }
 
   String _messageFromDio(DioException e, {String fallback = 'Erreur de connexion'}) {

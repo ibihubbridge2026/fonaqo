@@ -87,9 +87,18 @@ class ProfileHeader extends StatelessWidget {
       );
     }
 
-    final displayName = user.djangoUsername?.isNotEmpty == true
-        ? user.djangoUsername!
-        : user.username;
+    final displayName = () {
+      final first = user.firstName?.trim() ?? '';
+      final last = user.lastName?.trim() ?? '';
+      if (first.isNotEmpty || last.isNotEmpty) {
+        return [first, last].where((s) => s.isNotEmpty).join(' ');
+      }
+      final uname = user.djangoUsername ?? user.username;
+      if (uname.startsWith('client_') || uname.startsWith('agent_')) {
+        return 'Client Fonaqo';
+      }
+      return uname;
+    }();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -108,11 +117,9 @@ class ProfileHeader extends StatelessWidget {
                       ? NetworkImage(
                           '${user.avatarUrl}?t=${DateTime.now().millisecondsSinceEpoch}',
                         )
-                      : null,
+                      : const AssetImage('assets/images/avatar/user.png')
+                          as ImageProvider,
                   backgroundColor: Colors.grey[200],
-                  child: user.avatarUrl == null
-                      ? const Icon(Icons.person, size: 40, color: Colors.grey)
-                      : null,
                 ),
               ),
               InkWell(

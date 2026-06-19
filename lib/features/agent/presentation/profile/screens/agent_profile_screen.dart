@@ -134,44 +134,9 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
-                _ProfilePanel(
-                  title: 'Vérification KYC',
-                  subtitle: 'Pièce d\'identité et selfie',
-                  initiallyExpanded: true,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Profil complété à $kycProgress%',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LinearProgressIndicator(
-                          value: kycProgress / 100,
-                          minHeight: 8,
-                          backgroundColor: Colors.grey.shade200,
-                          color: const Color(0xFF2EC4B6),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Soumettez votre pièce d\'identité (CNI ou passeport) '
-                        'et un selfie pour valider votre compte agent.',
-                        style: TextStyle(height: 1.45),
-                      ),
-                      const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                        onPressed: () => context.push(AppRoutes.agentKycSubmit),
-                        icon: const Icon(Icons.upload_file),
-                        label: const Text('Soumettre mes documents'),
-                      ),
-                    ],
-                  ),
+                _KycSection(
+                  kyc: kyc,
+                  kycProgress: kycProgress,
                 ),
                 const SizedBox(height: 10),
                 _ProfilePanel(
@@ -195,6 +160,12 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                   title: 'Paramètres',
                   child: Column(
                     children: [
+                      ProfileParamItem(
+                        icon: Icons.badge_outlined,
+                        title: 'Badge professionnel',
+                        subtitle: 'Demander ou télécharger ma carte agent',
+                        onTap: () => context.push(AppRoutes.agentProBadge),
+                      ),
                       ProfileParamItem(
                         icon: Icons.rocket_launch_outlined,
                         title: 'Booster mon profil',
@@ -262,6 +233,95 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
             ),
           ),
           const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+}
+
+class _KycSection extends StatelessWidget {
+  final String kyc;
+  final int kycProgress;
+
+  const _KycSection({required this.kyc, required this.kycProgress});
+
+  @override
+  Widget build(BuildContext context) {
+    final isVerified = kyc == 'APPROVED';
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Vérification KYC',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+              if (isVerified)
+                Row(
+                  children: [
+                    Icon(Icons.verified, color: Colors.green.shade600, size: 22),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Compte Vérifié',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.green.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          if (!isVerified) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Profil complété à $kycProgress%',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: kycProgress / 100,
+                minHeight: 8,
+                backgroundColor: Colors.grey.shade200,
+                color: const Color(0xFF2EC4B6),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Soumettez votre pièce d\'identité (CNI ou passeport) '
+              'et un selfie pour valider votre compte agent.',
+              style: TextStyle(height: 1.45),
+            ),
+            if (kyc != 'SUBMITTED' && kyc != 'PENDING') ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () => context.push(AppRoutes.agentKycSubmit),
+                icon: const Icon(Icons.upload_file),
+                label: const Text('Soumettre mes documents'),
+              ),
+            ],
+          ],
         ],
       ),
     );

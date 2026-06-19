@@ -15,6 +15,7 @@ import 'core/services/image_compression_service.dart';
 import 'core/services/error_monitoring_service.dart';
 import 'core/services/cache_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/api/base_client.dart';
 import 'core/providers/auth_provider.dart';
 import 'core/providers/wallet_provider.dart';
 import 'core/providers/mission_provider.dart';
@@ -64,6 +65,9 @@ void main() async {
 
   final authProvider = AuthProvider();
   await authProvider.checkAuth();
+  BaseClient().setOnTokenExpiredCallback(() {
+    authProvider.handleTokenExpired();
+  });
   if (authProvider.isAuthenticated) {
     final token = authProvider.accessToken;
     if (token != null) {

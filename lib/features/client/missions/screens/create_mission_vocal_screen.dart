@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:record/record.dart';
 import 'package:path_provider/path_provider.dart';
@@ -20,6 +21,7 @@ class CreateMissionVocalScreen extends StatefulWidget {
 class _CreateMissionVocalScreenState extends State<CreateMissionVocalScreen>
     with TickerProviderStateMixin {
   final AudioRecorder _audioRecorder = AudioRecorder();
+  final AudioPlayer _previewPlayer = AudioPlayer();
   final BaseClient _api = BaseClient();
 
   // États de l'écran
@@ -27,6 +29,8 @@ class _CreateMissionVocalScreenState extends State<CreateMissionVocalScreen>
   bool _isProcessing = false;
   bool _hasRecorded = false;
   bool _isStopping = false;
+  bool _previewReady = false;
+  bool _isPlayingPreview = false;
   String? _audioPath;
   String? _transcription;
 
@@ -54,6 +58,7 @@ class _CreateMissionVocalScreenState extends State<CreateMissionVocalScreen>
   @override
   void dispose() {
     _waveController.dispose();
+    _previewPlayer.dispose();
     _audioRecorder.dispose();
     super.dispose();
   }
@@ -107,10 +112,10 @@ class _CreateMissionVocalScreenState extends State<CreateMissionVocalScreen>
       setState(() {
         _isRecording = false;
         _hasRecorded = true;
+        _previewReady = true;
         _audioPath = path;
         _isStopping = false;
       });
-      await _sendAudioToBackend();
     } catch (e) {
       setState(() => _isStopping = false);
       if (mounted) {
@@ -126,7 +131,10 @@ class _CreateMissionVocalScreenState extends State<CreateMissionVocalScreen>
   Future<void> _sendAudioToBackend() async {
     if (_audioPath == null) return;
 
-    setState(() => _isProcessing = true);
+    setState(() {
+      _isProcessing = true;
+      _previewReady = false;
+    });
 
     try {
       final file = File(_audioPath!);
@@ -254,6 +262,8 @@ class _CreateMissionVocalScreenState extends State<CreateMissionVocalScreen>
                 _buildProcessingState()
               else if (_missingFields != null && _missingFields!.isNotEmpty)
                 _buildMissingFieldsUI()
+              else if (_previewReady && !_isProcessing)
+                _buildPreviewUI()
               else
                 _buildRecordingUI(),
             ],
@@ -379,16 +389,91 @@ class _CreateMissionVocalScreenState extends State<CreateMissionVocalScreen>
             color: Colors.grey[700],
           ),
         ),
-        if (_hasRecorded && !_isRecording) ...[
+        if (_hasRecorded && !_isRecording && !_previewReady) ...[
           const SizedBox(height: 16),
           Text(
-            'Relâchez pour envoyer',
+            'Relâchez pour prévisualiser',
             style: TextStyle(
               fontSize: 14,
               color: Colors.grey[500],
             ),
           ),
         ],
+      ],
+    );
+  }
+
+  Future<void> _togglePreviewPlayback() async {
+    if (_audioPath == null) return;
+    if (_isPlayingPreview) {
+      await _previewPlayer.pause();
+      setState(() => _isPlayingPreview = false);
+      return;
+    }
+    await _previewPlayer.play(DeviceFileSource(_audioPath!));
+    setState(() => _isPlayingPreview = true);
+    _previewPlayer.onPlayerComplete.listen((_) {
+      if (mounted) setState(() => _isPlayingPreview = false);
+    });
+  }
+
+  Widget _buildPreviewUI() {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              const Text(
+                'Écoutez votre enregistrement',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              IconButton(
+                onPressed: _togglePreviewPlayback,
+                iconSize: 56,
+                color: const Color(0xFFFFD400),
+                icon: Icon(
+                  _isPlayingPreview ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () {
+                  setState(() {
+                    _previewReady = false;
+                    _hasRecorded = false;
+                    _audioPath = null;
+                    _extractedData = null;
+                    _missingFields = null;
+                  });
+                },
+                child: const Text('Réenregistrer'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFD400),
+                  foregroundColor: Colors.black,
+                ),
+                onPressed: _sendAudioToBackend,
+                child: const Text('Continuer'),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }

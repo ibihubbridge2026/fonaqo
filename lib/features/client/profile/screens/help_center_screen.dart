@@ -1,13 +1,66 @@
 import 'package:flutter/material.dart';
 
+import 'package:fonaco/core/config/app_configuration.dart';
+import 'package:fonaco/core/services/support_config_service.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 
-/// Centre d'aide : FAQ accordéon + liens politiques en pied de page.
-class HelpCenterScreen extends StatelessWidget {
+/// Centre d'aide client — FAQ + contact support.
+class HelpCenterScreen extends StatefulWidget {
   const HelpCenterScreen({super.key});
 
   @override
+  State<HelpCenterScreen> createState() => _HelpCenterScreenState();
+}
+
+class _HelpCenterScreenState extends State<HelpCenterScreen> {
+  SupportConfig? _config;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final cfg = await SupportConfigService().fetch(profile: 'client');
+    if (mounted) {
+      setState(() {
+        _config = cfg;
+        _loading = false;
+      });
+    }
+  }
+
+  List<({String question, String answer})> get _faqs {
+    if (_config != null && _config!.faqs.isNotEmpty) return _config!.faqs;
+    return const [
+      (
+        question: 'Comment créer une mission ?',
+        answer:
+            'Depuis l\'accueil ou l\'onglet Missions, ouvrez « Créer une mission », '
+            'choisissez le type, renseignez la logistique puis confirmez.',
+      ),
+      (
+        question: 'Comment contacter un agent ?',
+        answer:
+            'Une fois une mission créée ou acceptée, utilisez le chat lié à la mission.',
+      ),
+      (
+        question: 'Frais et paiement',
+        answer:
+            'Le montant affiché au récapitulatif est celui bloqué en séquestre. '
+            'Les frais plateforme sont prélevés uniquement lors du versement à l\'agent.',
+      ),
+    ];
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final config = AppConfiguration.instance;
+    final phone = _config?.phone ?? config.clientServicePhone;
+    final email = _config?.email ?? config.clientSupportEmail;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: const CustomAppBar.detailStack(
@@ -17,81 +70,34 @@ class HelpCenterScreen extends StatelessWidget {
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
       ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-          children: [
-            Text(
-              'Questions fréquentes',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: Colors.grey[800],
-                letterSpacing: 0.3,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFFFD400)))
+          : RefreshIndicator(
+              color: const Color(0xFFFFD400),
+              onRefresh: _load,
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                children: [
+                  Text(
+                    'Questions fréquentes',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ..._faqs.map(
+                    (f) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _FaqTile(question: f.question, answer: f.answer),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _ContactCard(email: email, phone: phone),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            const _FaqTile(
-              question: 'Comment créer une mission ?',
-              answer:
-                  'Depuis l’accueil ou l’onglet Missions, ouvrez le flux « Créer une mission », '
-                  'choisissez le type (file ou service), renseignez la logistique puis confirmez le récapitulatif.',
-            ),
-            const SizedBox(height: 10),
-            const _FaqTile(
-              question: 'Comment contacter un agent ?',
-              answer:
-                  'Une fois une mission créée ou acceptée, utilisez le chat lié à la mission. '
-                  'Vous pouvez aussi consulter les suggestions d’agents sur l’accueil.',
-            ),
-            const SizedBox(height: 10),
-            const _FaqTile(
-              question: 'Que couvrent les frais FONACO (10 %) ?',
-              answer:
-                  'Les frais de service contribuent à la plateforme, au support et à la sécurisation des paiements '
-                  '(hors intégration FeexPay en cours de déploiement).',
-            ),
-            const SizedBox(height: 10),
-            const _FaqTile(
-              question: 'Paiement et portefeuille',
-              answer:
-                  'Le portefeuille et les paiements seront synchronisés avec le backend après intégration complète des prestataires.',
-            ),
-            const SizedBox(height: 32),
-            Text(
-              'Politiques & confiance',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                color: Colors.grey[800],
-                letterSpacing: 0.3,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _PolicyCard(
-              title: 'Confidentialité',
-              body:
-                  'Nous traitons vos données personnelles uniquement pour fournir le service FONACO, '
-                  'améliorer la sécurité des missions et respecter la réglementation applicable. '
-                  'Vous pouvez demander l’accès ou la rectification via le support.',
-            ),
-            const SizedBox(height: 10),
-            _PolicyCard(
-              title: 'Conditions d’utilisation',
-              body:
-                  'L’utilisation de l’application implique le respect des lois locales, des agents et des clients. '
-                  'Les missions frauduleuses ou les comportements abusifs peuvent entraîner la suspension du compte.',
-            ),
-            const SizedBox(height: 10),
-            _PolicyCard(
-              title: 'Sécurité',
-              body:
-                  'Les échanges sensibles passent par des canaux sécurisés. Ne partagez jamais votre mot de passe '
-                  'ou codes OTP. Signalez tout incident depuis la section litiges ou le support.',
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -104,72 +110,53 @@ class _FaqTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
-      child: Theme(
-        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-          title: Text(
-            question,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-          ),
-          children: [
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                answer,
-                style: TextStyle(
-                  color: Colors.grey[800],
-                  fontSize: 13,
-                  height: 1.45,
-                ),
-              ),
-            ),
-          ],
-        ),
+    return ExpansionTile(
+      tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      collapsedBackgroundColor: const Color(0xFFFFD400),
+      backgroundColor: const Color(0xFFFFD400),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      collapsedShape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      title: Text(
+        question,
+        style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.black),
       ),
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          color: const Color(0xFFFFD400),
+          child: Text(answer, style: const TextStyle(height: 1.45)),
+        ),
+      ],
     );
   }
 }
 
-class _PolicyCard extends StatelessWidget {
-  final String title;
-  final String body;
+class _ContactCard extends StatelessWidget {
+  final String email;
+  final String phone;
 
-  const _PolicyCard({required this.title, required this.body});
+  const _ContactCard({required this.email, required this.phone});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
+        color: const Color(0xFFFFD400),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 15,
-            ),
+          const Text(
+            'Contacter le support',
+            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
           ),
           const SizedBox(height: 8),
-          Text(
-            body,
-            style: TextStyle(
-              color: Colors.grey[800],
-              fontSize: 13,
-              height: 1.45,
-            ),
-          ),
+          Text('Téléphone : $phone'),
+          Text('Email : $email'),
         ],
       ),
     );

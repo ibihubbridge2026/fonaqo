@@ -52,7 +52,10 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     if (!success && mounted) {
-      // Show error in SnackBar instead of static text
+      if (authProvider.accountSuspended) {
+        context.go(AppRoutes.accountSuspended);
+        return;
+      }
       final errorMessage = authProvider.errorMessage ?? 'Échec de la connexion';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

@@ -72,6 +72,8 @@ class MissionModel {
   final String? destinationAddress;
   final String? category;
   final String? avatarUrl;
+  final String? clientAvatarUrl;
+  final String? descriptionAudioUrl;
   final double? agentRating;
   final int? agentCompletedMissions;
   final double? agentLatitude;
@@ -110,6 +112,8 @@ class MissionModel {
     this.destinationAddress,
     this.category,
     this.avatarUrl,
+    this.clientAvatarUrl,
+    this.descriptionAudioUrl,
     this.agentRating,
     this.agentCompletedMissions,
     this.agentLatitude,
@@ -155,6 +159,8 @@ class MissionModel {
         category: json['category']?.toString() ??
             _firstTagName(json['tags']),
         avatarUrl: json['avatar_url']?.toString(),
+        clientAvatarUrl: json['client_avatar_url']?.toString(),
+        descriptionAudioUrl: json['description_audio_url']?.toString(),
         agentRating: _readDouble(json['agent_rating']),
         agentCompletedMissions: _readInt(json['agent_completed_missions']),
         agentLatitude: _readDouble(json['agent_latitude']),

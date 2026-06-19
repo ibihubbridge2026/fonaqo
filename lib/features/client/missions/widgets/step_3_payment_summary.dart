@@ -77,8 +77,8 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
       final targetAgent = _targetAgentController.text.trim();
 
       final totals = MissionPaymentTotals(
-        totalCfa: missionPrice + calculatedServiceFee,
-        serviceFeeCfa: calculatedServiceFee,
+        totalCfa: missionPrice,
+        serviceFeeCfa: 0,
         purchaseBudgetCfa: missionPrice,
         paySupplierDirectly: _paySupplierDirectly,
         targetAgentUsername: targetAgent.isNotEmpty ? targetAgent : null,
@@ -117,21 +117,23 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
                   'Type de mission',
                   widget.mode == 'queue' ? "File d'attente" : 'Service libre',
                 ),
-                _buildSummaryRow(
-                  'Frais de service',
-                  '${_serviceFee.toInt()} CFA',
-                ),
                 if (!_paySupplierDirectly) ...[
                   _buildSummaryRow(
-                    'Budget achats',
+                    'Montant séquestre',
                     '${_purchaseBudgetValue().toInt()} CFA',
                   ),
                 ],
                 const Divider(height: 30),
                 _buildSummaryRow(
-                  'Total à payer',
-                  '${_calculateTotal().toInt()} CFA',
+                  'Total bloqué',
+                  '${(_paySupplierDirectly ? 0 : _purchaseBudgetValue()).toInt()} CFA',
                   isTotal: true,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Aucun frais supplémentaire ne vous est facturé ici. '
+                  'Les frais plateforme sont prélevés lors du versement à l\'agent.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700, height: 1.4),
                 ),
               ],
             ),
@@ -232,15 +234,18 @@ class _Step3PaymentSummaryState extends State<Step3PaymentSummary> {
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 15),
-                _buildSummaryRow('Prix mission',
-                    '${_purchaseBudgetValue().toStringAsFixed(2)} CFA'),
-                _buildSummaryRow('Frais de service (10%)',
-                    '${_calculateServiceFee(_purchaseBudgetValue()).toStringAsFixed(2)} CFA'),
+                _buildSummaryRow('Montant séquestre',
+                    '${_purchaseBudgetValue().toStringAsFixed(0)} CFA'),
                 const Divider(),
                 _buildSummaryRow(
-                  'TOTAL',
-                  '${(_purchaseBudgetValue() + _calculateServiceFee(_purchaseBudgetValue())).toStringAsFixed(2)} CFA',
+                  'TOTAL BLOQUÉ',
+                  '${_purchaseBudgetValue().toStringAsFixed(0)} CFA',
                   isTotal: true,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Les frais plateforme seront déduits lors du paiement de l\'agent.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
               ],
             ),
