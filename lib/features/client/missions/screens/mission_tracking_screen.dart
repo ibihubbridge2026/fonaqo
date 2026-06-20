@@ -9,6 +9,9 @@ import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/services/gps_websocket_service.dart';
 import 'package:fonaco/features/chat/chat_repository.dart';
 import 'package:fonaco/features/client/missions/mission_repository.dart';
+import 'package:fonaco/features/client/missions/widgets/mission_rating_dialog.dart';
+import 'package:fonaco/features/rating/models/rating.dart';
+import 'package:fonaco/features/rating/repositories/rating_repository.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
@@ -144,6 +147,41 @@ class _MissionTrackingScreenState extends State<MissionTrackingScreen> {
       if (!mounted) return;
       setState(() => _mission = m);
       _gps.stopAgentLocationTicker();
+
+      // Show rating dialog after mission completion
+      if (mounted) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => MissionRatingDialog(
+            missionId: widget.missionId,
+            onSubmit: (rating, comment) async {
+              final ratingRepo = RatingRepository();
+              try {
+                await ratingRepo.submitRating(
+                  missionId: widget.missionId,
+                  ratedId: '', // Backend will infer from mission context
+                  score: rating,
+                  type: RatingType.clientRatesAgent,
+                  comment: comment,
+                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Évaluation envoyée avec succès')),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Erreur envoi évaluation: $e')),
+                  );
+                }
+              }
+            },
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -396,7 +434,9 @@ class _MissionTrackingScreenState extends State<MissionTrackingScreen> {
       if (!mounted) return;
       setState(() => _isChatLoading = false);
       if (conversation != null) {
-        context.push(AppRoutes.chatDetail, extra: {
+        context.push(
+          AppRoutes.chatDetail,
+          extra: {
             'chatId': conversation['id']?.toString(),
             'userName': _mission!.agentName ?? 'Agent',
             'agentAvatar': _mission!.avatarUrl,
@@ -543,6 +583,8 @@ class _AnimatedLinearProgressIndicatorState
 
 /// Ouvre l’écran de suivi (à utiliser depuis la liste / détail mission).
 void openMissionTracking(BuildContext context, String missionId) {
-  context.push(AppRoutes.missionTracking, extra: {'missionId': missionId},
+  context.push(
+    AppRoutes.missionTracking,
+    extra: {'missionId': missionId},
   );
 }

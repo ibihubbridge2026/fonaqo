@@ -244,8 +244,18 @@ class BaseClient {
         );
 
       case 403:
+        if (responseData is Map &&
+            responseData['code']?.toString() == 'ACCOUNT_SUSPENDED') {
+          return ApiException(
+            message: responseData['message']?.toString() ??
+                'Votre compte a été suspendu. Contactez le support FONACO.',
+            type: ApiErrorType.accountSuspended,
+          );
+        }
         return ApiException(
-          message: 'Accès refusé. Permissions insuffisantes.',
+          message: message.isEmpty
+              ? 'Accès refusé. Permissions insuffisantes.'
+              : message,
           type: ApiErrorType.forbidden,
         );
 
@@ -257,9 +267,8 @@ class BaseClient {
 
       case 409:
         return ApiException(
-          message: message.isEmpty
-              ? 'Conflit : ressource déjà modifiée'
-              : message,
+          message:
+              message.isEmpty ? 'Conflit : ressource déjà modifiée' : message,
           type: ApiErrorType.conflict,
         );
 
@@ -309,13 +318,18 @@ class BaseClient {
 class _AuthInterceptor extends Interceptor {
   final FlutterSecureStorage _secureStorage;
   final Logger _logger;
-  final Dio _dio; // Ajout de l'instance Dio
+  final Dio _dio;
   final Function()? onTokenExpired;
   final MemoryAuthCache _memoryCache;
   static const String _tokenKey = 'jwt_access_token';
   static const String _refreshTokenKey = 'jwt_refresh_token';
+
+  // Mutex pour le refresh concurrent
   bool _isRefreshing = false;
-  Completer<void>? _refreshCompleter;
+  Completer<String?>? _refreshCompleter;
+
+  // File d'attente des requêtes pendant le refresh
+  final List<_PendingRequest> _pendingRequests = [];
 
   _AuthInterceptor(
     this._secureStorage,
@@ -394,7 +408,8 @@ class _AuthInterceptor extends Interceptor {
       final refreshAttempt =
           err.requestOptions.extra['refresh_attempt'] as int? ?? 0;
       if (refreshAttempt >= 1) {
-        _logger.w('🚨 Refresh déjà tenté pour cette requête — rejet sans déconnexion');
+        _logger.w(
+            '🚨 Refresh déjà tenté pour cette requête — rejet sans déconnexion');
         return handler.reject(err);
       }
       err.requestOptions.extra['refresh_attempt'] = refreshAttempt + 1;
@@ -407,68 +422,65 @@ class _AuthInterceptor extends Interceptor {
       _logger.e('📍 Corps de l\'erreur: ${err.response?.data}');
       _logger.e('📍 Message: ${err.message}');
 
-      // MUTEX REFRESH: Si déjà en cours de refresh, attendre
+      // MUTEX REFRESH: Si déjà en cours de refresh, ajouter à la file d'attente
       if (_isRefreshing) {
-        _logger.w('⏳ Refresh déjà en cours, attente...');
-        if (_refreshCompleter != null) {
-          await _refreshCompleter!.future;
+        _logger.w('⏳ Refresh déjà en cours, ajout à la file d\'attente...');
+        _pendingRequests.add(_PendingRequest(err, handler));
 
-          // Une fois le refresh terminé, réessayer avec le nouveau token
-          final newToken = _memoryCache.accessToken;
-          if (newToken != null) {
-            err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
-            try {
-              final response = await _dio.fetch(err.requestOptions);
-              handler.resolve(response);
-              return;
-            } catch (e) {
-              _logger.e('Échec de la réessai après refresh: $e');
-            }
+        // Attendre que le refresh se termine
+        final newToken = await _refreshCompleter!.future;
+
+        // Si le refresh a réussi, rejouer la requête
+        if (newToken != null) {
+          err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+          try {
+            final response = await _dio.fetch(err.requestOptions);
+            handler.resolve(response);
+            return;
+          } catch (e) {
+            _logger.e('Échec de la réessai après refresh: $e');
           }
         }
+
+        // Si le refresh a échoué, rejeter la requête
+        return handler.reject(err);
       } else {
         // Premier 401: lancer le refresh
         _isRefreshing = true;
-        _refreshCompleter = Completer<void>();
+        _refreshCompleter = Completer<String?>();
+
+        // Ajouter la requête courante à la file d'attente
+        _pendingRequests.add(_PendingRequest(err, handler));
 
         _logger.w('🔄 401 reçu — tentative de rafraîchissement du token JWT');
         final refreshResult = await _tryRefreshToken();
 
-        // Notifier tous les requêtes en attente
-        _refreshCompleter!.complete();
+        String? newToken;
+        if (refreshResult == TokenRefreshResult.success) {
+          newToken = _memoryCache.accessToken;
+          _logger.i(
+              '✅ Token rafraîchi avec succès, nouvelle valeur: ${newToken?.substring(0, 20)}...');
+        }
+
+        // Notifier toutes les requêtes en attente et rejouer
+        _refreshCompleter!.complete(newToken);
         _isRefreshing = false;
         _refreshCompleter = null;
 
-        if (refreshResult == TokenRefreshResult.sessionRevoked) {
-          _logger.w('Refresh token rejeté — déconnexion forcée');
-          onTokenExpired?.call();
-          return handler.reject(err);
-        }
-
-        if (refreshResult == TokenRefreshResult.networkError) {
-          _logger.w(
-              '📴 Refresh impossible (réseau) — requête rejetée, session conservée');
-          return handler.reject(err);
-        }
-
-        if (refreshResult == TokenRefreshResult.success) {
-          final newToken = _memoryCache.accessToken;
-          if (newToken != null) {
-            err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
-
-            try {
-              final response = await _dio.fetch(err.requestOptions);
-              handler.resolve(response);
-              return;
-            } catch (e) {
-              _logger.e('Échec de la réessai après rafraîchissement: $e');
-            }
+        // Rejouer toutes les requêtes en attente si le refresh a réussi
+        if (refreshResult == TokenRefreshResult.success && newToken != null) {
+          await _retryPendingRequests(newToken);
+        } else {
+          // Si le refresh a échoué, rejeter toutes les requêtes en attente
+          if (refreshResult == TokenRefreshResult.sessionRevoked) {
+            _logger.w('Refresh token rejeté — déconnexion forcée');
+            onTokenExpired?.call();
           }
+          _rejectPendingRequests();
         }
-      }
 
-      _logger.w('⚠️ Refresh échoué — requête rejetée, session conservée');
-      return handler.reject(err);
+        return;
+      }
     }
 
     // Pour toutes les autres erreurs (404, 500, réseau, etc.), on ne fait rien de spécial
@@ -480,6 +492,33 @@ class _AuthInterceptor extends Interceptor {
     }
 
     handler.next(err);
+  }
+
+  /// Rejoue toutes les requêtes en attente avec le nouveau token
+  Future<void> _retryPendingRequests(String newToken) async {
+    _logger.i('🔄 Rejeu de ${_pendingRequests.length} requêtes en attente');
+
+    for (final pending in _pendingRequests) {
+      pending.err.requestOptions.headers['Authorization'] = 'Bearer $newToken';
+      try {
+        final response = await _dio.fetch(pending.err.requestOptions);
+        pending.handler.resolve(response);
+      } catch (e) {
+        _logger.e('Échec du rejeu pour ${pending.err.requestOptions.path}: $e');
+        pending.handler.reject(pending.err);
+      }
+    }
+
+    _pendingRequests.clear();
+  }
+
+  /// Rejette toutes les requêtes en attente
+  void _rejectPendingRequests() {
+    _logger.w('⚠️ Rejet de ${_pendingRequests.length} requêtes en attente');
+    for (final pending in _pendingRequests) {
+      pending.handler.reject(pending.err);
+    }
+    _pendingRequests.clear();
   }
 
   /// Tente de rafraîchir le token JWT.
@@ -514,6 +553,8 @@ class _AuthInterceptor extends Interceptor {
             .trim()
             .replaceAll('#', '')
             .replaceAll(RegExp(r'\s'), '');
+
+        // Écriture atomique du token dans le stockage
         await _memoryCache.updateAccessToken(cleanToken);
         _logger.i('Token JWT rafraîchi avec succès');
         return TokenRefreshResult.success;
@@ -539,6 +580,14 @@ class _AuthInterceptor extends Interceptor {
       return TokenRefreshResult.failed;
     }
   }
+}
+
+/// Requête en attente pendant le refresh du token
+class _PendingRequest {
+  final DioException err;
+  final ErrorInterceptorHandler handler;
+
+  _PendingRequest(this.err, this.handler);
 }
 
 /// Désenveloppe automatiquement `{ status, message, data }` des réponses API.
@@ -588,5 +637,6 @@ enum ApiErrorType {
   serverError,
   serviceUnavailable,
   cancelled,
+  accountSuspended,
   unknown,
 }

@@ -16,14 +16,13 @@ class RatingRepository {
     String? comment,
   }) async {
     try {
+      // Backend endpoint: POST /api/v1/ratings/missions/{missionId}/rate/
+      // Backend déduit le type (CLIENT_RATES_AGENT ou AGENT_RATES_CLIENT) selon le rôle de l'utilisateur
       final response = await _api.post(
-        '/ratings/',
+        '/ratings/missions/$missionId/rate/',
         data: {
-          'mission_id': missionId,
-          'rated_id': ratedId,
           'score': score,
-          'type': type.toJson(),
-          if (comment != null) 'comment': comment,
+          if (comment != null && comment.isNotEmpty) 'comment': comment,
         },
       );
 

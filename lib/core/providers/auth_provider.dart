@@ -534,7 +534,8 @@ class AuthProvider extends ChangeNotifier {
           return true;
         }
       }
-      _setError(_extractApiErrors(response.extra['api_envelope'] ?? response.data));
+      _setError(
+          _extractApiErrors(response.extra['api_envelope'] ?? response.data));
       return false;
     } on ApiException catch (e) {
       _setError(e.message);
@@ -566,6 +567,13 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
       }
     } on ApiException catch (e) {
+      if (e.type == ApiErrorType.accountSuspended) {
+        _accountSuspended = true;
+        _isAuthenticated = false;
+        _setError(e.message);
+        notifyListeners();
+        return;
+      }
       if (e.type == ApiErrorType.unauthorized) {
         final ok = await refreshToken();
         if (!ok) await handleTokenExpired();
@@ -700,7 +708,8 @@ class AuthProvider extends ChangeNotifier {
     return errors.join('\n');
   }
 
-  String _messageFromDio(DioException e, {String fallback = 'Erreur de connexion'}) {
+  String _messageFromDio(DioException e,
+      {String fallback = 'Erreur de connexion'}) {
     if (e.response?.statusCode == 400) {
       return _extractApiErrors(e.response?.data ?? {});
     }

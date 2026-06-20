@@ -2,52 +2,47 @@
 class Rating {
   final String id;
   final String missionId;
-  final String raterId; // ID de celui qui note
-  final String raterName; // Nom de celui qui note
-  final String? raterAvatar;
-  final String ratedId; // ID de celui noté
-  final String ratedName; // Nom de celui noté
-  final String? ratedAvatar;
+  final String reviewerId; // ID de celui qui note (backend: reviewer)
+  final String reviewerName; // Nom de celui qui note
+  final String? reviewerAvatar;
+  final String revieweeId; // ID de celui noté (backend: reviewee)
+  final String revieweeName; // Nom de celui noté
+  final String? revieweeAvatar;
   final int score; // 1-5 étoiles
   final String? comment; // Commentaire optionnel
-  final RatingType type; // client_to_agent ou agent_to_client
+  final RatingType ratingType; // CLIENT_RATES_AGENT ou AGENT_RATES_CLIENT
   final DateTime createdAt;
-  final DateTime? updatedAt;
 
   Rating({
     required this.id,
     required this.missionId,
-    required this.raterId,
-    required this.raterName,
-    this.raterAvatar,
-    required this.ratedId,
-    required this.ratedName,
-    this.ratedAvatar,
+    required this.reviewerId,
+    required this.reviewerName,
+    this.reviewerAvatar,
+    required this.revieweeId,
+    required this.revieweeName,
+    this.revieweeAvatar,
     required this.score,
     this.comment,
-    required this.type,
+    required this.ratingType,
     required this.createdAt,
-    this.updatedAt,
   });
 
-  /// Crée depuis JSON
+  /// Crée depuis JSON (backend Django format)
   factory Rating.fromJson(Map<String, dynamic> json) {
     return Rating(
       id: json['id'] as String,
-      missionId: json['mission_id'] as String,
-      raterId: json['rater_id'] as String,
-      raterName: json['rater_name'] as String,
-      raterAvatar: json['rater_avatar'] as String?,
-      ratedId: json['rated_id'] as String,
-      ratedName: json['rated_name'] as String,
-      ratedAvatar: json['rated_avatar'] as String?,
+      missionId: json['mission'] as String,
+      reviewerId: json['reviewer'] as String,
+      reviewerName: json['reviewer_name'] ?? 'Utilisateur',
+      reviewerAvatar: json['reviewer_avatar'] as String?,
+      revieweeId: json['reviewee'] as String,
+      revieweeName: json['reviewee_name'] ?? 'Utilisateur',
+      revieweeAvatar: json['reviewee_avatar'] as String?,
       score: json['score'] as int,
       comment: json['comment'] as String?,
-      type: RatingTypeExtension.fromJson(json['type'] as String),
+      ratingType: RatingTypeExtension.fromJson(json['rating_type'] as String),
       createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
-          : null,
     );
   }
 
@@ -55,18 +50,17 @@ class Rating {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'mission_id': missionId,
-      'rater_id': raterId,
-      'rater_name': raterName,
-      'rater_avatar': raterAvatar,
-      'rated_id': ratedId,
-      'rated_name': ratedName,
-      'rated_avatar': ratedAvatar,
+      'mission': missionId,
+      'reviewer': reviewerId,
+      'reviewer_name': reviewerName,
+      'reviewer_avatar': reviewerAvatar,
+      'reviewee': revieweeId,
+      'reviewee_name': revieweeName,
+      'reviewee_avatar': revieweeAvatar,
       'score': score,
       'comment': comment,
-      'type': type.toJson(),
+      'rating_type': ratingType.toJson(),
       'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt?.toIso8601String(),
     };
   }
 
@@ -74,53 +68,58 @@ class Rating {
   Rating copyWith({
     String? id,
     String? missionId,
-    String? raterId,
-    String? raterName,
-    String? raterAvatar,
-    String? ratedId,
-    String? ratedName,
-    String? ratedAvatar,
+    String? reviewerId,
+    String? reviewerName,
+    String? reviewerAvatar,
+    String? revieweeId,
+    String? revieweeName,
+    String? revieweeAvatar,
     int? score,
     String? comment,
-    RatingType? type,
+    RatingType? ratingType,
     DateTime? createdAt,
-    DateTime? updatedAt,
   }) {
     return Rating(
       id: id ?? this.id,
       missionId: missionId ?? this.missionId,
-      raterId: raterId ?? this.raterId,
-      raterName: raterName ?? this.raterName,
-      raterAvatar: raterAvatar ?? this.raterAvatar,
-      ratedId: ratedId ?? this.ratedId,
-      ratedName: ratedName ?? this.ratedName,
-      ratedAvatar: ratedAvatar ?? this.ratedAvatar,
+      reviewerId: reviewerId ?? this.reviewerId,
+      reviewerName: reviewerName ?? this.reviewerName,
+      reviewerAvatar: reviewerAvatar ?? this.reviewerAvatar,
+      revieweeId: revieweeId ?? this.revieweeId,
+      revieweeName: revieweeName ?? this.revieweeName,
+      revieweeAvatar: revieweeAvatar ?? this.revieweeAvatar,
       score: score ?? this.score,
       comment: comment ?? this.comment,
-      type: type ?? this.type,
+      ratingType: ratingType ?? this.ratingType,
       createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }
 
-/// Type de notation
+/// Type de notation (backend Django enum)
 enum RatingType {
-  clientToAgent,
-  agentToClient,
+  clientRatesAgent, // CLIENT_RATES_AGENT
+  agentRatesClient, // AGENT_RATES_CLIENT
 }
 
 extension RatingTypeExtension on RatingType {
-  String toJson() => toString().split('.').last;
+  String toJson() {
+    switch (this) {
+      case RatingType.clientRatesAgent:
+        return 'CLIENT_RATES_AGENT';
+      case RatingType.agentRatesClient:
+        return 'AGENT_RATES_CLIENT';
+    }
+  }
 
   static RatingType fromJson(String value) {
     switch (value) {
-      case 'client_to_agent':
-        return RatingType.clientToAgent;
-      case 'agent_to_client':
-        return RatingType.agentToClient;
+      case 'CLIENT_RATES_AGENT':
+        return RatingType.clientRatesAgent;
+      case 'AGENT_RATES_CLIENT':
+        return RatingType.agentRatesClient;
       default:
-        return RatingType.clientToAgent;
+        return RatingType.clientRatesAgent;
     }
   }
 }

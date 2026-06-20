@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:fonaco/core/models/mission_model.dart';
@@ -22,6 +23,28 @@ import 'package:go_router/go_router.dart';
 /// Constante pour la couleur des liens "Voir tous"
 /// Peut être changée en Colors.grey[700] pour un look plus discret
 final Color _seeAllColor = Colors.grey[700]!;
+
+/// Fonction de parsing JSON dans un isolate pour éviter les blocages UI
+List<MissionModel> _parseMissionsInIsolate(String jsonString) {
+  final decoded = jsonDecode(jsonString);
+  if (decoded is Map && decoded['data'] is List) {
+    return (decoded['data'] as List)
+        .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+  return [];
+}
+
+/// Fonction de parsing agents dans un isolate
+List<Map<String, dynamic>> _parseAgentsInIsolate(String jsonString) {
+  final decoded = jsonDecode(jsonString);
+  if (decoded is Map && decoded['data'] is List) {
+    return (decoded['data'] as List)
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
+  return [];
+}
 
 /// Bloc corps de page d'accueil (carrousel, missions API, suggestions agents).
 class HomeContent extends StatefulWidget {
@@ -93,54 +116,54 @@ class _HomeContentState extends State<HomeContent>
     }
 
     // 1. Charger depuis le cache d'abord (Cache-First)
-    _loadFromCache();
+    await _loadFromCache();
 
     // 2. Charger depuis l'API en arrière-plan
     _loadFromApi();
   }
 
-  void _loadFromCache() {
+  Future<void> _loadFromCache() async {
     try {
       _logger.d('Chargement depuis le cache...');
-      // Charger les missions depuis le cache
+
+      // Charger les missions depuis le cache avec compute pour parsing
       final cachedMissionsJson =
           _cacheService.getCachedJsonResponse('dashboard_missions');
       if (cachedMissionsJson != null &&
-          _cacheService.isJsonCacheValid('dashboard_missions', maxAgeMinutes: 2)) {
-        final cachedData = jsonDecode(cachedMissionsJson);
-        if (cachedData is Map && cachedData['data'] is List) {
-          final missionsList = (cachedData['data'] as List)
-              .map((e) => MissionModel.fromJson(e as Map<String, dynamic>))
-              .toList();
-          if (mounted) {
-            setState(() {
-              _missions = missionsList;
-              // Ne pas mettre _dashLoading à false ici - attendre l'API ou un délai minimum
-            });
-            _logger
-                .d('${missionsList.length} missions chargées depuis le cache');
-          }
+          _cacheService.isJsonCacheValid('dashboard_missions',
+              maxAgeMinutes: 2)) {
+        // Utiliser compute pour parsing dans un isolate si payload > 2000 chars
+        final missionsList = cachedMissionsJson.length > 2000
+            ? await compute(_parseMissionsInIsolate, cachedMissionsJson)
+            : _parseMissionsInIsolate(cachedMissionsJson);
+
+        if (mounted) {
+          setState(() {
+            _missions = missionsList;
+            // Ne pas mettre _dashLoading à false ici - attendre l'API ou un délai minimum
+          });
+          _logger.d('${missionsList.length} missions chargées depuis le cache');
         }
       } else {
         _logger.w('Cache missions vide ou invalide');
       }
 
-      // Charger les agents depuis le cache
+      // Charger les agents depuis le cache avec compute pour parsing
       final cachedAgentsJson =
           _cacheService.getCachedJsonResponse('dashboard_agents');
       if (cachedAgentsJson != null &&
-          _cacheService.isJsonCacheValid('dashboard_agents', maxAgeMinutes: 2)) {
-        final cachedData = jsonDecode(cachedAgentsJson);
-        if (cachedData is Map && cachedData['data'] is List) {
-          final agentsList = (cachedData['data'] as List)
-              .map((e) => Map<String, dynamic>.from(e as Map))
-              .toList();
-          if (mounted) {
-            setState(() {
-              _suggestedAgents = agentsList;
-            });
-            _logger.d('${agentsList.length} agents chargés depuis le cache');
-          }
+          _cacheService.isJsonCacheValid('dashboard_agents',
+              maxAgeMinutes: 2)) {
+        // Utiliser compute pour parsing dans un isolate si payload > 2000 chars
+        final agentsList = cachedAgentsJson.length > 2000
+            ? await compute(_parseAgentsInIsolate, cachedAgentsJson)
+            : _parseAgentsInIsolate(cachedAgentsJson);
+
+        if (mounted) {
+          setState(() {
+            _suggestedAgents = agentsList;
+          });
+          _logger.d('${agentsList.length} agents chargés depuis le cache');
         }
       } else {
         _logger.w('Cache agents vide ou invalide');
@@ -154,31 +177,32 @@ class _HomeContentState extends State<HomeContent>
   Future<void> _loadFromApi() async {
     final startTime = DateTime.now();
     try {
-      final missions = await _missionRepo.fetchMissionsList();
+      // Paralléliser les appels API pour éviter les blocages séquentiels
+      final results = await Future.wait([
+        _missionRepo.fetchMissionsList(),
+        _missionRepo.fetchAgentSuggestions(),
+      ]);
+
+      final missions = results[0] as List<MissionModel>;
+      final agents = results[1] as List<Map<String, dynamic>>;
 
       _logger.d('Missions reçues depuis API: ${missions.length}');
-      for (var m in missions) {
-        _logger.d('  - ${m.title} (status: ${m.status})');
-      }
-
-      // Pour l'instant, nous n'utilisons pas la localisation
-      // TODO: Ajouter la localisation à UserModel et utiliser les coordonnées utilisateur
-      final agents = await _missionRepo.fetchAgentSuggestions();
-
       _logger.d('Agents reçus depuis API: ${agents.length}');
 
-      // Mettre à jour le cache
+      // Mettre à jour le cache en parallèle
       try {
-        await _cacheService.cacheJsonResponse(
-            'dashboard_missions',
-            jsonEncode({
-              'data': missions.map((m) => m.toJson()).toList(),
-            }));
-        await _cacheService.cacheJsonResponse(
-            'dashboard_agents',
-            jsonEncode({
-              'data': agents,
-            }));
+        await Future.wait([
+          _cacheService.cacheJsonResponse(
+              'dashboard_missions',
+              jsonEncode({
+                'data': missions.map((m) => m.toJson()).toList(),
+              })),
+          _cacheService.cacheJsonResponse(
+              'dashboard_agents',
+              jsonEncode({
+                'data': agents,
+              })),
+        ]);
       } catch (e) {
         // Erreur de cache, ignorer
       }
@@ -374,7 +398,10 @@ class WelcomeHeader extends StatelessWidget {
         final hasName = (first != null && first.isNotEmpty) ||
             (last != null && last.isNotEmpty);
         final greet = hasName
-            ? 'Bonjour, ${[first, last].whereType<String>().where((s) => s.isNotEmpty).join(' ')} !'
+            ? 'Bonjour, ${[
+                first,
+                last
+              ].whereType<String>().where((s) => s.isNotEmpty).join(' ')} !'
             : 'Bonjour !';
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -939,8 +966,7 @@ class AvailableMissionsPreview extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () =>
-                  context.push('/missions-available'),
+              onPressed: () => context.push('/missions-available'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFFD400),
                 foregroundColor: Colors.black,
@@ -1491,7 +1517,9 @@ class OngoingMissionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: () {
-        context.push(AppRoutes.missionDetail, extra: {'missionId': missionId},
+        context.push(
+          AppRoutes.missionDetail,
+          extra: {'missionId': missionId},
         );
       },
       borderRadius: BorderRadius.circular(18),
@@ -1599,7 +1627,9 @@ class QuickHistoryEntries extends StatelessWidget {
         for (final m in missions)
           InkWell(
             onTap: () {
-              context.push(AppRoutes.missionDetail, extra: {'missionId': m.id},
+              context.push(
+                AppRoutes.missionDetail,
+                extra: {'missionId': m.id},
               );
             },
             borderRadius: BorderRadius.circular(12),

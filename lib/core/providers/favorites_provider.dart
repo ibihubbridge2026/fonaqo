@@ -43,17 +43,24 @@ class FavoritesProvider extends ChangeNotifier {
   Future<void> addFavorite(String agentId) async {
     if (_favoriteAgentIds.contains(agentId) || _currentUserId == null) return;
 
+    // Optimistic UI update + Hive cache
     _favoriteAgentIds.add(agentId);
+    await _cacheService.saveFavoriteAgents(
+      _favoriteAgentIds.toList(),
+      _currentUserId!,
+    );
     notifyListeners();
 
     try {
+      // Async API call
       await _repository.addFavorite(agentId);
+    } catch (e) {
+      // Revert on error
+      _favoriteAgentIds.remove(agentId);
       await _cacheService.saveFavoriteAgents(
         _favoriteAgentIds.toList(),
         _currentUserId!,
       );
-    } catch (e) {
-      _favoriteAgentIds.remove(agentId);
       notifyListeners();
       debugPrint('Erreur ajout favori: $e');
       rethrow;
@@ -63,17 +70,24 @@ class FavoritesProvider extends ChangeNotifier {
   Future<void> removeFavorite(String agentId) async {
     if (!_favoriteAgentIds.contains(agentId) || _currentUserId == null) return;
 
+    // Optimistic UI update + Hive cache
     _favoriteAgentIds.remove(agentId);
+    await _cacheService.saveFavoriteAgents(
+      _favoriteAgentIds.toList(),
+      _currentUserId!,
+    );
     notifyListeners();
 
     try {
+      // Async API call
       await _repository.removeFavorite(agentId);
+    } catch (e) {
+      // Revert on error
+      _favoriteAgentIds.add(agentId);
       await _cacheService.saveFavoriteAgents(
         _favoriteAgentIds.toList(),
         _currentUserId!,
       );
-    } catch (e) {
-      _favoriteAgentIds.add(agentId);
       notifyListeners();
       debugPrint('Erreur retrait favori: $e');
       rethrow;
@@ -81,10 +95,61 @@ class FavoritesProvider extends ChangeNotifier {
   }
 
   Future<void> toggleFavorite(String agentId) async {
-    if (_favoriteAgentIds.contains(agentId)) {
-      await removeFavorite(agentId);
+    if (_currentUserId == null) return;
+
+    // Optimistic UI update + Hive cache
+    final wasFavorite = _favoriteAgentIds.contains(agentId);
+    if (wasFavorite) {
+      _favoriteAgentIds.remove(agentId);
     } else {
-      await addFavorite(agentId);
+      _favoriteAgentIds.add(agentId);
+    }
+    await _cacheService.saveFavoriteAgents(
+      _favoriteAgentIds.toList(),
+      _currentUserId!,
+    );
+    notifyListeners();
+
+    try {
+      // Async API call using toggle endpoint
+      final isNowFavorite = await _repository.toggleFavorite(agentId);
+
+      // Sync with server response
+      if (isNowFavorite && !wasFavorite) {
+        // Already added, no change needed
+      } else if (!isNowFavorite && wasFavorite) {
+        // Already removed, no change needed
+      } else if (isNowFavorite && wasFavorite) {
+        // Server says added but we removed → add back
+        _favoriteAgentIds.add(agentId);
+        await _cacheService.saveFavoriteAgents(
+          _favoriteAgentIds.toList(),
+          _currentUserId!,
+        );
+        notifyListeners();
+      } else if (!isNowFavorite && !wasFavorite) {
+        // Server says removed but we added → remove
+        _favoriteAgentIds.remove(agentId);
+        await _cacheService.saveFavoriteAgents(
+          _favoriteAgentIds.toList(),
+          _currentUserId!,
+        );
+        notifyListeners();
+      }
+    } catch (e) {
+      // Revert on error
+      if (wasFavorite) {
+        _favoriteAgentIds.add(agentId);
+      } else {
+        _favoriteAgentIds.remove(agentId);
+      }
+      await _cacheService.saveFavoriteAgents(
+        _favoriteAgentIds.toList(),
+        _currentUserId!,
+      );
+      notifyListeners();
+      debugPrint('Erreur toggle favori: $e');
+      rethrow;
     }
   }
 

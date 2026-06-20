@@ -10,7 +10,7 @@ class RatingScreen extends StatefulWidget {
   final String ratedId;
   final String ratedName;
   final String? ratedAvatar;
-  final RatingType type;
+  final RatingType type; // Utilisé pour l'affichage UI uniquement
 
   const RatingScreen({
     super.key,
@@ -87,7 +87,7 @@ class _RatingScreenState extends State<RatingScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(
-          widget.type == RatingType.clientToAgent
+          widget.type == RatingType.clientRatesAgent
               ? 'Noter l\'agent'
               : 'Noter le client',
         ),
@@ -121,7 +121,7 @@ class _RatingScreenState extends State<RatingScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              widget.type == RatingType.clientToAgent
+              widget.type == RatingType.clientRatesAgent
                   ? 'Comment s\'est passé votre mission ?'
                   : 'Comment était le client ?',
               style: TextStyle(

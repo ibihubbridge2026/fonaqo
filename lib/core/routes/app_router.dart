@@ -32,6 +32,7 @@ import 'package:fonaco/features/client/profile/screens/personal_info_screen.dart
 import 'package:fonaco/features/client/profile/screens/security_settings_screen.dart';
 import 'package:fonaco/features/client/screens/client_agent_profile_screen.dart';
 import 'package:fonaco/features/client/screens/favorite_agents_screen.dart';
+import 'package:fonaco/features/client/screens/rewards_screen.dart';
 import 'package:fonaco/features/client/wallet/client_wallet_screen.dart';
 import 'package:fonaco/features/litiges/litige_screen.dart';
 import 'package:fonaco/features/onboarding/onboarding_screen.dart';
@@ -114,6 +115,10 @@ GoRouter createAppRouter({
       GoRoute(
         path: AppRoutes.wallet,
         builder: (_, __) => const ClientWalletScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.rewards,
+        builder: (_, __) => const RewardsScreen(),
       ),
       GoRoute(
         path: AppRoutes.helpCenter,

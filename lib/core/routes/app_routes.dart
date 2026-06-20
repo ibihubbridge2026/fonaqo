@@ -74,6 +74,9 @@ abstract final class AppRoutes {
   /// Portefeuille client
   static const String wallet = '/wallet';
 
+  /// Récompenses et fidélité client
+  static const String rewards = '/rewards';
+
   /// Assistant IA Moki
   static const String aiAssistant = '/ai-assistant';
 

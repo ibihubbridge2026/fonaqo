@@ -59,7 +59,9 @@ class _AuthGuardState extends State<AuthGuard> {
       if (mounted) {
         await SplashConfig.removeSplash();
 
-        if (authProvider.isAuthenticated) {
+        if (authProvider.accountSuspended) {
+          context.replace(AppRoutes.accountSuspended);
+        } else if (authProvider.isAuthenticated) {
           await navigateAfterAuth(context, authProvider);
         } else {
           context.replace(AppRoutes.login);
