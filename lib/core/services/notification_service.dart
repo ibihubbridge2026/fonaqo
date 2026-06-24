@@ -8,6 +8,10 @@ import 'package:logger/logger.dart';
 
 import 'package:fonaco/core/api/base_client.dart';
 import 'package:fonaco/core/services/feedback_service.dart';
+import 'package:fonaco/core/services/mission_state_sync_service.dart';
+import 'package:fonaco/core/providers/mission_provider.dart';
+import 'package:fonaco/features/agent/providers/agent_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:fonaco/core/services/memory_auth_cache.dart';
 
 /// Service de gestion des notifications Firebase
@@ -176,6 +180,8 @@ class NotificationService {
 
     final messageType = message.data['type'];
 
+    await _syncMissionFromPush(Map<String, dynamic>.from(message.data));
+
     // Filtrage spécial pour les nouvelles missions
     if (messageType == 'NEW_MISSION') {
       await _handleNewMissionAlert(message);
@@ -231,6 +237,8 @@ class NotificationService {
 
     final messageType = message.data['type'];
 
+    await _syncMissionFromPush(Map<String, dynamic>.from(message.data));
+
     // Filtrage spécial pour les nouvelles missions
     if (messageType == 'NEW_MISSION') {
       await _handleNewMissionAlert(message);
@@ -240,6 +248,20 @@ class NotificationService {
         body: message.notification?.body ?? 'Vous avez un nouveau message',
         data: message.data,
       );
+    }
+  }
+
+  Future<void> _syncMissionFromPush(Map<String, dynamic> data) async {
+    final ctx = FeedbackService.navigatorKey?.currentContext;
+    if (ctx == null || !ctx.mounted) return;
+    try {
+      await MissionStateSyncService.instance.handleNotificationData(
+        data,
+        missionProvider: Provider.of<MissionProvider>(ctx, listen: false),
+        agentProvider: Provider.of<AgentProvider>(ctx, listen: false),
+      );
+    } catch (e) {
+      _logger.w('Sync mission depuis push ignorée: $e');
     }
   }
 

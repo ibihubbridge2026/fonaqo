@@ -102,13 +102,15 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
       _isPolyvalent = false;
       _selectedSkills
         ..clear()
-        ..addAll(domain.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty));
+        ..addAll(
+            domain.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty));
     }
     final exp = profile['expertises']?.toString().trim() ?? '';
     if (exp.isNotEmpty) {
       _selectedExpertises
         ..clear()
-        ..addAll(exp.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty));
+        ..addAll(
+            exp.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty));
     }
     setState(() {});
   }
@@ -149,13 +151,31 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
       return;
     }
 
+    // Check if trying to change profile picture - allowed only once as first KYC step
+    if (_profileImage != null) {
+      final auth = context.read<AuthProvider>();
+      final kycStatus = auth.currentUser?.kycStatus;
+      final hasExistingPhoto = auth.currentUser?.avatarUrl != null &&
+          auth.currentUser!.avatarUrl!.isNotEmpty;
+
+      // Allow photo upload only if: no existing photo OR KYC is not yet started
+      if (hasExistingPhoto && kycStatus != null && kycStatus != 'NONE') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'La photo de profil ne peut être modifiée qu\'une seule fois. C\'est la première étape du KYC.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() => _isSaving = true);
 
     final serviceDomain = _isPolyvalent
         ? 'Polyvalent'
-        : (_selectedSkills.isEmpty
-            ? 'Polyvalent'
-            : _selectedSkills.join(', '));
+        : (_selectedSkills.isEmpty ? 'Polyvalent' : _selectedSkills.join(', '));
     final expertises = _selectedExpertises.join(', ');
 
     try {
@@ -380,7 +400,8 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
                     const SizedBox(height: 4),
                     Text(
                       'Sélectionnez une ou plusieurs expertises (cumulables avec la polyvalence)',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      style:
+                          TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     ),
                     const SizedBox(height: 12),
                     Wrap(
@@ -391,7 +412,8 @@ class _AgentPersonalInfoScreenState extends State<AgentPersonalInfoScreen> {
                         return FilterChip(
                           label: Text(exp),
                           selected: selected,
-                          selectedColor: const Color(0xFFFFD400).withOpacity(0.4),
+                          selectedColor:
+                              const Color(0xFFFFD400).withOpacity(0.4),
                           onSelected: (sel) {
                             setState(() {
                               if (sel) {

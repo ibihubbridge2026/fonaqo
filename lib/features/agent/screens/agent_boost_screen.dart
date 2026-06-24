@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:fonaco/core/services/feexpay_service.dart';
+import 'package:fonaco/features/agent/data/models/boost_plan_model.dart';
 import 'package:fonaco/features/agent/providers/agent_provider.dart';
 
 /// Écran boost agent — plans API, boost actif, achat wallet/FeexPay.
@@ -30,9 +31,9 @@ class _AgentBoostScreenState extends State<AgentBoostScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _purchase(Map<String, dynamic> plan) async {
-    final name = plan['name']?.toString() ?? '';
-    final price = (plan['price'] as num?)?.toDouble() ?? 0;
+  Future<void> _purchase(BoostPlanModel plan) async {
+    final name = plan.name;
+    final price = plan.price;
 
     final method = await showModalBottomSheet<String>(
       context: context,
@@ -93,8 +94,9 @@ class _AgentBoostScreenState extends State<AgentBoostScreen> {
       }
 
       final ok = await provider.profileRepository.purchaseBoost(
-        name,
+        plan.id,
         price,
+        planName: name,
         paymentMethod: method == 'feexpay' ? 'feexpay' : 'wallet',
         transactionId: transactionId,
       );
@@ -197,10 +199,8 @@ class _AgentBoostScreenState extends State<AgentBoostScreen> {
                     const Text('Aucun plan disponible pour le moment.')
                   else
                     ...List.generate(plans.length, (index) {
-                      final plan = plans[index];
+                      final plan = BoostPlanModel.fromJson(plans[index]);
                       final selected = _selectedIndex == index;
-                      final price = (plan['price'] as num?)?.toDouble() ?? 0;
-                      final hours = plan['duration_hours'] ?? plan['duration'];
                       return GestureDetector(
                         onTap: () => setState(() => _selectedIndex = index),
                         child: Container(
@@ -223,7 +223,7 @@ class _AgentBoostScreenState extends State<AgentBoostScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      plan['name']?.toString() ?? 'Boost',
+                                      plan.name,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w800,
                                         fontSize: 16,
@@ -232,7 +232,7 @@ class _AgentBoostScreenState extends State<AgentBoostScreen> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '${hours ?? '?'} h · x${plan['visibility_multiplier'] ?? '1.5'} visibilité',
+                                      '${plan.durationHours > 0 ? plan.durationHours : '?'} h · x${plan.visibilityMultiplier} visibilité',
                                       style: TextStyle(
                                         color: Colors.grey.shade600,
                                         fontSize: 13,
@@ -242,7 +242,7 @@ class _AgentBoostScreenState extends State<AgentBoostScreen> {
                                 ),
                               ),
                               Text(
-                                '${price.toStringAsFixed(0)} F',
+                                '${plan.price.toStringAsFixed(0)} F',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w900,
                                   fontSize: 17,
@@ -260,7 +260,9 @@ class _AgentBoostScreenState extends State<AgentBoostScreen> {
                     child: ElevatedButton(
                       onPressed: _purchasing || plans.isEmpty
                           ? null
-                          : () => _purchase(plans[_selectedIndex]),
+                          : () => _purchase(
+                                BoostPlanModel.fromJson(plans[_selectedIndex]),
+                              ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFFFD400),
                         foregroundColor: Colors.black,

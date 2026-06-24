@@ -1,6 +1,6 @@
 import 'package:logger/logger.dart';
-import 'package:flutter/material.dart';
 
+import 'package:fonaco/core/models/transaction_display_policy.dart';
 import 'package:fonaco/core/api/base_client.dart';
 import 'package:fonaco/features/agent/domain/repositories/agent_wallet_repository.dart';
 
@@ -76,49 +76,90 @@ class AgentWalletRepositoryImpl implements AgentWalletRepository {
   }
 
   Map<String, dynamic> _mapTransaction(Map<String, dynamic> tx) {
-    final type = (tx['transaction_type'] ?? tx['type'] ?? '').toString();
+    final type = TransactionDisplayPolicy.normalizeType(
+      tx['transaction_type'] ?? tx['type'],
+    );
     final amount = _readAmount(tx['amount']);
-    final isCredit = amount >= 0 ||
-        type == 'DEPOSIT' ||
-        type == 'ESCROW_RELEASE' ||
-        type == 'REFERRAL_BONUS' ||
-        type == 'REFUND';
+    final isInflow = TransactionDisplayPolicy.isInflow(type, amount);
     final absAmount = amount.abs();
-    final sign = isCredit ? '+' : '-';
+    final sign = isInflow ? '+' : '-';
+    final rawDescription = tx['description']?.toString() ?? '';
+    final missionId = _extractMissionId(tx, rawDescription);
+    final missionTitle = _extractMissionTitle(rawDescription);
+    final friendlyTitle = missionTitle.isNotEmpty
+        ? missionTitle
+        : TransactionDisplayPolicy.labelForType(type);
+    final friendlyDate = _formatFullDate(tx['created_at']);
+
     return {
       'id': tx['id']?.toString() ?? '',
-      'title': tx['description']?.toString() ?? _labelForType(type),
+      'title': friendlyTitle,
       'subtitle': _formatDate(tx['created_at']),
       'amount': '$sign${absAmount.toStringAsFixed(0)} FCFA',
       'rawAmount': amount,
       'type': type,
+      'typeLabel': TransactionDisplayPolicy.labelForType(type),
       'status': tx['status']?.toString() ?? '',
+      'statusLabel': _labelForStatus(tx['status']?.toString() ?? ''),
       'reference': tx['reference']?.toString(),
-      'description': tx['description']?.toString() ?? '',
+      'description': rawDescription,
+      'missionId': missionId,
+      'missionIdShort': missionId != null && missionId.length >= 8
+          ? missionId.substring(0, 8)
+          : missionId,
+      'missionTitle': missionTitle,
+      'fullDate': friendlyDate,
       'createdAt': tx['created_at']?.toString(),
-      'icon': isCredit ? Icons.arrow_downward : Icons.arrow_upward,
-      'iconColor': isCredit ? Colors.green : Colors.red,
-      'amountColor': isCredit ? Colors.green.shade700 : Colors.red.shade700,
-      'isIncome': isCredit,
+      'icon': TransactionDisplayPolicy.flowIcon(isInflow),
+      'iconColor': TransactionDisplayPolicy.flowColor(isInflow),
+      'amountColor': isInflow
+          ? TransactionDisplayPolicy.inflowColor
+          : TransactionDisplayPolicy.outflowColor,
+      'isIncome': isInflow,
     };
   }
 
-  String _labelForType(String type) {
-    switch (type) {
-      case 'DEPOSIT':
-        return 'Dépôt';
-      case 'WITHDRAWAL':
-        return 'Retrait';
-      case 'MISSION_PAYMENT':
-        return 'Paiement mission';
-      case 'ESCROW_LOCK':
-        return 'Blocage séquestre';
-      case 'ESCROW_RELEASE':
-        return 'Libération séquestre';
-      case 'BOOST_PAYMENT':
-        return 'Achat boost';
+  String? _extractMissionId(Map<String, dynamic> tx, String description) {
+    final fromField = tx['mission_id']?.toString() ??
+        tx['mission']?.toString();
+    if (fromField != null && fromField.isNotEmpty) return fromField;
+
+    final uuidPattern = RegExp(
+      r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}',
+    );
+    final match = uuidPattern.firstMatch(description);
+    return match?.group(0);
+  }
+
+  String _extractMissionTitle(String description) {
+    if (description.isEmpty) return '';
+    final cleaned = description
+        .replaceAll(
+          RegExp(
+            r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}',
+          ),
+          '',
+        )
+        .replaceAll(RegExp(r'\b(ESCROW_RELEASE|COMPLETED|PENDING)\b'), '')
+        .trim();
+    if (cleaned.isEmpty) return '';
+    final parts = cleaned.split('—');
+    if (parts.length > 1) return parts.last.trim();
+    return cleaned.length > 80 ? '${cleaned.substring(0, 77)}…' : cleaned;
+  }
+
+  String _labelForStatus(String status) {
+    switch (status.toUpperCase()) {
+      case 'COMPLETED':
+        return 'Réussi';
+      case 'PENDING':
+        return 'En attente';
+      case 'FAILED':
+        return 'Échoué';
+      case 'CANCELLED':
+        return 'Annulé';
       default:
-        return 'Transaction';
+        return status.isEmpty ? '—' : status;
     }
   }
 
@@ -127,6 +168,28 @@ class AgentWalletRepositoryImpl implements AgentWalletRepository {
     final dt = DateTime.tryParse(value.toString());
     if (dt == null) return value.toString();
     return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+  }
+
+  String _formatFullDate(dynamic value) {
+    if (value == null) return '';
+    final dt = DateTime.tryParse(value.toString());
+    if (dt == null) return value.toString();
+    const months = [
+      'janvier',
+      'février',
+      'mars',
+      'avril',
+      'mai',
+      'juin',
+      'juillet',
+      'août',
+      'septembre',
+      'octobre',
+      'novembre',
+      'décembre',
+    ];
+    final month = months[dt.month - 1];
+    return '${dt.day} $month ${dt.year} à ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
   String? _extractErrorMessage(dynamic data) {

@@ -166,10 +166,8 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
       (_isUrgent ? PlatformConfigService.instance.feesUrgent : 0) +
       (_isConfidential ? PlatformConfigService.instance.feesConfidential : 0);
 
-  double get _fonnaqoFee => _serviceAmountValue * 0.10;
-
   double get _totalAmount =>
-      _serviceAmountValue + _purchaseAmountValue + _optionsCost + _fonnaqoFee;
+      _serviceAmountValue + _purchaseAmountValue + _optionsCost;
 
   int? get _resolvedCategoryId {
     if (_selectedType == 'queue') return null;
@@ -426,7 +424,7 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
 
     setState(() => _submitting = true);
     try {
-      final serviceFee = _fonnaqoFee + _optionsCost;
+      final serviceFee = _optionsCost;
       final missionLat = _destLat ?? _gpsLat ?? AppConstants.defaultLatitude;
       final missionLng = _destLng ?? _gpsLng ?? AppConstants.defaultLongitude;
 
@@ -800,7 +798,6 @@ class _CreateMissionScreenState extends State<CreateMissionScreen> {
           serviceAmount: _serviceAmountValue,
           purchaseAmount: _purchaseAmountValue,
           optionsCost: _optionsCost,
-          fonnaqoFee: _fonnaqoFee,
           total: _totalAmount,
         ),
       ],
@@ -913,14 +910,12 @@ class _FeeBreakdown extends StatelessWidget {
   final double serviceAmount;
   final double purchaseAmount;
   final double optionsCost;
-  final double fonnaqoFee;
   final double total;
 
   const _FeeBreakdown({
     required this.serviceAmount,
     required this.purchaseAmount,
     required this.optionsCost,
-    required this.fonnaqoFee,
     required this.total,
   });
 
@@ -965,7 +960,6 @@ class _FeeBreakdown extends StatelessWidget {
           row('Prestation', serviceAmount),
           row('Achats', purchaseAmount),
           if (optionsCost > 0) row('Options', optionsCost),
-          row('Frais FONACO (10 %)', fonnaqoFee),
           const Divider(height: 16),
           row('Total', total, bold: true),
         ],

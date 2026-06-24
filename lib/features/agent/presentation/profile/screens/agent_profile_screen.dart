@@ -161,12 +161,6 @@ class _AgentProfileScreenState extends State<AgentProfileScreen> {
                   child: Column(
                     children: [
                       ProfileParamItem(
-                        icon: Icons.badge_outlined,
-                        title: 'Badge professionnel',
-                        subtitle: 'Demander ou télécharger ma carte agent',
-                        onTap: () => context.push(AppRoutes.agentProBadge),
-                      ),
-                      ProfileParamItem(
                         icon: Icons.rocket_launch_outlined,
                         title: 'Booster mon profil',
                         subtitle: 'Priorité missions + visibilité',

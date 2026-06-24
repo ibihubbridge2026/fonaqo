@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:fonaco/core/widgets/section_title_strip.dart';
+import 'package:fonaco/features/agent/presentation/dashboard/widgets/agent_boost_status_banner.dart';
 import 'package:fonaco/features/agent/presentation/dashboard/widgets/agent_dashboard_quick_actions.dart';
 import 'package:fonaco/features/agent/presentation/dashboard/widgets/agent_mission_strip.dart';
 import 'package:fonaco/features/agent/presentation/dashboard/widgets/dashboard_header.dart';
@@ -34,6 +35,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
       agentProvider.fetchAvailableMissions(),
       agentProvider.fetchActiveMissions(),
       agentProvider.fetchStats(),
+      agentProvider.fetchBoostData(),
       agentProvider.syncOnlineStatus(),
     ]);
     if (mounted) setState(() => _isLoading = false);
@@ -61,6 +63,8 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
           const SizedBox(height: 20),
           const AgentDashboardQuickActions(),
           const SizedBox(height: 24),
+          if (!_isLoading && agentProvider.isBoostActive)
+            const AgentBoostStatusBanner(),
           SectionTitleStrip(
             title: 'Missions en cours',
             onSeeAllPressed: _goToMissionsTab,
@@ -79,6 +83,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
             AgentMissionStrip(
               missions: agentProvider.activeMissions,
               showAcceptButton: false,
+              cardHeight: 168,
               emptyMessage:
                   'Aucune mission en cours. Acceptez une mission disponible.',
             ),
@@ -106,6 +111,7 @@ class _AgentDashboardScreenState extends State<AgentDashboardScreen> {
           else
             AgentMissionStrip(
               missions: agentProvider.availableMissions.take(8).toList(),
+              cardHeight: 210,
               onRefreshAfterConflict: _loadDashboard,
               onMissionAccepted: _loadDashboard,
             ),

@@ -24,38 +24,50 @@ class WalletTransactionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final flowColor = iconColor ??
+        (isIncome
+            ? const Color(0xFF2E7D32)
+            : const Color(0xFFC62828));
+
     return ListTile(
       onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       leading: Container(
-        padding: const EdgeInsets.all(10),
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF7CC),
-          borderRadius: BorderRadius.circular(14),
+          color: flowColor.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
           icon,
-          color: iconColor ?? Colors.black,
-          size: 20,
+          color: flowColor,
+          size: 18,
         ),
       ),
       title: Text(
         title,
         style: const TextStyle(
-          fontWeight: FontWeight.w700,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
         ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
         subtitle,
         style: TextStyle(
-          color: Colors.grey.shade600,
-          fontSize: 13,
+          color: Colors.grey[500],
+          fontSize: 10,
         ),
       ),
       trailing: Text(
         amount,
         style: TextStyle(
-          fontWeight: FontWeight.w900,
-          color: amountColor ?? (isIncome ? Colors.green : Colors.red),
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          color: amountColor ?? flowColor,
         ),
       ),
     );

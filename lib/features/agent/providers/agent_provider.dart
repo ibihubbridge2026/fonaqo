@@ -6,6 +6,7 @@ import 'package:fonaco/core/config/app_configuration.dart';
 import 'package:fonaco/core/models/mission_model.dart';
 import 'package:fonaco/core/services/location_service.dart';
 import 'package:fonaco/core/services/cache_service.dart';
+import 'package:fonaco/features/agent/data/models/boost_plan_model.dart';
 import 'package:fonaco/features/agent/data/repositories/agent_mission_repository_impl.dart';
 import 'package:fonaco/features/agent/data/repositories/agent_profile_repository_impl.dart';
 import 'package:fonaco/features/agent/data/repositories/agent_wallet_repository_impl.dart';
@@ -26,8 +27,7 @@ class AgentProvider extends ChangeNotifier {
     AgentWalletRepository? walletRepository,
     AgentProfileRepository? profileRepository,
     CacheService? cacheService,
-  })  : _missionRepository =
-            missionRepository ?? AgentMissionRepositoryImpl(),
+  })  : _missionRepository = missionRepository ?? AgentMissionRepositoryImpl(),
         _walletRepository = walletRepository ?? AgentWalletRepositoryImpl(),
         _profileRepository = profileRepository ?? AgentProfileRepositoryImpl(),
         _cacheService = cacheService ?? CacheService();
@@ -56,6 +56,7 @@ class AgentProvider extends ChangeNotifier {
   Map<String, dynamic> get stats => _stats;
   List<Map<String, dynamic>> get boostPlans => _boostPlans;
   Map<String, dynamic>? get activeBoost => _activeBoost;
+  bool get isBoostActive => _activeBoost != null;
 
   AgentMissionRepository get missionRepository => _missionRepository;
   AgentWalletRepository get walletRepository => _walletRepository;
@@ -202,9 +203,12 @@ class AgentProvider extends ChangeNotifier {
       }
     }
     final list = merged.values.toList();
+    list.removeWhere((m) => !MissionModel.isActiveLifecycle(m.status));
     list.sort((a, b) {
-      final aDate = a.updatedAt ?? a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
-      final bDate = b.updatedAt ?? b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final aDate =
+          a.updatedAt ?? a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate =
+          b.updatedAt ?? b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
       return bDate.compareTo(aDate);
     });
     return list;
@@ -251,16 +255,19 @@ class AgentProvider extends ChangeNotifier {
         _profileRepository.getActiveBoost(),
       ]);
       if (results[0] is List<Map<String, dynamic>>) {
-        final plans = results[0] as List<Map<String, dynamic>>;
-        _boostPlans = plans.isNotEmpty
-            ? plans
+        final rawPlans = results[0] as List<Map<String, dynamic>>;
+        final normalized = rawPlans
+            .map((p) => BoostPlanModel.fromJson(p).toMap())
+            .toList();
+        _boostPlans = normalized.isNotEmpty
+            ? normalized
             : List<Map<String, dynamic>>.from(
                 AppConfiguration.instance.defaultBoostPlans,
-              );
+              ).map((p) => BoostPlanModel.fromJson(p).toMap()).toList();
       } else {
         _boostPlans = List<Map<String, dynamic>>.from(
           AppConfiguration.instance.defaultBoostPlans,
-        );
+        ).map((p) => BoostPlanModel.fromJson(p).toMap()).toList();
       }
       _activeBoost = results[1] as Map<String, dynamic>?;
       notifyListeners();
@@ -268,7 +275,7 @@ class AgentProvider extends ChangeNotifier {
       _logger.e('fetchBoostData', error: e, stackTrace: st);
       _boostPlans = List<Map<String, dynamic>>.from(
         AppConfiguration.instance.defaultBoostPlans,
-      );
+      ).map((p) => BoostPlanModel.fromJson(p).toMap()).toList();
       notifyListeners();
     }
   }
@@ -322,9 +329,16 @@ class AgentProvider extends ChangeNotifier {
   Future<MissionAcceptResult> acceptMissionAndUpdateState(
     String missionId,
   ) async {
+    if (!_isOnline) {
+      return MissionAcceptResult(
+        success: false,
+        message: 'Vous devez être en ligne pour accepter une mission.',
+      );
+    }
+
     try {
       final result = await _missionRepository.accept(missionId);
-      if (result.success) {
+        if (result.success) {
         _clearError();
         final accepted = result.mission ??
             _availableMissions
@@ -339,13 +353,11 @@ class AgentProvider extends ChangeNotifier {
                   ),
                 )
                 .copyWith(status: MissionStatus.ACCEPTED);
+        upsertMission(accepted);
         _availableMissions =
             _availableMissions.where((m) => m.id != missionId).toList();
         _assignedMissions =
             _assignedMissions.where((m) => m.id != missionId).toList();
-        if (!_activeMissions.any((m) => m.id == missionId)) {
-          _activeMissions = [accepted, ..._activeMissions];
-        }
         notifyListeners();
         await Future.wait([
           fetchAvailableMissions(),
@@ -445,6 +457,72 @@ class AgentProvider extends ChangeNotifier {
     } catch (e, st) {
       _logger.e('depositWallet', error: e, stackTrace: st);
       return false;
+    }
+  }
+
+  MissionModel? findMissionById(String missionId) {
+    for (final m in [
+      ..._activeMissions,
+      ..._assignedMissions,
+      ..._availableMissions,
+    ]) {
+      if (m.id == missionId) return m;
+    }
+    return null;
+  }
+
+  List<MissionModel> _replaceInList(
+    List<MissionModel> list,
+    MissionModel mission,
+  ) {
+    final idx = list.indexWhere((m) => m.id == mission.id);
+    if (idx < 0) return list;
+    final copy = List<MissionModel>.from(list);
+    copy[idx] = mission;
+    return copy;
+  }
+
+  /// Source de vérité centralisée — propage le statut à toutes les listes.
+  void upsertMission(MissionModel mission) {
+    _availableMissions = _replaceInList(_availableMissions, mission);
+    _assignedMissions = _replaceInList(_assignedMissions, mission);
+    _activeMissions = _replaceInList(_activeMissions, mission);
+
+    if (MissionModel.isTerminal(mission.status) ||
+        MissionModel.isDisputed(mission.status)) {
+      _activeMissions =
+          _activeMissions.where((m) => m.id != mission.id).toList();
+    } else if (MissionModel.isActiveLifecycle(mission.status) &&
+        !_activeMissions.any((m) => m.id == mission.id)) {
+      _activeMissions = [
+        mission,
+        ..._activeMissions.where((m) => m.id != mission.id),
+      ];
+    }
+
+    final cached = _cacheService.getCachedMissions();
+    if (cached.isNotEmpty) {
+      final updated = cached.map((row) {
+        if (row['id']?.toString() == mission.id) {
+          return mission.toJson();
+        }
+        return row;
+      }).toList();
+      _cacheService.cacheMissions(updated);
+    }
+    notifyListeners();
+  }
+
+  Future<MissionModel?> refreshMissionFromServer(String missionId) async {
+    try {
+      final detail = await _missionRepository.getMissionDetail(missionId);
+      if (detail != null) {
+        upsertMission(detail);
+      }
+      return detail;
+    } catch (e, st) {
+      _logger.e('refreshMissionFromServer', error: e, stackTrace: st);
+      return findMissionById(missionId);
     }
   }
 

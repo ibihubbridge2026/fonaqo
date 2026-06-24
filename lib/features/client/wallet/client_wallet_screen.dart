@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../core/providers/wallet_provider.dart';
+import '../../../core/models/transaction_display_policy.dart';
 import '../../../core/services/feexpay_service.dart';
 import '../../../features/wallet/repositories/wallet_repository.dart';
 import '../../../features/wallet/models/transaction.dart';
@@ -131,7 +132,8 @@ class _ClientWalletScreenState extends State<ClientWalletScreen> {
     if (result == null) return;
 
     try {
-      await context.read<WalletProvider>().fetchBalance();
+      final walletProvider = context.read<WalletProvider>();
+      await walletProvider.fetchBalance();
       await _loadTransactions();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -161,7 +163,8 @@ class _ClientWalletScreenState extends State<ClientWalletScreen> {
         backgroundColor: Colors.white,
         elevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios_new,
+              size: 20, color: Colors.black),
           onPressed: () => Navigator.maybePop(context),
         ),
         title: const Text(
@@ -333,7 +336,8 @@ class _ClientWalletScreenState extends State<ClientWalletScreen> {
           child: Center(
             child: Column(
               children: [
-                Icon(Icons.receipt_long_outlined, size: 56, color: Colors.grey[300]),
+                Icon(Icons.receipt_long_outlined,
+                    size: 56, color: Colors.grey[300]),
                 const SizedBox(height: 12),
                 Text(
                   'Aucune transaction',
@@ -349,9 +353,8 @@ class _ClientWalletScreenState extends State<ClientWalletScreen> {
       delegate: SliverChildBuilderDelegate(
         (context, index) {
           final tx = _transactions[index];
-          final isCredit = tx.type == TransactionType.credit ||
-              tx.type == TransactionType.refund ||
-              tx.type == TransactionType.bonus;
+          final isInflow = tx.isInflow;
+          final flowColor = TransactionDisplayPolicy.flowColor(isInflow);
           return Container(
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             padding: const EdgeInsets.all(14),
@@ -369,19 +372,17 @@ class _ClientWalletScreenState extends State<ClientWalletScreen> {
             child: Row(
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: (isCredit ? Colors.green : Colors.red)
-                        .withValues(alpha: 0.1),
+                    color: flowColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
-                    isCredit
-                        ? Icons.arrow_downward_rounded
-                        : Icons.arrow_upward_rounded,
-                    color: isCredit ? Colors.green[600] : Colors.red[400],
-                    size: 20,
+                    TransactionDisplayPolicy.flowIcon(isInflow),
+                    color: flowColor,
+                    size: 18,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -390,11 +391,9 @@ class _ClientWalletScreenState extends State<ClientWalletScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        tx.description.isNotEmpty
-                            ? tx.description
-                            : tx.type.toJson(),
+                        tx.displayTitle,
                         style: const TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
                         maxLines: 1,
@@ -403,17 +402,17 @@ class _ClientWalletScreenState extends State<ClientWalletScreen> {
                       const SizedBox(height: 2),
                       Text(
                         _formatDate(tx.createdAt),
-                        style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                        style: TextStyle(fontSize: 10, color: Colors.grey[500]),
                       ),
                     ],
                   ),
                 ),
                 Text(
-                  '${isCredit ? '+' : '-'}${tx.amount.toStringAsFixed(0)} FCFA',
+                  '${isInflow ? '+' : '-'}${tx.amount.abs().toStringAsFixed(0)} FCFA',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: isCredit ? Colors.green[600] : Colors.red[400],
+                    color: flowColor,
                   ),
                 ),
               ],

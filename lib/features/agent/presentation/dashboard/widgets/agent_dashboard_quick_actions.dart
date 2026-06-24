@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:open_file/open_file.dart';
 import 'package:provider/provider.dart';
 
+import 'package:fonaco/core/exceptions/monthly_report_exception.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
+import 'package:fonaco/core/utils/pdf_file_opener.dart';
 import 'package:fonaco/features/agent/providers/agent_provider.dart';
 import 'package:fonaco/widgets/main_wrapper.dart';
 import 'package:go_router/go_router.dart';
@@ -30,22 +31,22 @@ class _AgentDashboardQuickActionsState extends State<AgentDashboardQuickActions>
             year: DateTime.now().year,
           );
       if (!mounted) return;
-      if (path != null) {
-        await OpenFile.open(path);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Relevé mensuel téléchargé'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Impossible de télécharger le relevé'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      await openOrSharePdf(path!);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Relevé mensuel téléchargé'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } on MonthlyReportException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) setState(() => _downloadingReport = false);
     }

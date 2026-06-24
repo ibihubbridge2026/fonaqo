@@ -131,9 +131,10 @@ class _AgentNotificationsScreenState extends State<AgentNotificationsScreen> {
                 )
               : RefreshIndicator(
                   onRefresh: _loadNotifications,
-                  child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 12),
                     itemCount: _items.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 16),
                     itemBuilder: (context, index) {
                       final item = _items[index];
                       return _NotificationTile(
@@ -248,12 +249,18 @@ class _NotificationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0.5,
       color: item.isRead ? Colors.white : const Color(0xFFF5FBFA),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
       child: ListTile(
         onTap: onTap,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Container(
           width: 44,
           height: 44,

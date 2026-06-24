@@ -6,7 +6,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:open_file/open_file.dart';
 import 'package:provider/provider.dart';
 
+import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/features/agent/providers/agent_provider.dart';
+import 'package:fonaco/features/agent/widgets/agent_pro_badge_preview_card.dart';
 
 /// Demande et téléchargement du badge professionnel FONACO.
 class AgentProBadgeScreen extends StatefulWidget {
@@ -116,8 +118,46 @@ class _AgentProBadgeScreenState extends State<AgentProBadgeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Builder(
+                    builder: (context) {
+                      final user = context.watch<AuthProvider>().currentUser;
+                      final fullName = [
+                        user?.firstName,
+                        user?.lastName,
+                      ].where((s) => s != null && s.trim().isNotEmpty).join(' ');
+                      return AgentProBadgePreviewCard(
+                        agentName: fullName.isNotEmpty
+                            ? fullName
+                            : (user?.djangoUsername ?? 'Agent'),
+                        specialty: 'Agent terrain',
+                        agentCode: _status['agent_code']?.toString().isNotEmpty ==
+                                true
+                            ? _status['agent_code'].toString()
+                            : 'AGT-XXXX',
+                        phone: user?.phoneNumber,
+                        photoUrl: _photo == null
+                            ? _status['badge_photo_url']?.toString()
+                            : null,
+                        localPhoto: _photo,
+                        isCertified: _status['is_internal'] == true,
+                      );
+                    },
+                  ),
+                  if (_photo != null) ...[
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.file(
+                        _photo!,
+                        height: 120,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
                   Container(
-                    padding: const EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
@@ -125,8 +165,6 @@ class _AgentProBadgeScreenState extends State<AgentProBadgeScreen> {
                     ),
                     child: Column(
                       children: [
-                        const Icon(Icons.badge_outlined, size: 48, color: Colors.black87),
-                        const SizedBox(height: 12),
                         Text(
                           (_status['agent_code']?.toString().isNotEmpty ?? false)
                               ? 'ID ${_status['agent_code']}'

@@ -71,7 +71,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         ),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFFFFD400)))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFFFFD400)))
           : RefreshIndicator(
               color: const Color(0xFFFFD400),
               onRefresh: _load,
@@ -112,21 +113,23 @@ class _FaqTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ExpansionTile(
       tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      collapsedBackgroundColor: const Color(0xFFFFD400),
-      backgroundColor: const Color(0xFFFFD400),
+      collapsedBackgroundColor: Colors.white,
+      backgroundColor: Colors.white,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       collapsedShape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       title: Text(
         question,
-        style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.black),
+        style:
+            const TextStyle(fontWeight: FontWeight.w800, color: Colors.black),
       ),
       children: [
         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          color: const Color(0xFFFFD400),
-          child: Text(answer, style: const TextStyle(height: 1.45)),
+          color: Colors.white,
+          child: Text(answer,
+              style: const TextStyle(height: 1.45, color: Colors.grey)),
         ),
       ],
     );

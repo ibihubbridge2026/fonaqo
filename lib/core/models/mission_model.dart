@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 
+import 'mission_status_policy.dart';
+
 /// Logger dédié au mapping JSON des missions.
 final Logger _missionLogger = Logger();
 
@@ -265,20 +267,24 @@ class MissionModel {
     };
   }
 
-  /// Statuts faisant partie du cycle de vie actif agent.
-  static const Set<MissionStatus> activeLifecycle = {
-    MissionStatus.ACCEPTED,
-    MissionStatus.ON_THE_WAY,
-    MissionStatus.ARRIVED,
-    MissionStatus.IN_PROGRESS,
-    MissionStatus.IN_PROGRESS_REVIEW,
-  };
+  /// Statuts faisant partie du cycle de vie actif agent (voir [MissionStatusPolicy]).
+  static Set<MissionStatus> get activeLifecycle =>
+      MissionStatusPolicy.agentActive;
 
   /// Délai priorité boost avant ouverture au pool général (minutes).
   static const int boostGateMinutes = 10;
 
   static bool isActiveLifecycle(MissionStatus status) =>
-      activeLifecycle.contains(status);
+      MissionStatusPolicy.isAgentActive(status);
+
+  static bool isClientOngoing(MissionStatus status) =>
+      MissionStatusPolicy.isClientOngoing(status);
+
+  static bool isTerminal(MissionStatus status) =>
+      MissionStatusPolicy.isTerminal(status);
+
+  static bool isDisputed(MissionStatus status) =>
+      MissionStatusPolicy.isDisputed(status);
 
   bool get hasAcceptedAgent =>
       agentName != null && agentName!.trim().isNotEmpty;
@@ -344,7 +350,7 @@ class MissionModel {
       case 'disputed':
         return MissionStatus.DISPUTED;
       default:
-        return MissionStatus.PENDING;
+        return MissionStatus.UNKNOWN;
     }
   }
 

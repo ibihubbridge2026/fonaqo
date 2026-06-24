@@ -22,13 +22,15 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
   final ScrollController _scrollController = ScrollController();
   final AiAssistantRepository _repository = AiAssistantRepository();
 
+  static const _welcomeText =
+      'Bonjour, je suis Moki 👋\n'
+      'Je peux vous aider sur les missions, paiements, litiges '
+      'et vous suggérer des agents disponibles près de vous.';
+
   final List<_ChatTurn> _messages = [
     const _ChatTurn(
       isUser: false,
-      text:
-          'Bonjour, je suis Moki 👋\n'
-          'Je peux vous aider sur les missions, paiements, litiges '
-          'et vous suggérer des agents disponibles près de vous.',
+      text: _welcomeText,
     ),
   ];
 
@@ -86,12 +88,31 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
   List<Map<String, String>> _buildHistory() {
     return _messages
+        .skip(1)
         .map((m) => {
               'role': m.isUser ? 'user' : 'assistant',
               'content': m.text,
             })
         .where((m) => m['content']!.isNotEmpty)
         .toList();
+  }
+
+  bool _isDuplicateWelcome(String reply) {
+    final normalized = reply.trim().toLowerCase();
+    if (normalized.isEmpty) return true;
+    return normalized.contains('je suis moki') &&
+        normalized.contains('bonjour');
+  }
+
+  List<_ChatTurn> get _visibleMessages {
+    var welcomeKept = false;
+    return _messages.where((m) {
+      if (!m.isUser && _isDuplicateWelcome(m.text)) {
+        if (welcomeKept) return false;
+        welcomeKept = true;
+      }
+      return true;
+    }).toList();
   }
 
   void _scrollToBottom() {
@@ -139,13 +160,23 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
 
       if (!mounted) return;
       setState(() {
-        _messages.add(
-          _ChatTurn(
-            isUser: false,
-            text: response.reply,
-            agents: agents,
-          ),
-        );
+        if (!_isDuplicateWelcome(response.reply)) {
+          _messages.add(
+            _ChatTurn(
+              isUser: false,
+              text: response.reply,
+              agents: agents,
+            ),
+          );
+        } else if (agents.isNotEmpty) {
+          _messages.add(
+            _ChatTurn(
+              isUser: false,
+              text: 'Voici des agents qui pourraient vous aider :',
+              agents: agents,
+            ),
+          );
+        }
         _thinking = false;
       });
     } catch (e) {
@@ -228,9 +259,9 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              itemCount: _messages.length + (_thinking ? 1 : 0),
+              itemCount: _visibleMessages.length + (_thinking ? 1 : 0),
               itemBuilder: (context, index) {
-                if (_thinking && index == _messages.length) {
+                if (_thinking && index == _visibleMessages.length) {
                   return const Align(
                     alignment: Alignment.centerLeft,
                     child: Padding(
@@ -244,7 +275,7 @@ class _AiAssistantScreenState extends State<AiAssistantScreen> {
                   );
                 }
                 return _Bubble(
-                  turn: _messages[index],
+                  turn: _visibleMessages[index],
                   onAgentTap: _openAgentProfile,
                 );
               },
@@ -325,64 +356,87 @@ class _Bubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: turn.isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.92,
-        ),
-        child: Column(
-          crossAxisAlignment: turn.isUser
-              ? CrossAxisAlignment.end
-              : CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: turn.isUser ? const Color(0xFFD9FDD3) : Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: turn.isUser
-                      ? const Color(0xFFB8E6B0)
-                      : const Color(0xFFE8E8E8),
-                ),
-              ),
-              child: Text(
-                turn.text,
-                style: const TextStyle(
-                  color: Colors.black87,
-                  fontSize: 14,
-                  height: 1.4,
-                ),
-              ),
+    return Padding(
+      padding: EdgeInsets.only(
+        left: turn.isUser ? 40 : 0,
+        right: turn.isUser ? 0 : 40,
+        bottom: 10,
+      ),
+      child: Row(
+        mainAxisAlignment:
+            turn.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!turn.isUser) ...[
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: const Color(0xFFFFD400),
+              child: const Icon(Icons.auto_awesome, size: 14, color: Colors.black),
             ),
-            if (turn.agents.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              const Padding(
-                padding: EdgeInsets.only(left: 4, bottom: 4),
-                child: Text(
-                  'Agents suggérés',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black54,
-                  ),
-                ),
-              ),
-              ...turn.agents.map(
-                (agent) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: InkWell(
-                    onTap: () => onAgentTap(agent),
-                    borderRadius: BorderRadius.circular(20),
-                    child: AiAgentCard(agent: agent),
-                  ),
-                ),
-              ),
-            ],
+            const SizedBox(width: 8),
           ],
-        ),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: turn.isUser
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: turn.isUser
+                        ? const Color(0xFFFFD400)
+                        : Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(16),
+                      topRight: const Radius.circular(16),
+                      bottomLeft: Radius.circular(turn.isUser ? 16 : 4),
+                      bottomRight: Radius.circular(turn.isUser ? 4 : 16),
+                    ),
+                    border: Border.all(
+                      color: turn.isUser
+                          ? const Color(0xFFE0B800)
+                          : const Color(0xFFE8E8E8),
+                    ),
+                  ),
+                  child: Text(
+                    turn.text,
+                    style: const TextStyle(
+                      color: Colors.black87,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+                if (turn.agents.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 4, bottom: 4),
+                    child: Text(
+                      'Agents suggérés',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+                  ...turn.agents.map(
+                    (agent) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: InkWell(
+                        onTap: () => onAgentTap(agent),
+                        borderRadius: BorderRadius.circular(20),
+                        child: AiAgentCard(agent: agent),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

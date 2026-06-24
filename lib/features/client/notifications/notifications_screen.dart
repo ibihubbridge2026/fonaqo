@@ -3,8 +3,11 @@ import 'package:logger/logger.dart';
 import 'package:provider/provider.dart';
 
 import 'package:fonaco/core/api/base_client.dart';
+import 'package:fonaco/core/providers/mission_provider.dart';
 import 'package:fonaco/core/providers/notification_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
+import 'package:fonaco/core/services/mission_state_sync_service.dart';
+import 'package:fonaco/features/agent/providers/agent_provider.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 import 'package:go_router/go_router.dart';
 
@@ -121,8 +124,30 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _navigateFromNotification(Map<String, dynamic> notif) async {
     if (!mounted) return;
 
-    final action = notif['action']?.toString().toLowerCase() ?? '';
-    final targetId = notif['target_id']?.toString() ?? '';
+    final data = notif['data'] is Map
+        ? Map<String, dynamic>.from(notif['data'] as Map)
+        : <String, dynamic>{};
+    final type = data['type']?.toString() ?? notif['type']?.toString() ?? '';
+
+    if (type.contains('DISPUTE') || type.contains('MISSION')) {
+      await MissionStateSyncService.instance.handleNotificationData(
+        {
+          ...data,
+          'type': type,
+          'mission_id': data['mission_id'] ?? data['target_id'],
+        },
+        missionProvider: context.read<MissionProvider>(),
+        agentProvider: context.read<AgentProvider>(),
+      );
+    }
+
+    final action = notif['action']?.toString().toLowerCase() ??
+        data['action']?.toString().toLowerCase() ??
+        '';
+    final targetId = notif['target_id']?.toString() ??
+        data['target_id']?.toString() ??
+        data['mission_id']?.toString() ??
+        '';
     final title = notif['title']?.toString().toLowerCase() ?? '';
     final body = notif['body']?.toString().toLowerCase() ?? '';
 
@@ -241,11 +266,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
     }
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      children: _notifications.asMap().entries.map((entry) {
-        final index = entry.key;
-        final notif = entry.value;
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+      itemCount: _notifications.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 16),
+      itemBuilder: (context, index) {
+        final notif = _notifications[index];
         try {
           final title = notif['title']?.toString() ?? '';
           final body = notif['body']?.toString() ?? '';
@@ -265,7 +291,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               error: e, stackTrace: st);
           return const SizedBox.shrink();
         }
-      }).toList(),
+      },
     );
   }
 }

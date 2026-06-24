@@ -131,8 +131,9 @@ class AgentProfileRepositoryImpl implements AgentProfileRepository {
 
   @override
   Future<bool> purchaseBoost(
-    String boostType,
+    String planId,
     double amount, {
+    String? planName,
     String paymentMethod = 'wallet',
     String? transactionId,
   }) async {
@@ -140,8 +141,8 @@ class AgentProfileRepositoryImpl implements AgentProfileRepository {
       final response = await _baseClient.post(
         'boosts/my-boosts/purchase/',
         data: {
-          'boost_type': boostType,
-          'plan_id': boostType,
+          'plan_id': planId,
+          if (planName != null && planName.isNotEmpty) 'boost_type': planName,
           'amount': amount,
           'payment_method': paymentMethod,
           if (transactionId != null) 'transaction_id': transactionId,
@@ -150,7 +151,7 @@ class AgentProfileRepositoryImpl implements AgentProfileRepository {
       );
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e, st) {
-      _logger.e('purchaseBoost', error: e, stackTrace: st);
+      _logger.e('purchaseBoost planId=$planId', error: e, stackTrace: st);
       return false;
     }
   }

@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 import '../presentation/mission/widgets/mission_step_timeline.dart';
 import '../presentation/mission/widgets/completion_proof_sheet.dart';
 import '../widgets/dispute_bottom_sheet.dart';
@@ -110,13 +111,13 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Bandeau de statut coloré
+            // Bandeau de statut blanc épuré
             Container(
               width: double.infinity,
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-              decoration: BoxDecoration(
-                color: status.badgeBackgroundColor,
-                borderRadius: const BorderRadius.vertical(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(
                   bottom: Radius.circular(20),
                 ),
               ),
@@ -178,6 +179,65 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
                         height: 1.4,
+                      ),
+                    ),
+                  ],
+                  if (_mission.descriptionAudioUrl != null &&
+                      _mission.descriptionAudioUrl!.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Description vocale',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.play_circle_outline,
+                                color: Colors.amber.shade700,
+                                size: 32,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Écouter la consigne',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'Audio disponible',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -276,12 +336,14 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
                         children: [
                           CircleAvatar(
                             radius: 30,
-                            backgroundImage: widget.mission.avatarUrl != null
-                                ? CachedNetworkImageProvider(
-                                    widget.mission.avatarUrl!) as ImageProvider
-                                : null,
+                            backgroundImage:
+                                widget.mission.clientAvatarUrl != null
+                                    ? CachedNetworkImageProvider(
+                                            widget.mission.clientAvatarUrl!)
+                                        as ImageProvider
+                                    : null,
                             backgroundColor: const Color(0xFFFFD54F),
-                            child: widget.mission.avatarUrl == null
+                            child: widget.mission.clientAvatarUrl == null
                                 ? const Icon(
                                     Icons.person,
                                     color: Colors.black,
@@ -311,6 +373,16 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
                                     fontSize: 13,
                                   ),
                                 ),
+                                if (widget.mission.createdAt != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Créée le ${_formatDate(widget.mission.createdAt!)}',
+                                    style: const TextStyle(
+                                      color: Colors.grey,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -568,7 +640,8 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
                 child: const Text(
                   'Mission suspendue (litige ouvert)',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
+                  style:
+                      TextStyle(color: Colors.red, fontWeight: FontWeight.w700),
                 ),
               ),
           ],
@@ -617,14 +690,48 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
   }
 
   Future<void> _handlePrimaryAction() async {
+    final agentProvider = context.read<AgentProvider>();
+    if (!agentProvider.isOnline) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Vous devez être en ligne pour effectuer cette action.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     if (_mission.status == MissionStatus.IN_PROGRESS) {
-      await CompletionProofSheet.show(context, missionId: _missionId);
+      final result =
+          await CompletionProofSheet.show(context, missionId: _missionId);
+      if (result == true) {
+        await _refreshMission();
+      }
       return;
     }
 
     final nextStatus = _nextStatusApi;
     if (nextStatus != null) {
       await _updateMissionStep(nextStatus);
+    }
+  }
+
+  Future<void> _refreshMission() async {
+    try {
+      await context.read<AgentProvider>().fetchActiveMissions();
+      final activeMissions = context.read<AgentProvider>().activeMissions;
+      final updatedMission = activeMissions.firstWhere(
+        (m) => m.id == _missionId,
+        orElse: () => _mission,
+      );
+      if (mounted) {
+        setState(() {
+          _mission = updatedMission;
+        });
+      }
+    } catch (e) {
+      _logger.e('Failed to refresh mission', error: e);
     }
   }
 
@@ -637,15 +744,13 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
       await _locationService.getCurrentLocation();
       final position = _locationService.currentPosition;
 
-      final success = await context
-          .read<AgentProvider>()
-          .missionRepository
-          .updateSteps(
-            _missionId,
-            status,
-            latitude: position?.latitude,
-            longitude: position?.longitude,
-          );
+      final success =
+          await context.read<AgentProvider>().missionRepository.updateSteps(
+                _missionId,
+                status,
+                latitude: position?.latitude,
+                longitude: position?.longitude,
+              );
 
       if (!mounted) return;
 
@@ -928,12 +1033,15 @@ class _AgentActiveMissionScreenState extends State<AgentActiveMissionScreen> {
     );
   }
 
-
   @override
   void dispose() {
     _stopGpsTracking();
     _gpsReconnectTimer?.cancel();
     _gpsHeartbeatTimer?.cancel();
     super.dispose();
+  }
+
+  String _formatDate(DateTime date) {
+    return DateFormat('dd/MM/yyyy à HH:mm').format(date);
   }
 }

@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 class AgentMissionStrip extends StatelessWidget {
   final List<MissionModel> missions;
   final bool showAcceptButton;
+  final double? cardHeight;
   final VoidCallback? onRefreshAfterConflict;
   final VoidCallback? onMissionAccepted;
   final String emptyMessage;
@@ -17,6 +18,7 @@ class AgentMissionStrip extends StatelessWidget {
     super.key,
     required this.missions,
     this.showAcceptButton = true,
+    this.cardHeight,
     this.onRefreshAfterConflict,
     this.onMissionAccepted,
     this.emptyMessage = 'Aucune mission pour le moment.',
@@ -55,28 +57,35 @@ class AgentMissionStrip extends StatelessWidget {
       );
     }
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var i = 0; i < missions.length; i++) ...[
-            if (i > 0) const SizedBox(width: 14),
-            SizedBox(
-              width: 300,
-              child: MissionCard(
-                key: ValueKey('strip-${missions[i].id}'),
-                mission: missions[i],
-                compact: true,
-                showAcceptButton: showAcceptButton,
-                onConflict: onRefreshAfterConflict,
-                onMissionAccepted: onMissionAccepted,
-                onTap: () => _openDetail(context, missions[i]),
+    final stripHeight = cardHeight ?? (showAcceptButton ? 210.0 : 168.0);
+
+    return SizedBox(
+      height: stripHeight,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < missions.length; i++) ...[
+              if (i > 0) const SizedBox(width: 14),
+              SizedBox(
+                width: 300,
+                height: stripHeight,
+                child: MissionCard(
+                  key: ValueKey('strip-${missions[i].id}'),
+                  mission: missions[i],
+                  compact: true,
+                  fixedHeight: true,
+                  showAcceptButton: showAcceptButton,
+                  onConflict: onRefreshAfterConflict,
+                  onMissionAccepted: onMissionAccepted,
+                  onTap: () => _openDetail(context, missions[i]),
+                ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

@@ -1,8 +1,12 @@
+import 'package:fonaco/core/models/transaction_display_policy.dart';
+
 /// Modèle pour les transactions du wallet
 class WalletTransaction {
   final String id;
   final String userId;
   final TransactionType type;
+  /// Type brut renvoyé par l'API Django (`DEPOSIT`, `ESCROW_RELEASE`, …).
+  final String apiTransactionType;
   final double amount;
   final String currency;
   final String description;
@@ -16,6 +20,7 @@ class WalletTransaction {
     required this.id,
     required this.userId,
     required this.type,
+    required this.apiTransactionType,
     required this.amount,
     required this.currency,
     required this.description,
@@ -26,35 +31,63 @@ class WalletTransaction {
     this.processedAt,
   });
 
-  /// Crée depuis JSON
+  bool get isInflow =>
+      TransactionDisplayPolicy.isInflow(apiTransactionType, amount);
+
+  /// Crée depuis JSON (tolérant — aligné sur TransactionSerializer Django).
   factory WalletTransaction.fromJson(Map<String, dynamic> json) {
+    final apiType = TransactionDisplayPolicy.normalizeType(
+      json['transaction_type'] ?? json['type'] ?? 'DEPOSIT',
+    );
+    final amount = _readAmount(json['amount']);
+    final createdRaw = json['created_at']?.toString();
+    final createdAt = createdRaw != null
+        ? (DateTime.tryParse(createdRaw) ?? DateTime.now())
+        : DateTime.now();
+
     return WalletTransaction(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      type: TransactionTypeExtension.fromJson(json['type'] as String),
-      amount: (json['amount'] as num).toDouble(),
-      currency: json['currency'] as String,
-      description: json['description'] as String,
-      status: TransactionStatusExtension.fromJson(json['status'] as String),
-      reference: json['reference'] as String?,
-      missionId: json['mission_id'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      id: json['id']?.toString() ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      apiTransactionType: apiType,
+      type: _mapLegacyType(apiType, amount),
+      amount: amount,
+      currency: json['currency']?.toString() ?? 'FCFA',
+      description: json['description']?.toString() ?? '',
+      status: TransactionStatusExtension.fromApi(json['status']),
+      reference: json['reference']?.toString(),
+      missionId: json['mission_id']?.toString(),
+      createdAt: createdAt,
       processedAt: json['processed_at'] != null
-          ? DateTime.parse(json['processed_at'] as String)
+          ? DateTime.tryParse(json['processed_at'].toString())
           : null,
     );
+  }
+
+  static double _readAmount(dynamic value) {
+    if (value is num) return value.toDouble();
+    return double.tryParse(value?.toString() ?? '0') ?? 0;
+  }
+
+  static TransactionType _mapLegacyType(String apiType, double amount) {
+    if (!TransactionDisplayPolicy.isInflow(apiType, amount)) {
+      return TransactionType.debit;
+    }
+    if (apiType == 'REFUND') return TransactionType.refund;
+    if (apiType == 'REFERRAL_BONUS') return TransactionType.bonus;
+    return TransactionType.credit;
   }
 
   /// Convertit en JSON
   Map<String, dynamic> toJson() {
     return {
       'id': id,
-      'user_id': userId,
+      if (userId.isNotEmpty) 'user_id': userId,
+      'transaction_type': apiTransactionType,
       'type': type.toJson(),
       'amount': amount,
-      'currency': currency,
+      if (currency.isNotEmpty) 'currency': currency,
       'description': description,
-      'status': status.toJson(),
+      'status': status.toApi(),
       'reference': reference,
       'mission_id': missionId,
       'created_at': createdAt.toIso8601String(),
@@ -64,36 +97,26 @@ class WalletTransaction {
 
   /// Montant formaté
   String get formattedAmount {
-    final sign = type == TransactionType.credit ? '+' : '-';
-    return '$sign${amount.toStringAsFixed(2)} $currency';
+    final sign = isInflow ? '+' : '-';
+    final abs = amount.abs().toStringAsFixed(0);
+    return '$sign$abs ${currency.isNotEmpty ? currency : 'FCFA'}';
   }
+
+  String get displayTitle => description.isNotEmpty
+      ? description
+      : TransactionDisplayPolicy.labelForType(apiTransactionType);
 }
 
-/// Type de transaction
+/// Type de transaction (vue simplifiée rétrocompatible).
 enum TransactionType {
-  credit, // Crédit (gain)
-  debit, // Débit (dépense)
-  refund, // Remboursement
-  bonus, // Bonus
+  credit,
+  debit,
+  refund,
+  bonus,
 }
 
 extension TransactionTypeExtension on TransactionType {
   String toJson() => toString().split('.').last;
-
-  static TransactionType fromJson(String value) {
-    switch (value) {
-      case 'credit':
-        return TransactionType.credit;
-      case 'debit':
-        return TransactionType.debit;
-      case 'refund':
-        return TransactionType.refund;
-      case 'bonus':
-        return TransactionType.bonus;
-      default:
-        return TransactionType.credit;
-    }
-  }
 }
 
 /// Statut de transaction
@@ -107,15 +130,18 @@ enum TransactionStatus {
 extension TransactionStatusExtension on TransactionStatus {
   String toJson() => toString().split('.').last;
 
-  static TransactionStatus fromJson(String value) {
-    switch (value) {
-      case 'pending':
+  String toApi() => toJson().toUpperCase();
+
+  static TransactionStatus fromApi(dynamic raw) {
+    final normalized = (raw?.toString() ?? 'PENDING').toUpperCase();
+    switch (normalized) {
+      case 'PENDING':
         return TransactionStatus.pending;
-      case 'completed':
+      case 'COMPLETED':
         return TransactionStatus.completed;
-      case 'failed':
+      case 'FAILED':
         return TransactionStatus.failed;
-      case 'cancelled':
+      case 'CANCELLED':
         return TransactionStatus.cancelled;
       default:
         return TransactionStatus.pending;
@@ -190,7 +216,7 @@ class TransactionFilter {
   Map<String, dynamic> toQueryParameters() {
     final params = <String, dynamic>{};
     if (type != null) params['type'] = type!.toJson();
-    if (status != null) params['status'] = status!.toJson();
+    if (status != null) params['status'] = status!.toApi();
     if (startDate != null) params['start_date'] = startDate!.toIso8601String();
     if (endDate != null) params['end_date'] = endDate!.toIso8601String();
     if (minAmount != null) params['min_amount'] = minAmount;

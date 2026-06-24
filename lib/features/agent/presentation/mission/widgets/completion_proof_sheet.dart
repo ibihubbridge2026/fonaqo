@@ -1,11 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
-import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/services/image_compression_service.dart';
 import 'package:fonaco/core/services/mission_audio_cleanup.dart';
 import 'package:fonaco/features/agent/providers/agent_provider.dart';
@@ -16,13 +14,13 @@ class CompletionProofSheet extends StatefulWidget {
 
   const CompletionProofSheet({super.key, required this.missionId});
 
-  static Future<void> show(BuildContext context, {required String missionId}) {
-    return showModalBottomSheet<void>(
+  static Future<bool> show(BuildContext context, {required String missionId}) {
+    return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => CompletionProofSheet(missionId: missionId),
-    );
+    ).then((value) => value ?? false);
   }
 
   @override
@@ -75,7 +73,7 @@ class _CompletionProofSheetState extends State<CompletionProofSheet> {
       await MissionAudioCleanup.purgeTemporaryRecordings();
       if (!mounted) return;
 
-      Navigator.pop(context);
+      Navigator.pop(context, true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -86,9 +84,6 @@ class _CompletionProofSheetState extends State<CompletionProofSheet> {
       );
 
       await context.read<AgentProvider>().fetchWalletDetails();
-      if (!mounted) return;
-
-      context.go(AppRoutes.agentDashboard);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -156,7 +151,8 @@ class _CompletionProofSheetState extends State<CompletionProofSheet> {
                 border: Border.all(color: Colors.grey.shade300),
               ),
               child: const Center(
-                child: Icon(Icons.camera_alt_outlined, size: 48, color: Colors.grey),
+                child: Icon(Icons.camera_alt_outlined,
+                    size: 48, color: Colors.grey),
               ),
             ),
           const SizedBox(height: 16),

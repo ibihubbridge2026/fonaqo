@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:open_file/open_file.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 
+import 'package:fonaco/core/exceptions/monthly_report_exception.dart';
+import 'package:fonaco/core/utils/pdf_file_opener.dart';
 import '../providers/agent_provider.dart';
 import '../widgets/wallet_transaction_tile.dart';
 import 'package:fonaco/core/services/feexpay_service.dart';
@@ -41,22 +42,22 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
           .missionRepository
           .downloadMonthlyReport();
       if (!mounted) return;
-      if (path != null) {
-        await OpenFile.open(path);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Relevé mensuel téléchargé'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Impossible de télécharger le relevé'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      await openOrSharePdf(path!);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Relevé mensuel téléchargé'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } on MonthlyReportException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
       if (mounted) setState(() => _downloading = false);
     }
@@ -81,6 +82,12 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
   }
 
   void _showTransactionDetail(BuildContext context, Map<String, dynamic> tx) {
+    final title = tx['title']?.toString() ?? 'Transaction';
+    final fullDate = tx['fullDate']?.toString() ?? tx['subtitle']?.toString() ?? '';
+    final typeLabel = tx['typeLabel']?.toString() ?? tx['type']?.toString() ?? '';
+    final statusLabel = tx['statusLabel']?.toString() ?? tx['status']?.toString() ?? '';
+    final missionShort = tx['missionIdShort']?.toString();
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -93,10 +100,17 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              tx['title']?.toString() ?? 'Transaction',
+              title,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
+            if (fullDate.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                fullDate,
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+              ),
+            ],
+            const SizedBox(height: 12),
             Text(
               tx['amount']?.toString() ?? '',
               style: TextStyle(
@@ -106,14 +120,25 @@ class _AgentWalletScreenState extends State<AgentWalletScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            if ((tx['description']?.toString() ?? '').isNotEmpty)
-              Text(tx['description'].toString()),
-            if ((tx['type']?.toString() ?? '').isNotEmpty)
-              Text('Type : ${tx['type']}'),
-            if ((tx['status']?.toString() ?? '').isNotEmpty)
-              Text('Statut : ${tx['status']}'),
-            if ((tx['subtitle']?.toString() ?? '').isNotEmpty)
-              Text('Date : ${tx['subtitle']}'),
+            if (typeLabel.isNotEmpty)
+              Text(
+                'Type : $typeLabel',
+                style: const TextStyle(fontSize: 14),
+              ),
+            if (statusLabel.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Statut : $statusLabel',
+                style: const TextStyle(fontSize: 14),
+              ),
+            ],
+            if (missionShort != null && missionShort.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Mission : $missionShort…',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+              ),
+            ],
           ],
         ),
       ),

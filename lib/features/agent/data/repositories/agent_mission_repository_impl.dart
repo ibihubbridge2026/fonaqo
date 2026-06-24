@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:fonaco/core/exceptions/monthly_report_exception.dart';
 import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -347,6 +349,27 @@ class AgentMissionRepositoryImpl implements AgentMissionRepository {
   }
 
   @override
+  Future<MissionModel?> getMissionDetail(String missionId) async {
+    try {
+      final response = await _baseClient.get('missions/$missionId/');
+      if (response.statusCode == 200) {
+        final raw = response.data;
+        if (raw is Map<String, dynamic>) {
+          final data = raw['data'];
+          if (data is Map<String, dynamic>) {
+            return MissionModel.fromJson(data);
+          }
+          return MissionModel.fromJson(raw);
+        }
+      }
+      return null;
+    } catch (e, st) {
+      _logger.e('getMissionDetail', error: e, stackTrace: st);
+      return null;
+    }
+  }
+
+  @override
   Future<List<MissionModel>> getDisputed({int limit = 50}) async {
     try {
       final response = await _baseClient.get(
@@ -366,12 +389,12 @@ class AgentMissionRepositoryImpl implements AgentMissionRepository {
 
   @override
   Future<String?> downloadMonthlyReport({int? month, int? year}) async {
-    try {
-      final now = DateTime.now();
-      final m = month ?? now.month;
-      final y = year ?? now.year;
-      final monthKey = '$y-${m.toString().padLeft(2, '0')}';
+    final now = DateTime.now();
+    final m = month ?? now.month;
+    final y = year ?? now.year;
+    final monthKey = '$y-${m.toString().padLeft(2, '0')}';
 
+    try {
       final response = await _baseClient.get(
         'missions/statistics/monthly_report/',
         queryParameters: {'month': monthKey},
@@ -381,22 +404,79 @@ class AgentMissionRepositoryImpl implements AgentMissionRepository {
         ),
       );
 
-      if (response.statusCode == 200 && response.data != null) {
-        final raw = response.data;
-        final bytes = raw is Uint8List
-            ? raw
-            : Uint8List.fromList(List<int>.from(raw as List));
-        final dir = await getApplicationDocumentsDirectory();
-        final filePath = '${dir.path}/releve_mensuel.pdf';
-        final file = File(filePath);
-        await file.writeAsBytes(bytes, flush: true);
-        return filePath;
+      final raw = response.data;
+      if (response.statusCode != 200 || raw == null) {
+        final message = _extractServerErrorMessage(raw) ??
+            'Échec HTTP ${response.statusCode} lors du téléchargement du relevé.';
+        throw MonthlyReportException(message);
       }
-      return null;
+
+      final bytes = raw is Uint8List
+          ? raw
+          : Uint8List.fromList(List<int>.from(raw as List));
+
+      if (bytes.length < 4 ||
+          String.fromCharCodes(bytes.sublist(0, 4)) != '%PDF') {
+        final serverMessage = _extractServerErrorMessage(bytes);
+        throw MonthlyReportException(
+          serverMessage ??
+              'Le serveur n\'a pas renvoyé un fichier PDF valide.',
+        );
+      }
+
+      final filePath = await _saveMonthlyReportPdf(bytes, monthKey);
+      return filePath;
+    } on DioException catch (e, st) {
+      _logger.e('downloadMonthlyReport DioException', error: e, stackTrace: st);
+      final message = _extractServerErrorMessage(e.response?.data) ??
+          'Échec HTTP ${e.response?.statusCode ?? 'réseau'} lors du téléchargement du relevé.';
+      throw MonthlyReportException(message);
+    } on MonthlyReportException {
+      rethrow;
     } catch (e, st) {
       _logger.e('downloadMonthlyReport', error: e, stackTrace: st);
-      return null;
+      throw MonthlyReportException(
+        'Impossible de télécharger le relevé : $e',
+      );
     }
+  }
+
+  String? _extractServerErrorMessage(dynamic raw) {
+    try {
+      if (raw is Uint8List || raw is List<int>) {
+        final bytes = raw is Uint8List ? raw : Uint8List.fromList(raw);
+        final text = utf8.decode(bytes);
+        return _parseErrorJson(text);
+      }
+      if (raw is String) return _parseErrorJson(raw);
+      if (raw is Map) {
+        return raw['message']?.toString() ?? raw['error']?.toString();
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  String? _parseErrorJson(String text) {
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is Map) {
+        final message = decoded['message']?.toString();
+        final error = decoded['error']?.toString();
+        if (message != null && message.isNotEmpty) return message;
+        if (error != null && error.isNotEmpty) return error;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<String> _saveMonthlyReportPdf(Uint8List bytes, String monthKey) async {
+    final fileName = 'releve_mensuel_$monthKey.pdf';
+    final downloadsDir = await getDownloadsDirectory();
+    final targetDir = downloadsDir ?? await getApplicationDocumentsDirectory();
+    final filePath = '${targetDir.path}/$fileName';
+    final file = File(filePath);
+    await file.writeAsBytes(bytes, flush: true);
+    return filePath;
   }
 
   @override

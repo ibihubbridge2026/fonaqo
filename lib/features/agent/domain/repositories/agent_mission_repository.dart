@@ -58,6 +58,9 @@ abstract class AgentMissionRepository {
 
   Future<List<MissionModel>> getDisputed({int limit = 50});
 
+  /// Détail mission frais (source de vérité API).
+  Future<MissionModel?> getMissionDetail(String missionId);
+
   /// Complément cycle mission active (hors contrat minimal Sprint 0).
   Future<bool> validateCompletion(String missionId, String qrCodeData);
 

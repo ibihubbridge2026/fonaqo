@@ -6,11 +6,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:logger/logger.dart';
 import 'package:fonaco/core/models/mission_model.dart';
+import 'package:fonaco/core/models/mission_status_policy.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/providers/favorites_provider.dart';
 import 'package:fonaco/core/providers/mission_provider.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/services/cache_service.dart';
+import 'package:fonaco/core/services/dashboard_refresh_service.dart';
 import 'package:fonaco/core/widgets/agent_avatar.dart';
 import 'package:fonaco/core/widgets/skeleton_loading.dart';
 import 'package:fonaco/widgets/main_wrapper.dart';
@@ -78,6 +80,7 @@ class _HomeContentState extends State<HomeContent>
     _heroTimer = Timer.periodic(const Duration(seconds: 4), _onHeroTick);
     // Lazy loading: delay data loading until after first frame
     Future.microtask(() => _loadDashboard());
+    DashboardRefreshService.instance.addListener(_onDashboardRefreshRequested);
     // Initialiser le provider de favoris avec l'userId
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final favoritesProvider =
@@ -242,14 +245,7 @@ class _HomeContentState extends State<HomeContent>
 
   List<MissionModel> _ongoingMissionsFrom(List<MissionModel> source) {
     final ongoing = source
-        .where(
-          (m) =>
-              m.status == MissionStatus.PENDING ||
-              m.status == MissionStatus.ACCEPTED ||
-              m.status == MissionStatus.ON_THE_WAY ||
-              m.status == MissionStatus.ARRIVED ||
-              m.status == MissionStatus.IN_PROGRESS,
-        )
+        .where((m) => MissionStatusPolicy.isClientOngoing(m.status))
         .toList();
     // Sort by createdAt desc (most recent first)
     ongoing.sort((a, b) {
@@ -274,9 +270,16 @@ class _HomeContentState extends State<HomeContent>
 
   @override
   void dispose() {
+    DashboardRefreshService.instance.removeListener(_onDashboardRefreshRequested);
     _heroTimer?.cancel();
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _onDashboardRefreshRequested() {
+    if (!mounted) return;
+    _loadFromApi();
+    context.read<MissionProvider>().refreshMissions();
   }
 
   @override

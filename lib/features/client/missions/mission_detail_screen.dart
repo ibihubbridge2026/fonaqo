@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -6,11 +7,12 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
 import 'package:printing/printing.dart';
-import 'package:pdf/pdf.dart';
 import 'package:provider/provider.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:fonaco/widgets/custom_app_bar.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/models/mission_model.dart';
+import 'package:fonaco/core/models/mission_status_policy.dart';
 import 'package:fonaco/core/utils/marker_icon_cache.dart';
 import 'package:fonaco/core/api/base_client.dart';
 import 'package:fonaco/core/constants/app_constants.dart';
@@ -19,6 +21,7 @@ import 'package:fonaco/core/providers/mission_provider.dart';
 import 'package:fonaco/core/services/mission_audio_cleanup.dart';
 import 'package:fonaco/core/widgets/fon_dialog.dart';
 import 'package:fonaco/features/chat/chat_repository.dart';
+import 'package:fonaco/features/chat/screens/chat_detail_screen.dart';
 import 'mission_repository.dart';
 import 'widgets/mission_invoice_card.dart';
 import 'package:go_router/go_router.dart';
@@ -44,6 +47,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
   bool _isCancelling = false;
   String? _errorMessage;
   String? _resolvedMissionId;
+  Timer? _statusRefreshTimer;
 
   @override
   void initState() {
@@ -57,6 +61,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _statusRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -92,11 +97,42 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
 
     if (_resolvedMissionId != null && _resolvedMissionId!.isNotEmpty) {
       _loadMissionDetails();
+      _startStatusRefresh();
     } else {
       setState(() {
         _isLoading = false;
         _errorMessage = 'ID de mission non fourni';
       });
+    }
+  }
+
+  void _startStatusRefresh() {
+    // Refresh mission status every 10 seconds to catch agent actions
+    _statusRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (_mission != null &&
+          _mission!.status != MissionStatus.COMPLETED &&
+          _mission!.status != MissionStatus.CANCELLED) {
+        _refreshMissionStatus();
+      }
+    });
+  }
+
+  Future<void> _refreshMissionStatus() async {
+    try {
+      final updated =
+          await _missionRepository.fetchMissionDetails(_resolvedMissionId!);
+      if (!mounted) return;
+      final changed = updated.status != _mission!.status ||
+          updated.endPhotoUrl != _mission!.endPhotoUrl;
+      if (changed ||
+          MissionStatusPolicy.isAwaitingClientValidation(updated.status)) {
+        setState(() {
+          _mission = updated;
+        });
+        context.read<MissionProvider>().upsertMission(updated);
+      }
+    } catch (e) {
+      // Silent refresh, don't show errors
     }
   }
 
@@ -133,20 +169,13 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
 
   bool _hasAgentAccepted() {
     if (_mission == null) return false;
-    final acceptedStatuses = [
-      MissionStatus.ACCEPTED,
-      MissionStatus.ON_THE_WAY,
-      MissionStatus.ARRIVED,
-      MissionStatus.IN_PROGRESS,
-      MissionStatus.COMPLETED
-    ];
-    return acceptedStatuses.contains(_mission!.status);
+    return MissionStatusPolicy.isAgentActive(_mission!.status) ||
+        _mission!.status == MissionStatus.COMPLETED;
   }
 
   bool _isMissionFinal() {
     if (_mission == null) return false;
-    return _mission!.status == MissionStatus.COMPLETED ||
-        _mission!.status == MissionStatus.CANCELLED;
+    return MissionStatusPolicy.isTerminal(_mission!.status);
   }
 
   bool get _canCancelMission {
@@ -225,6 +254,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
 
   @override
   Widget build(BuildContext context) {
+    final awaitingReview = _mission?.status == MissionStatus.IN_PROGRESS_REVIEW;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: CustomAppBar.detailStack(
@@ -235,6 +266,59 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
         ),
       ),
       body: _buildBody(),
+      bottomNavigationBar: awaitingReview ? _buildValidationStickyBar() : null,
+    );
+  }
+
+  Widget? _buildValidationStickyBar() {
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 12,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: ElevatedButton(
+            onPressed:
+                _isReleasingFunds ? null : () => _confirmReleaseFunds(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFD400),
+              foregroundColor: const Color(0xFF121212),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 0,
+            ),
+            child: _isReleasingFunds
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color(0xFF121212),
+                      ),
+                    ),
+                  )
+                : const Text(
+                    'Valider la mission et Libérer les fonds',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14,
+                    ),
+                  ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -329,7 +413,9 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
                                   onPressed: _resolvedMissionId == null
                                       ? null
                                       : () {
-                                          context.push(AppRoutes.missionTracking, extra: {
+                                          context.push(
+                                            AppRoutes.missionTracking,
+                                            extra: {
                                               'missionId': _resolvedMissionId,
                                             },
                                           );
@@ -358,72 +444,51 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
                           // Timeline directe
                           _buildTimeline(),
                           const SizedBox(height: 24),
+                          if (_mission!.status ==
+                              MissionStatus.IN_PROGRESS_REVIEW) ...[
+                            _buildMissionProofSection(),
+                            const SizedBox(height: 16),
+                          ],
                           // ExpansionTiles simplifiés
                           _buildExpansionTile(
                             title: 'Informations de la mission',
                             icon: Icons.assignment_outlined,
                             initiallyExpanded: true,
-                            children: [_buildMissionInfo()],
+                            children: [
+                              _buildMissionInfo(),
+                              if (_mission!.descriptionAudioUrl != null &&
+                                  _mission!
+                                      .descriptionAudioUrl!.isNotEmpty) ...[
+                                const SizedBox(height: 16),
+                                _buildVoiceDescriptionCard(),
+                              ],
+                            ],
                           ),
                           const SizedBox(height: 12),
-                          _buildExpansionTile(
-                            title: 'Documents & Preuves',
-                            icon: Icons.folder_open_rounded,
-                            children: [_buildDocumentsSection()],
-                          ),
-                          const SizedBox(height: 12),
+                          if (_mission!.status !=
+                              MissionStatus.IN_PROGRESS_REVIEW)
+                            _buildExpansionTile(
+                              title: 'Documents & Preuves',
+                              icon: Icons.folder_open_rounded,
+                              children: [_buildDocumentsSection()],
+                            ),
+                          if (_mission!.status !=
+                              MissionStatus.IN_PROGRESS_REVIEW)
+                            const SizedBox(height: 12),
                           _buildExpansionTile(
                             title: 'Règles de Sécurité & Recommandations',
                             icon: Icons.shield_outlined,
                             children: [_buildSafetyRules()],
                           ),
                           const SizedBox(height: 24),
-                          // Validation client après preuve agent
-                          if (_mission!.status == MissionStatus.IN_PROGRESS_REVIEW)
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: _isReleasingFunds
-                                    ? null
-                                    : () => _confirmReleaseFunds(context),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFF7C600),
-                                  foregroundColor: const Color(0xFF121212),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                ),
-                                child: _isReleasingFunds
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                            Color(0xFF121212),
-                                          ),
-                                        ),
-                                      )
-                                    : const Text(
-                                        'Finaliser et Valider la mission',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          if (_mission!.status == MissionStatus.IN_PROGRESS_REVIEW)
-                            const SizedBox(height: 16),
                           if (_mission!.status == MissionStatus.COMPLETED)
                             MissionInvoiceCard(
                               mission: _mission!,
                               clientEmail: _mission!.clientEmail ??
-                                  context.read<AuthProvider>().currentUser?.email,
+                                  context
+                                      .read<AuthProvider>()
+                                      .currentUser
+                                      ?.email,
                               agentEmail: _mission!.agentEmail,
                               onDownload: _downloadInvoice,
                             ),
@@ -467,7 +532,12 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
                           if (_mission!.status != MissionStatus.DISPUTED &&
                               _mission!.status != MissionStatus.CANCELLED)
                             _buildLitigeSection(),
-                          const SizedBox(height: 32),
+                          SizedBox(
+                            height: _mission!.status ==
+                                    MissionStatus.IN_PROGRESS_REVIEW
+                                ? 88
+                                : 32,
+                          ),
                         ],
                       ),
                     ),
@@ -619,6 +689,12 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
       iconColor = Colors.orange[700]!;
       iconData = Icons.shield_outlined;
       text = 'Litige En Cours';
+    } else if (status == MissionStatus.IN_PROGRESS_REVIEW) {
+      backgroundColor = const Color(0xFFFFF8E1);
+      borderColor = const Color(0xFFFFD400);
+      iconColor = const Color(0xFFE0B800);
+      iconData = Icons.fact_check_outlined;
+      text = 'En attente de votre validation';
     } else if (status == MissionStatus.COMPLETED) {
       backgroundColor = Colors.green[50]!;
       borderColor = Colors.green[200]!;
@@ -687,8 +763,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
           if (_mission!.agentName != null)
             _buildDetailRow('Agent', _mission!.agentName!),
           if (_mission!.isUrgent) _buildDetailRow('Urgence', 'Oui'),
-          if (_mission!.isConfidential)
-            _buildDetailRow('Agent interne', 'Oui'),
+          if (_mission!.isConfidential) _buildDetailRow('Agent interne', 'Oui'),
         ],
       ),
     );
@@ -722,6 +797,10 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
     );
   }
 
+  Widget _buildVoiceDescriptionCard() {
+    return _VoiceDescriptionCard(audioUrl: _mission!.descriptionAudioUrl!);
+  }
+
   Future<void> _downloadInvoice() async {
     if (_resolvedMissionId == null) return;
 
@@ -734,9 +813,8 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
 
       if (response.statusCode == 200 && response.data != null) {
         final bytes = response.data as List<int>;
-        await Printing.layoutPdf(
-          onLayout: (PdfPageFormat format) async => Uint8List.fromList(bytes),
-          name: 'facture_$_resolvedMissionId',
+        await Printing.sharePdf(
+          bytes: Uint8List.fromList(bytes),
         );
       } else {
         if (mounted) {
@@ -1031,21 +1109,43 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
   }
 
   Widget _buildTimeline() {
+    final status = _mission!.status;
     final steps = [
-      {'title': 'Créée', 'completed': true, 'icon': Icons.check_circle},
+      {
+        'title': 'Créée',
+        'completed': true,
+        'icon': Icons.check_circle,
+      },
       {
         'title': 'Acceptée',
-        'completed': _mission!.status.index >= MissionStatus.ACCEPTED.index,
+        'completed': const {
+          MissionStatus.ACCEPTED,
+          MissionStatus.ON_THE_WAY,
+          MissionStatus.ARRIVED,
+          MissionStatus.IN_PROGRESS,
+          MissionStatus.IN_PROGRESS_REVIEW,
+          MissionStatus.COMPLETED,
+        }.contains(status),
         'icon': Icons.check_circle,
       },
       {
         'title': 'En cours',
-        'completed': _mission!.status.index >= MissionStatus.IN_PROGRESS.index,
+        'completed': const {
+          MissionStatus.IN_PROGRESS,
+          MissionStatus.IN_PROGRESS_REVIEW,
+          MissionStatus.COMPLETED,
+        }.contains(status),
         'icon': Icons.access_time,
       },
       {
+        'title': 'Validation client',
+        'completed': status == MissionStatus.COMPLETED,
+        'active': status == MissionStatus.IN_PROGRESS_REVIEW,
+        'icon': Icons.fact_check_outlined,
+      },
+      {
         'title': 'Terminée',
-        'completed': _mission!.status == MissionStatus.COMPLETED,
+        'completed': status == MissionStatus.COMPLETED,
         'icon': Icons.flag,
       },
     ];
@@ -1057,6 +1157,7 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
           final step = steps[index];
           final isLast = index == steps.length - 1;
           final isCompleted = step['completed'] as bool;
+          final isActive = step['active'] as bool? ?? false;
           final icon = step['icon'] as IconData;
 
           return Row(
@@ -1070,12 +1171,16 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
                     decoration: BoxDecoration(
                       color: isCompleted
                           ? const Color(0xFF22C55E)
-                          : Colors.grey[300],
+                          : isActive
+                              ? const Color(0xFFFFD400)
+                              : Colors.grey[300],
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       isCompleted ? Icons.check : icon,
-                      color: isCompleted ? Colors.white : Colors.grey[600],
+                      color: isCompleted || isActive
+                          ? Colors.white
+                          : Colors.grey[600],
                       size: 14,
                     ),
                   ),
@@ -1099,7 +1204,9 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
                       fontWeight: FontWeight.w600,
                       color: isCompleted
                           ? const Color(0xFF121212)
-                          : Colors.grey[400],
+                          : isActive
+                              ? const Color(0xFFE0B800)
+                              : Colors.grey[400],
                     ),
                   ),
                 ),
@@ -1107,6 +1214,93 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
             ],
           );
         }),
+      ),
+    );
+  }
+
+  Widget _buildMissionProofSection() {
+    final proofUrl = _mission?.endPhotoUrl;
+    final hasProof = proofUrl != null && proofUrl.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFFFD400), width: 2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.verified_outlined, color: Color(0xFFE0B800)),
+                SizedBox(width: 8),
+                Text(
+                  'Preuves de fin de mission',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    color: Color(0xFF121212),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              hasProof
+                  ? 'L\'agent a soumis une preuve. Vérifiez avant de libérer les fonds.'
+                  : 'L\'agent a terminé sa mission. Les preuves seront affichées dès réception.',
+              style: TextStyle(
+                color: Colors.grey.shade700,
+                fontSize: 13,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (hasProof)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: CachedNetworkImage(
+                  imageUrl: proofUrl,
+                  height: 220,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    height: 220,
+                    color: Colors.grey.shade200,
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
+                  errorWidget: (_, __, ___) => const Icon(Icons.broken_image),
+                ),
+              )
+            else
+              Container(
+                height: 120,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.hourglass_top, color: Colors.grey, size: 36),
+                      SizedBox(height: 8),
+                      Text(
+                        'En attente des preuves de l\'agent',
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1284,7 +1478,9 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
           // Bouton rouge
           ElevatedButton(
             onPressed: () {
-              context.push(AppRoutes.litige, extra: {'missionId': _resolvedMissionId},
+              context.push(
+                AppRoutes.litige,
+                extra: {'missionId': _resolvedMissionId},
               );
             },
             style: ElevatedButton.styleFrom(
@@ -1392,14 +1588,26 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
         }
 
         if (conversationId != null) {
-          context.push(
-            AppRoutes.chatDetail,
-            extra: {
-              'conversationId': conversationId,
-              'userName': userName,
-              'missionId': _resolvedMissionId,
-            },
-          );
+          // Navigate to dedicated chat screen
+          if (mounted) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ChatDetailScreen(
+                  chatId: conversationId,
+                  userName: userName,
+                  missionId: _resolvedMissionId!,
+                ),
+              ),
+            ).then((_) {
+              // Force le rafraîchissement immédiat du provider gérant les détails financiers de la mission
+              if (mounted && _resolvedMissionId != null) {
+                context
+                    .read<MissionProvider>()
+                    .refreshMissionById(_resolvedMissionId!);
+              }
+            });
+          }
         } else {
           throw Exception('Conversation ID not found in response');
         }
@@ -1424,5 +1632,85 @@ class _MissionDetailScreenState extends State<MissionDetailScreen>
         setState(() => _isChatLoading = false);
       }
     }
+  }
+}
+
+class _VoiceDescriptionCard extends StatefulWidget {
+  final String audioUrl;
+
+  const _VoiceDescriptionCard({required this.audioUrl});
+
+  @override
+  State<_VoiceDescriptionCard> createState() => _VoiceDescriptionCardState();
+}
+
+class _VoiceDescriptionCardState extends State<_VoiceDescriptionCard> {
+  final AudioPlayer _player = AudioPlayer();
+  bool _playing = false;
+
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    if (_playing) {
+      await _player.pause();
+      setState(() => _playing = false);
+      return;
+    }
+    await _player.play(UrlSource(widget.audioUrl));
+    setState(() => _playing = true);
+    _player.onPlayerComplete.listen((_) {
+      setState(() => _playing = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFD400)),
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: _toggle,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFD400),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _playing ? Icons.pause : Icons.play_arrow,
+                color: Colors.black,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Description vocale',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _playing ? 'En lecture...' : 'Écouter la description',
+                  style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

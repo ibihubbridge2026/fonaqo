@@ -46,8 +46,20 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
   void initState() {
     super.initState();
     _mission = widget.mission;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _resolveMissionFromRoute();
+      final id = _mission?.id;
+      if (id != null) {
+        final provider = context.read<AgentProvider>();
+        final synced = provider.findMissionById(id);
+        if (synced != null && synced.status != _mission?.status) {
+          setState(() => _mission = synced);
+        }
+        final fresh = await provider.refreshMissionFromServer(id);
+        if (fresh != null && mounted) {
+          setState(() => _mission = fresh);
+        }
+      }
       if (_mission != null) _startCountdown();
     });
   }
@@ -117,19 +129,21 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
     }
 
     final boostRemaining = _boostRemaining;
+    final netEarnings = (mission.price * 0.88).round();
+    final showClientIdentity = mission.status != MissionStatus.PENDING;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
+      backgroundColor: const Color(0xFFF3F4F6),
       body: SafeArea(
         child: Column(
           children: [
-            _Header(
+            _PremiumHeader(
               mission: mission,
               onBack: () => Navigator.pop(context),
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -142,62 +156,87 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
                       ),
                     ],
                     const SizedBox(height: 16),
-                    _ClientCard(mission: mission),
+                    _PremiumSectionCard(
+                      icon: Icons.inventory_2_outlined,
+                      title: 'Détails de la commande',
+                      child: Column(
+                        children: [
+                          _InfoTile(
+                            icon: Icons.category_outlined,
+                            label: 'Type',
+                            value: mission.category ?? 'Livraison',
+                          ),
+                          const SizedBox(height: 10),
+                          _InfoTile(
+                            icon: Icons.location_on_outlined,
+                            label: 'Adresse',
+                            value: mission.address ??
+                                mission.pickupAddress ??
+                                'Non spécifiée',
+                          ),
+                          if (mission.destinationAddress != null) ...[
+                            const SizedBox(height: 10),
+                            _InfoTile(
+                              icon: Icons.flag_outlined,
+                              label: 'Destination',
+                              value: mission.destinationAddress!,
+                            ),
+                          ],
+                          const SizedBox(height: 10),
+                          _InfoTile(
+                            icon: Icons.schedule_outlined,
+                            label: 'Créée',
+                            value: mission.createdAt != null
+                                ? '${mission.createdAt!.day}/${mission.createdAt!.month}/${mission.createdAt!.year} • ${mission.timeAgo}'
+                                : 'Non spécifiée',
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _PremiumSectionCard(
+                      icon: Icons.payments_outlined,
+                      title: 'Gain agent net (88 % escrow)',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$netEarnings FCFA',
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: _black,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Montant mission ${mission.price.toStringAsFixed(0)} FCFA — part agent après commission',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _PremiumSectionCard(
+                      icon: Icons.person_outline,
+                      title: 'Infos client',
+                      child: _ClientCard(
+                        mission: mission,
+                        anonymized: !showClientIdentity,
+                      ),
+                    ),
                     if (mission.descriptionAudioUrl != null &&
                         mission.descriptionAudioUrl!.isNotEmpty) ...[
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
                       _VoiceDescriptionCard(audioUrl: mission.descriptionAudioUrl!),
                     ],
-                    const SizedBox(height: 24),
-                    const _SectionTitle('Informations'),
-                    const SizedBox(height: 12),
-                    _InfoTile(
-                      icon: Icons.category_outlined,
-                      label: 'Type',
-                      value: mission.category ?? 'Livraison',
-                    ),
-                    const SizedBox(height: 10),
-                    _InfoTile(
-                      icon: Icons.location_on_outlined,
-                      label: 'Adresse',
-                      value: mission.address ??
-                          mission.pickupAddress ??
-                          'Non spécifiée',
-                    ),
-                    if (mission.destinationAddress != null) ...[
-                      const SizedBox(height: 10),
-                      _InfoTile(
-                        icon: Icons.flag_outlined,
-                        label: 'Destination',
-                        value: mission.destinationAddress!,
-                      ),
-                    ],
-                    const SizedBox(height: 10),
-                    _InfoTile(
-                      icon: Icons.schedule_outlined,
-                      label: 'Créée',
-                      value: mission.createdAt != null
-                          ? '${mission.createdAt!.day}/${mission.createdAt!.month}/${mission.createdAt!.year} • ${mission.timeAgo}'
-                          : 'Non spécifiée',
-                    ),
-                    if (mission.etaMinutes != null && _isActive) ...[
-                      const SizedBox(height: 10),
-                      _InfoTile(
-                        icon: Icons.timer_outlined,
-                        label: 'Temps estimé',
-                        value: '~ ${mission.etaMinutes} min',
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    const _SectionTitle('Description'),
-                    const SizedBox(height: 12),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
+                    const SizedBox(height: 14),
+                    _PremiumSectionCard(
+                      icon: Icons.notes_outlined,
+                      title: 'Description',
                       child: Text(
                         mission.description.isNotEmpty
                             ? mission.description
@@ -209,22 +248,17 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    _PriceCard(price: mission.price),
-                    const SizedBox(height: 28),
-                    _ActionArea(
-                      canAccept: _canAccept,
-                      canDecline: _canDecline,
-                      isActive: _isActive,
-                      isAccepting: _isAccepting,
-                      isDeclining: _isDeclining,
-                      onAccept: _acceptMission,
-                      onDecline: _declineMission,
-                      onContinue: () {},
-                    ),
                   ],
                 ),
               ),
+            ),
+            _PremiumStickyFooter(
+              canAccept: _canAccept,
+              canDecline: _canDecline,
+              isAccepting: _isAccepting,
+              isDeclining: _isDeclining,
+              onAccept: _acceptMission,
+              onDecline: _declineMission,
             ),
           ],
         ),
@@ -252,6 +286,7 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
           ),
         );
         final mission = result.mission ?? _mission!;
+        context.read<AgentProvider>().upsertMission(mission);
         setState(() => _mission = mission);
       } else if (result.conflict) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -308,6 +343,203 @@ class _AgentMissionDetailScreenState extends State<AgentMissionDetailScreen> {
     } finally {
       if (mounted) setState(() => _isDeclining = false);
     }
+  }
+}
+
+class _PremiumHeader extends StatelessWidget {
+  final MissionModel mission;
+  final VoidCallback onBack;
+
+  const _PremiumHeader({required this.mission, required this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 8, 16, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: onBack,
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: _AgentMissionDetailScreenState._black),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  mission.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    color: _AgentMissionDetailScreenState._black,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: mission.status.badgeBackgroundColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    mission.formattedStatus,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: mission.status.badgeColor,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Itinéraire',
+            onPressed: () {},
+            icon: const Icon(Icons.map_outlined, color: _AgentMissionDetailScreenState._black),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumSectionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Widget child;
+
+  const _PremiumSectionCard({
+    required this.icon,
+    required this.title,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: _AgentMissionDetailScreenState._black),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: _AgentMissionDetailScreenState._black,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _PremiumStickyFooter extends StatelessWidget {
+  final bool canAccept;
+  final bool canDecline;
+  final bool isAccepting;
+  final bool isDeclining;
+  final VoidCallback onAccept;
+  final VoidCallback onDecline;
+
+  const _PremiumStickyFooter({
+    required this.canAccept,
+    required this.canDecline,
+    required this.isAccepting,
+    required this.isDeclining,
+    required this.onAccept,
+    required this.onDecline,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          if (canDecline)
+            Expanded(
+              child: OutlinedButton(
+                onPressed: isDeclining ? null : onDecline,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                  side: const BorderSide(color: Color(0xFFE5E7EB)),
+                ),
+                child: isDeclining
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Refuser'),
+              ),
+            ),
+          if (canDecline && canAccept) const SizedBox(width: 12),
+          if (canAccept)
+            Expanded(
+              flex: canDecline ? 2 : 1,
+              child: FilledButton(
+                onPressed: isAccepting ? null : onAccept,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                  backgroundColor: _AgentMissionDetailScreenState._black,
+                ),
+                child: isAccepting
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Démarrer la mission',
+                        style: TextStyle(fontWeight: FontWeight.w800),
+                      ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
 
@@ -456,56 +688,57 @@ class _CountdownBanner extends StatelessWidget {
 
 class _ClientCard extends StatelessWidget {
   final MissionModel mission;
+  final bool anonymized;
 
-  const _ClientCard({required this.mission});
+  const _ClientCard({required this.mission, this.anonymized = false});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 28,
-            backgroundColor: const Color(0xFFFFD400).withValues(alpha: 0.2),
-            backgroundImage: (mission.clientAvatarUrl ?? mission.avatarUrl) != null
-                ? CachedNetworkImageProvider(
-                    mission.clientAvatarUrl ?? mission.avatarUrl!,
-                  )
-                : null,
-            child: (mission.clientAvatarUrl ?? mission.avatarUrl) == null
-                ? const Icon(Icons.person, color: _AgentMissionDetailScreenState._black)
-                : null,
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  mission.clientName ?? 'Client',
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    color: _AgentMissionDetailScreenState._black,
-                  ),
+    final displayName = anonymized
+        ? 'Client FONACO'
+        : (mission.clientName ?? 'Client');
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 28,
+          backgroundColor: const Color(0xFFFFD400).withValues(alpha: 0.2),
+          backgroundImage: !anonymized &&
+                  (mission.clientAvatarUrl ?? mission.avatarUrl) != null
+              ? CachedNetworkImageProvider(
+                  mission.clientAvatarUrl ?? mission.avatarUrl!,
+                )
+              : null,
+          child: anonymized ||
+                  (mission.clientAvatarUrl ?? mission.avatarUrl) == null
+              ? const Icon(Icons.person, color: _AgentMissionDetailScreenState._black)
+              : null,
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                displayName,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  color: _AgentMissionDetailScreenState._black,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  mission.isVerified
-                      ? 'Client vérifié${mission.clientRating != null ? ' • ${mission.clientRating!.toStringAsFixed(1)} ★' : ''}'
-                      : 'Client non vérifié',
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                anonymized
+                    ? 'Identité révélée après acceptation'
+                    : mission.isVerified
+                        ? 'Client vérifié${mission.clientRating != null ? ' • ${mission.clientRating!.toStringAsFixed(1)} ★' : ''}'
+                        : 'Client non vérifié',
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

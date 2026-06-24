@@ -16,6 +16,7 @@ class MissionCard extends StatefulWidget {
   final VoidCallback? onConflict;
   final VoidCallback? onDeclined;
   final bool compact;
+  final bool fixedHeight;
   final bool showAcceptButton;
   final bool showDeclineButton;
   final VoidCallback? onTap;
@@ -27,6 +28,7 @@ class MissionCard extends StatefulWidget {
     this.onConflict,
     this.onDeclined,
     this.compact = false,
+    this.fixedHeight = false,
     this.showAcceptButton = true,
     this.showDeclineButton = false,
     this.onTap,
@@ -184,15 +186,120 @@ class _MissionCardState extends State<MissionCard> {
     final compact = widget.compact;
     const blackTitle = Color(0xFF000000);
     final titleStyle = TextStyle(
-      fontWeight: FontWeight.w900,
+      fontWeight: FontWeight.bold,
       fontSize: compact ? 14 : 16,
       color: blackTitle,
     );
     final boostRemaining = _boostRemaining;
 
+    final mainRow = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CircleAvatar(
+          radius: compact ? 20 : 24,
+          backgroundColor: const Color(0xFFFFD400).withValues(alpha: 0.15),
+          child: Icon(
+            Icons.work_outline,
+            color: blackTitle,
+            size: compact ? 18 : 24,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.mission.title,
+                style: titleStyle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Icon(
+                    Icons.location_on_outlined,
+                    size: compact ? 14 : 16,
+                    color: const Color(0xFF777777),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      _locationLabel,
+                      style: TextStyle(
+                        color: const Color(0xFF777777),
+                        fontSize: compact ? 12 : 13,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              if (widget.mission.clientName != null) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.person_outline,
+                      size: compact ? 14 : 16,
+                      color: const Color(0xFF777777),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        widget.mission.clientName!,
+                        style: TextStyle(
+                          color: Colors.grey.shade700,
+                          fontSize: compact ? 11 : 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${widget.mission.price.toStringAsFixed(0)} F',
+                style: TextStyle(
+                  color: const Color(0xFFE0B800),
+                  fontWeight: FontWeight.w900,
+                  fontSize: compact ? 14 : 16,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (!widget.showAcceptButton) ...[
+                const SizedBox(height: 4),
+                Text(
+                  widget.mission.formattedStatus,
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: widget.mission.status.badgeColor,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+
     final card = Container(
       margin: EdgeInsets.only(bottom: compact ? 0 : 14),
       padding: EdgeInsets.all(compact ? 14 : 18),
+      height: widget.fixedHeight ? double.infinity : null,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(compact ? 18 : 22),
@@ -205,111 +312,10 @@ class _MissionCardState extends State<MissionCard> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize:
+            widget.fixedHeight ? MainAxisSize.max : MainAxisSize.min,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                radius: compact ? 20 : 24,
-                backgroundColor: const Color(0xFFFFD400).withValues(alpha: 0.15),
-                child: Icon(
-                  Icons.work_outline,
-                  color: blackTitle,
-                  size: compact ? 18 : 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.mission.title,
-                      style: titleStyle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.location_on_outlined,
-                          size: compact ? 14 : 16,
-                          color: const Color(0xFF777777),
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            _locationLabel,
-                            style: TextStyle(
-                              color: const Color(0xFF777777),
-                              fontSize: compact ? 12 : 13,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (widget.mission.clientName != null) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.person_outline,
-                            size: compact ? 14 : 16,
-                            color: const Color(0xFF777777),
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              widget.mission.clientName!,
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontSize: compact ? 11 : 12,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '${widget.mission.price.toStringAsFixed(0)} F',
-                      style: TextStyle(
-                        color: const Color(0xFFE0B800),
-                        fontWeight: FontWeight.w900,
-                        fontSize: compact ? 14 : 16,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (!widget.showAcceptButton) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        widget.mission.formattedStatus,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: widget.mission.status.badgeColor,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
+          if (widget.fixedHeight) Expanded(child: mainRow) else mainRow,
           if (boostRemaining != null) ...[
             const SizedBox(height: 10),
             Container(

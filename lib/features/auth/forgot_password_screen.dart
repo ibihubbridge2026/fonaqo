@@ -16,7 +16,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
-  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -24,19 +24,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 
   Future<void> _handleForgotPassword() async {
     final authProvider = context.read<AuthProvider>();
+    final phone = _phoneController.text.trim();
 
-    final email = _emailController.text.trim();
-
-    if (email.isEmpty) {
+    if (phone.isEmpty) {
       FeedbackService.showError(
         context,
-        'Veuillez entrer votre email',
+        'Veuillez entrer votre numéro de téléphone',
       );
       return;
     }
@@ -48,21 +47,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
 
     try {
-      final success = await authProvider.forgotPassword({
-        'email': email,
+      final result = await authProvider.forgotPassword({
+        'phone_number': phone,
       });
 
-      if (success) {
+      if (result.success) {
         setState(() {
-          _successMessage =
-              'Un code de récupération a été envoyé à votre adresse email';
+          _successMessage = result.message ??
+              'Demande enregistrée. Un administrateur vous contactera avec un mot de passe temporaire.';
+        });
+      } else {
+        setState(() {
+          _errorMessage = result.message ??
+              authProvider.formatErrorMessage('Erreur lors de la demande');
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = authProvider.formatErrorMessage(
-          e.toString(),
-        );
+        _errorMessage = authProvider.formatErrorMessage(e.toString());
       });
     } finally {
       if (mounted) {
@@ -75,7 +77,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Set status bar style for better visibility on yellow/white background
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -89,7 +90,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // HEADER STYLE REGISTER
             Container(
               height: 170,
               width: double.infinity,
@@ -116,7 +116,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'FONACO',
+                    'FONAQO',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w900,
@@ -127,7 +127,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ],
               ),
             ),
-
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 24,
@@ -137,7 +136,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    "Mot de passe oublié",
+                    'Mot de passe oublié',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -145,48 +144,38 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       letterSpacing: -0.5,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   Text(
-                    "Entrez votre adresse email pour recevoir un code de récupération.",
+                    'Entrez votre numéro de téléphone enregistré sur Fonaqo.',
                     style: TextStyle(
                       color: Colors.grey[600],
                       fontSize: 14,
                     ),
                   ),
-
-                  const SizedBox(height: 30),
-
-                  // EMAIL FIELD
+                  const SizedBox(height: 24),
                   const Text(
-                    'Adresse Email',
+                    'Numéro de téléphone',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: Colors.black,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
                   InputCard(
                     child: TextField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
                       decoration: const InputDecoration(
-                        hintText: 'nom@exemple.com',
+                        hintText: '+229 XX XX XX XX',
                         border: InputBorder.none,
                         filled: false,
                         fillColor: Colors.transparent,
-                        prefixIcon: Icon(Icons.mail_outline),
+                        prefixIcon: Icon(Icons.phone_outlined),
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
-                  // ERROR MESSAGE
                   if (_errorMessage != null)
                     Container(
                       width: double.infinity,
@@ -194,9 +183,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
                         color: Colors.red.shade50,
-                        border: Border.all(
-                          color: Colors.red.shade200,
-                        ),
+                        border: Border.all(color: Colors.red.shade200),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -208,8 +195,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         textAlign: TextAlign.center,
                       ),
                     ),
-
-                  // SUCCESS MESSAGE
                   if (_successMessage != null)
                     Container(
                       width: double.infinity,
@@ -217,9 +202,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
                         color: Colors.green.shade50,
-                        border: Border.all(
-                          color: Colors.green.shade200,
-                        ),
+                        border: Border.all(color: Colors.green.shade200),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -231,8 +214,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         textAlign: TextAlign.center,
                       ),
                     ),
-
-                  // BUTTON
                   SizedBox(
                     width: double.infinity,
                     height: 56,
@@ -256,7 +237,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               ),
                             )
                           : const Text(
-                              "Envoyer le code",
+                              'Envoyer la demande',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
@@ -264,16 +245,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             ),
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
-                  // BACK TO LOGIN
                   Center(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         const Text(
-                          "Rééssayez  ?",
+                          'Rééssayez  ?',
                           style: TextStyle(
                             fontSize: 14,
                             color: Color(0xFF5E5E5E),
@@ -281,11 +259,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         ),
                         TextButton(
                           onPressed: () {
-                            context.replace(AppRoutes.login,
-                            );
+                            context.replace(AppRoutes.login);
                           },
                           child: const Text(
-                            "Connexion",
+                            'Connexion',
                             style: TextStyle(
                               color: Color(0xFFFFD700),
                               fontWeight: FontWeight.bold,
@@ -295,21 +272,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 30),
-
-                  // FOOTER
-                  // const Center(
-                  //   child: Text(
-                  //     "Propulsé par IBIHUB BRIDGE",
-                  //     style: TextStyle(
-                  //       fontSize: 12,
-                  //       color: Colors.grey,
-                  //     ),
-                  //   ),
-                  // ),
-
-                  // const SizedBox(height: 40),
                 ],
               ),
             ),

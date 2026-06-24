@@ -16,6 +16,13 @@ import '../services/notification_service.dart';
 
 export '../api/base_client.dart' show ApiException, ApiErrorType;
 
+class ForgotPasswordResult {
+  final bool success;
+  final String? message;
+
+  const ForgotPasswordResult({required this.success, this.message});
+}
+
 /// Provider pour gérer l'état d'authentification
 class AuthProvider extends ChangeNotifier {
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
@@ -598,8 +605,8 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// Mot de passe oublié
-  Future<bool> forgotPassword(Map<String, String> data) async {
+  /// Mot de passe oublié (email ou téléphone)
+  Future<ForgotPasswordResult> forgotPassword(Map<String, String> data) async {
     try {
       _setLoading(true);
       _clearError();
@@ -610,17 +617,37 @@ class AuthProvider extends ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        return true;
-      } else {
-        _setError('Erreur lors de l\'envoi de l\'email de réinitialisation');
-        return false;
+        final body = response.data;
+        String? msg;
+        if (body is Map) {
+          msg = body['message']?.toString();
+        }
+        return ForgotPasswordResult(success: true, message: msg);
       }
+      final msg = _extractApiMessage(response.data) ??
+          'Erreur lors de la demande de réinitialisation';
+      _setError(msg);
+      return ForgotPasswordResult(success: false, message: msg);
+    } on ApiException catch (e) {
+      _setError(e.message);
+      return ForgotPasswordResult(success: false, message: e.message);
     } catch (e) {
-      _setError('Erreur: ${e.toString()}');
-      return false;
+      final msg = 'Erreur: ${e.toString()}';
+      _setError(msg);
+      return ForgotPasswordResult(success: false, message: msg);
     } finally {
       _setLoading(false);
     }
+  }
+
+  String? _extractApiMessage(dynamic responseData) {
+    if (responseData is! Map) return null;
+    final map = Map<String, dynamic>.from(responseData);
+    if (map['message'] != null) return map['message'].toString();
+    if (map['data'] is Map && map['data']['message'] != null) {
+      return map['data']['message'].toString();
+    }
+    return null;
   }
 
   /// Changer le mot de passe

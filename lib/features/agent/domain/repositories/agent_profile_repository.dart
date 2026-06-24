@@ -19,8 +19,9 @@ abstract class AgentProfileRepository {
 
   /// Boost visibilité agent.
   Future<bool> purchaseBoost(
-    String boostType,
+    String planId,
     double amount, {
+    String? planName,
     String paymentMethod = 'wallet',
     String? transactionId,
   });

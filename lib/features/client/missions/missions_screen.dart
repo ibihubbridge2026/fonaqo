@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import 'package:fonaco/core/providers/mission_provider.dart';
 import 'package:fonaco/core/models/mission_model.dart';
+import 'package:fonaco/core/models/mission_status_policy.dart';
 import 'package:fonaco/core/routes/app_routes.dart';
 import 'package:fonaco/core/providers/auth_provider.dart';
 import 'package:fonaco/core/services/cache_service.dart';
@@ -331,13 +332,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
     switch (_filter) {
       case 'ongoing':
         return visible
-            .where((m) =>
-                m.status == MissionStatus.PENDING ||
-                m.status == MissionStatus.ACCEPTED ||
-                m.status == MissionStatus.ON_THE_WAY ||
-                m.status == MissionStatus.ARRIVED ||
-                m.status == MissionStatus.IN_PROGRESS ||
-                m.status == MissionStatus.IN_PROGRESS_REVIEW)
+            .where((m) => MissionStatusPolicy.isClientOngoing(m.status))
             .toList();
       case 'completed':
         return visible
