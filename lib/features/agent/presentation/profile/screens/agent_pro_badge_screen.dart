@@ -125,21 +125,24 @@ class _AgentProBadgeScreenState extends State<AgentProBadgeScreen> {
                         user?.firstName,
                         user?.lastName,
                       ].where((s) => s != null && s.trim().isNotEmpty).join(' ');
+                      final joined = user?.createdAt;
+                      final joinedLabel = joined != null
+                          ? '${joined.month.toString().padLeft(2, '0')} / ${joined.year}'
+                          : null;
                       return AgentProBadgePreviewCard(
                         agentName: fullName.isNotEmpty
                             ? fullName
                             : (user?.djangoUsername ?? 'Agent'),
-                        specialty: 'Agent terrain',
                         agentCode: _status['agent_code']?.toString().isNotEmpty ==
                                 true
                             ? _status['agent_code'].toString()
                             : 'AGT-XXXX',
-                        phone: user?.phoneNumber,
+                        joinedDate: joinedLabel,
                         photoUrl: _photo == null
                             ? _status['badge_photo_url']?.toString()
                             : null,
                         localPhoto: _photo,
-                        isCertified: _status['is_internal'] == true,
+                        isInternal: _status['is_internal'] == true,
                       );
                     },
                   ),
